@@ -141,16 +141,16 @@ io = [
 
 class DACThroughGPIO(Module, AutoCSR):
     def __init__(self, pins):
-        self._ss = CSRStorage(1, description="Slave Select (Control)")
-        self._mosi = CSRStorage(1, description="Master Out, Slave In (Control)")
         self._miso = CSRStatus(1, description="Master In, Slave Out (Status)")
-        self._sck = CSRStorage(1, description="Serial Clock (Control)")
+        # Read as [MSB ... LSB]
+        self._ctrl = CSRStorage(3, description="SS, SCK, MOSI (Control)")
         self._pins = pins
 
-        self.comb += self._pins.ss.eq(self._ss.storage)
-        self.comb += self._pins.mosi.eq(self._mosi.storage)
-        self.comb += self._pins.sck.eq(self._sck.storage)
         self.comb += self._miso.status.eq(self._pins.miso)
+
+        self.comb += self._pins.ss.eq(~self._ctrl.storage[2])
+        self.comb += self._pins.mosi.eq(self._ctrl.storage[1])
+        self.comb += self._pins.sck.eq(self._ctrl.storage[0])
 
 class ADCThroughGPIO(Module, AutoCSR):
     def __init__(self, pins):
