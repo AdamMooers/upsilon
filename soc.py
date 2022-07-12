@@ -35,35 +35,134 @@ from migen import *
 import litex_boards.platforms.digilent_arty as board_spec
 from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.integration.builder import Builder
-from litex.build.generic_platform import IOStandard, Pins
+from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.soc.integration.soc_core import SoCCore
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
+from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
 
 from litedram.phy import s7ddrphy
 from litedram.modules import MT41K128M16
 from liteeth.phy.mii import LiteEthPHYMII
 
 # Refer to `A7-constraints.xdc` for pin names.
-# SS MOSI MISO SCK
+# IO with Subsignals make Record types, which have the name of the
+# subsignal as an attribute.
 io = [
-        ("dac0", 0, Pins("G13 B11 A11 D12"), IOStandard("LVCMOS33")),
-        ("dac1", 0, Pins("D13 B18 A18 K16"), IOStandard("LVCMOS33")),
-        ("dac2", 0, Pins("E15 E16 D15 C15"), IOStandard("LVCMOS33")),
-        ("dac3", 0, Pins("J17 J18 K15 J15"), IOStandard("LVCMOS33")),
-        ("dac4", 0, Pins("U12 V12 V10 V11"), IOStandard("LVCMOS33")),
-        ("dac5", 0, Pins("U14 V14 T13 U13"), IOStandard("LVCMOS33")),
-        ("dac6", 0, Pins("D4 D3 F4 F3"), IOStandard("LVCMOS33")),
-        ("dac7", 0, Pins("E2 D2 H2 G2"), IOStandard("LVCMOS33")),
+        ("dac", 0,
+            Subsignal("ss", Pins("G13")),
+            Subsignal("mosi", Pins("B11")),
+            Subsignal("miso", Pins("A11")),
+            Subsignal("sck", Pins("D12")),
+            IOStandard("LVCMOS33")),
+        ("dac", 1,
+            Subsignal("ss", Pins("D13")),
+            Subsignal("mosi", Pins("B18")),
+            Subsignal("miso", Pins("A18")),
+            Subsignal("sck", Pins("K16")),
+            IOStandard("LVCMOS33")),
+        ("dac", 2,
+            Subsignal("ss", Pins("E15")),
+            Subsignal("mosi", Pins("E16")),
+            Subsignal("miso", Pins("D15")),
+            Subsignal("sck", Pins("C15")),
+            IOStandard("LVCMOS33")),
+        ("dac", 3,
+            Subsignal("ss", Pins("J17")),
+            Subsignal("mosi", Pins("J18")),
+            Subsignal("miso", Pins("K15")),
+            Subsignal("sck", Pins("J15")),
+            IOStandard("LVCMOS33")),
+        ("dac", 4,
+            Subsignal("ss", Pins("U12")),
+            Subsignal("mosi", Pins("V12")),
+            Subsignal("miso", Pins("V10")),
+            Subsignal("sck", Pins("V11")),
+            IOStandard("LVCMOS33")),
+        ("dac", 5,
+            Subsignal("ss", Pins("U14")),
+            Subsignal("mosi", Pins("V14")),
+            Subsignal("miso", Pins("T13")),
+            Subsignal("sck", Pins("U13")),
+            IOStandard("LVCMOS33")),
+        ("dac", 6,
+            Subsignal("ss", Pins("D4")),
+            Subsignal("mosi", Pins("D3")),
+            Subsignal("miso", Pins("F4")),
+            Subsignal("sck", Pins("F3")),
+            IOStandard("LVCMOS33")),
+        ("dac", 7,
+            Subsignal("ss", Pins("E2")),
+            Subsignal("mosi", Pins("D2")),
+            Subsignal("miso", Pins("H2")),
+            Subsignal("sck", Pins("G2")),
+            IOStandard("LVCMOS33")),
 
-        ("adc0", 0, Pins("V15 U16 P14"), IOStandard("LVCMOS33")),
-        ("adc1", 0, Pins("T11 R12 T14"), IOStandard("LVCMOS33")),
-        ("adc2", 0, Pins("T15 T16 N15"), IOStandard("LVCMOS33")),
-        ("adc3", 0, Pins("M16 V17 U18"), IOStandard("LVCMOS33")),
-        ("adc4", 0, Pins("U11 V16 M13"), IOStandard("LVCMOS33")),
-        ("adc5", 0, Pins("R10 R11 R13"), IOStandard("LVCMOS33")),
-        ("adc6", 0, Pins("R15 P15 R16"), IOStandard("LVCMOS33")),
-        ("adc7", 0, Pins("N16 N14 U17"), IOStandard("LVCMOS33"))
+        ("adc", 0,
+                Subsignal("conv", Pins("V15")),
+                Subsignal("sck", Pins("U16")),
+                Subsignal("sdo", Pins("P14")),
+                IOStandard("LVCMOS33")),
+        ("adc", 1,
+                Subsignal("conv", Pins("T11")),
+                Subsignal("sck", Pins("R12")),
+                Subsignal("sdo", Pins("T14")),
+                IOStandard("LVCMOS33")),
+        ("adc", 2,
+                Subsignal("conv", Pins("T15")),
+                Subsignal("sck", Pins("T16")),
+                Subsignal("sdo", Pins("N15")),
+                IOStandard("LVCMOS33")),
+        ("adc", 3,
+                Subsignal("conv", Pins("M16")),
+                Subsignal("sck", Pins("V17")),
+                Subsignal("sdo", Pins("U18")),
+                IOStandard("LVCMOS33")),
+        ("adc", 4,
+                Subsignal("conv", Pins("U11")),
+                Subsignal("sck", Pins("V16")),
+                Subsignal("sdo", Pins("M13")),
+                IOStandard("LVCMOS33")),
+        ("adc", 5,
+                Subsignal("conv", Pins("R10")),
+                Subsignal("sck", Pins("R11")),
+                Subsignal("sdo", Pins("R13")),
+                IOStandard("LVCMOS33")),
+        ("adc", 6,
+                Subsignal("conv", Pins("R15")),
+                Subsignal("sck", Pins("P15")),
+                Subsignal("sdo", Pins("R16")),
+                IOStandard("LVCMOS33")),
+        ("adc", 7,
+                Subsignal("conv", Pins("N16")),
+                Subsignal("sck", Pins("N14")),
+                Subsignal("sdo", Pins("U17")),
+                IOStandard("LVCMOS33"))
 ]
+
+class DACThroughGPIO(Module, AutoCSR):
+    def __init__(self, pins):
+        self._ss = CSRStorage(1, description="Slave Select (Control)")
+        self._mosi = CSRStorage(1, description="Master Out, Slave In (Control)")
+        self._miso = CSRStatus(1, description="Master In, Slave Out (Status)")
+        self._sck = CSRStorage(1, description="Serial Clock (Control)")
+        self._pins = pins
+
+        self.comb += self._pins.ss.eq(self._ss.storage)
+        self.comb += self._pins.mosi.eq(self._mosi.storage)
+        self.comb += self._pins.sck.eq(self._sck.storage)
+        self.comb += self._miso.status.eq(self._pins.miso)
+
+class ADCThroughGPIO(Module, AutoCSR):
+    def __init__(self, pins):
+        self._pins = pins
+        self._conv = CSRStorage(1, description="Conversion Signal (Control)")
+        self._sck = CSRStorage(1, description="Serial Clock (Control)")
+        self._sdo = CSRStatus(1, description="Serial Data Output (Status)")
+
+        self.comb += self._pins.conv.eq(self._conv.storage)
+        self.comb += self._pins.sck.eq(self._sck.storage)
+
+        self.comb += self._sdo.status.eq(self._pins.sdo)
 
 class _CRG(Module):
     def __init__(self, platform, sys_clk_freq, with_dram=True, with_rst=True):
@@ -74,9 +173,6 @@ class _CRG(Module):
             self.clock_domains.cd_sys4x     = ClockDomain()
             self.clock_domains.cd_sys4x_dqs = ClockDomain()
             self.clock_domains.cd_idelay    = ClockDomain()
-
-
-        # # #
 
         # Clk/Rst.
         clk100 = platform.request("clk100")
@@ -141,10 +237,9 @@ class CryoSNOM1SoC(SoCCore):
         # Add the DAC and ADC pins as GPIO. They will be used directly
         # by Zephyr.
         platform.add_extension(io)
-        for name in [f"dac{n}" for n in range(0,8)]:
-            setattr(self.submodules, name, GPIOTristate(platform.request(name)))
-        for name in [f"adc{n}" for n in range(0,8)]:
-            setattr(self.submodules, name, GPIOTristate(platform.request(name)))
+        for i in range(0,8):
+            setattr(self.submodules, f"dac{i}", DACThroughGPIO(platform.request("dac", i)))
+            setattr(self.submodules, f"adc{i}", ADCThroughGPIO(platform.request("adc", i)))
 
 def main():
     soc = CryoSNOM1SoC("a7-35")
