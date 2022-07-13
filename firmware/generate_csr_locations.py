@@ -12,9 +12,12 @@ def get_reg(j, name, num, pos):
 
 j = json.load(open("csr.json"))
 
-print('''#pragma once
-         typedef volatile uint32_t *csr_t;
-      ''')
+print('''
+#pragma once
+typedef volatile uint32_t *csr_t;
+#define ADC_MAX 8
+#define DAC_MAX 8
+''')
 
 for conv in iter(reg_names):
     for reg in reg_names[conv]:
