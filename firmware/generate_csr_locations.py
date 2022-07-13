@@ -20,7 +20,7 @@ for conv in iter(reg_names):
     for reg in reg_names[conv]:
         print(f"const csr_t {conv}_{reg}[{max_num}] =", "{")
         for i in range(0,max_num):
-            print("\t", get_reg(j, conv, i, reg), end='')
+            print("\t (csr_t)", get_reg(j, conv, i, reg), end='')
             if i != max_num - 1:
                 print(",")
         print("\n};")
