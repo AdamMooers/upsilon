@@ -6,18 +6,15 @@
 void
 main(void)
 {
-	uint32_t out_pins = 0;
-	uint32_t in_pin;
-
+	uint32_t v = 0;
+	uint32_t r = 0;
 	LOG_PRINTK("hello, world\n");
 	for (;;) {
 		k_sleep(K_MSEC(1000));
-		*dac_ctrl[0] = out_pins;
-		out_pins++;
-		if (out_pins == 7)
-			out_pins = 0;
-		in_pin = *dac_miso[0];
+		*adc_conv[0] = v;
+		v = !v;
+		r = *adc_sdo[0];
 
-		LOG_PRINTK("out: %d; in: %d\n", out_pins, in_pin);
+		LOG_PRINTK("out: %d; in: %d\n", v, r);
 	}
 }
