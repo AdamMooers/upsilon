@@ -1,7 +1,9 @@
 .PHONY: cpu clean
 
 DEVICETREE_GEN_DIR=.
-cpu: soc.py
+
+all: build/digilent_arty/digilent_arty.bit overlay.dts overlay.config pin_io.h
+build/digilent_arty/digilent_arty.bit: soc.py
 	python3 soc.py
 clean:
 	rm -rf build csr.json overlay.config overlay.dts pin_io.h
