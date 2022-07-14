@@ -23,7 +23,7 @@ enum adc_types {
 };
 
 uint32_t
-adc_read(int num, enum adc_types ty)
+adc_read(size_t num, enum adc_types ty)
 {
 	uint32_t r = 0;
 	// TODO
@@ -37,7 +37,7 @@ adc_read(int num, enum adc_types ty)
 		LOG_ERROR("adc_read got unknown ADC type\n");
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
-	if (num < 0 || num >= ADC_MAX) {
+	if (num >= ADC_MAX) {
 		LOG_ERROR("Bad ADC %d\n", num);
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
@@ -45,7 +45,7 @@ adc_read(int num, enum adc_types ty)
 	*adc_sck[num] = 0;
 	*adc_conv[num] = 1;
 
-	k_sleep(K_NSEC(T_CONV + T_DSOBUSYL));
+	k_sleep(K_NSEC(time[ty].conv_time));
 	*adc_conv[num] = 0;
 
 	for (int i = 0; i < time[ty].wid; i++) {
@@ -56,6 +56,7 @@ adc_read(int num, enum adc_types ty)
 		/* 1 millisecond -> 1 MHz */
 		k_sleep(K_NSEC(500));
 		*adc_sck[num] = 0;
+		k_sleep(K_NSEC(500));
 	}
 
 	return r;
@@ -75,12 +76,17 @@ adc_read(int num, enum adc_types ty)
  * 5) Set SCK high, wait setup time.
 */
 uint32_t
-dac_write_raw(int n, uint32_t data)
+dac_write_raw(size_t n, uint32_t data)
 {
 	uint32_t r = 0;
 	DAC_SCK(n, 1);
 	DAC_SS(n, 1);
 	k_sleep(K_NSEC(10));
+
+	if (n >= DAC_MAX) {
+		LOG_ERROR("dac_write_raw got bad ADC %d\n", n);
+		k_fatal_halt(K_ERR_KERNEL_OOPS);
+	}
 
 	for (int i = 0; i < 20; i++) {
 		DAC_SCK(n, 0);
@@ -98,13 +104,13 @@ dac_write_raw(int n, uint32_t data)
 }
 
 void
-dac_write_v(int n, uint32_t v)
+dac_write_v(size_t n, uint32_t v)
 {
 	dac_write_raw(n, (1 << 20) | (v & 0xFFFFF));
 }
 
 int
-dac_init(int n)
+dac_init(size_t n)
 {
 	/* Write to control register. */
 	const uint32_t msg =
