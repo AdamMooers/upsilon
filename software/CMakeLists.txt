@@ -4,4 +4,4 @@ find_package(Zephyr)
 project(cryosnom1)
 include_directories("../firmware")
 
-target_sources(app PRIVATE src/main.c)
+target_sources(app PRIVATE src/io.c src/dac_adc_test_main.c)
