@@ -10,45 +10,29 @@
  * in disguise because it's easier for me to write blocking code :-)
  */
 
-struct adc_timing {
-	unsigned conv_time;
-	unsigned wid;
-};
-
-enum adc_types {
-	LT2380_24, 
-	LT2328_16,
-	LT2328_18,
-	ADC_TYPES_LEN
-};
-
 uint32_t
-adc_read(size_t num, enum adc_types ty)
+adc_read(size_t num, unsigned wid, enum adc_types ty)
 {
 	uint32_t r = 0;
-	// TODO
-	static const struct time[ADC_TYPES_LEN] = {
-		[LT2380_24] = {0},
-		[LT2328_16] = {0},
-		[LT2328_18] = {0}
-	};
 
-	if (ty < 0 || ty >= ADC_TYPES_LEN) {
-		LOG_ERROR("adc_read got unknown ADC type\n");
-		k_fatal_halt(K_ERR_KERNEL_OOPS);
-	}
 	if (num >= ADC_MAX) {
 		LOG_ERROR("Bad ADC %d\n", num);
+		k_fatal_halt(K_ERR_KERNEL_OOPS);
+	}
+	if (wid > 32) {
+		LOG_ERROR("Bad ADC Width %u\n", wid);
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 
 	*adc_sck[num] = 0;
 	*adc_conv[num] = 1;
 
-	k_sleep(K_NSEC(time[ty].conv_time));
+	// 24 bit: ~400 ns
+	// 16 bit and 18 bit: ~550 ns
+	k_sleep(K_NSEC(550));
 	*adc_conv[num] = 0;
 
-	for (int i = 0; i < time[ty].wid; i++) {
+	for (int i = 0; i < wid; i++) {
 		r <<= 1;
 		r |= *adc_sdo[num];
 
