@@ -1,5 +1,11 @@
+#include <zephyr/zephyr.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_REGISTER(adc_dac_io);
+
 #include <string.h>
+#define CSR_LOCATIONS
 #include "pin_io.h"
 
 /* LT ADCs work like this:
@@ -85,7 +91,7 @@ dac_write_raw(size_t n, uint32_t data)
 	k_sleep(K_NSEC(10));
 
 	if (n >= DAC_MAX) {
-		LOG_ERROR("dac_write_raw got bad ADC %d\n", n);
+		LOG_ERR("dac_write_raw got bad ADC %d\n", n);
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 
