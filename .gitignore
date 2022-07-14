@@ -1,0 +1,10 @@
+extdoc/
+firmware/build/
+firmware/csr.json
+firmware/litex_json2dts_zephyr.py
+firmware/overlay.config
+firmware/overlay.dts
+firmware/pin_io.h
+misc/
+software/build/
+
