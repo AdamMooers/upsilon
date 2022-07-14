@@ -1,4 +1,5 @@
 #include <zephyr/kernel.h>
+#include <string.h>
 #include "pin_io.h"
 
 /* LT ADCs work like this:
@@ -10,17 +11,31 @@
  * in disguise because it's easier for me to write blocking code :-)
  */
 
-uint32_t
-adc_read(size_t num, unsigned wid, enum adc_types ty)
+static int32_t
+sign_extend(uint32_t in, size_t neg)
+{
+	if (neg) {
+		int32_t rval = 0;
+		in &= ~((uint32_t) 0);
+		memcpy(&rval, &in, sizeof(uint32_t));
+		return rval;
+	} else {
+		return in;
+	}
+}
+
+int32_t
+adc_read(size_t num, unsigned wid)
 {
 	uint32_t r = 0;
+	size_t neg = 0;
 
 	if (num >= ADC_MAX) {
-		LOG_ERROR("Bad ADC %d\n", num);
+		LOG_ERR("Bad ADC %d\n", num);
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 	if (wid > 32) {
-		LOG_ERROR("Bad ADC Width %u\n", wid);
+		LOG_ERR("Bad ADC Width %u\n", wid);
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 
@@ -35,6 +50,8 @@ adc_read(size_t num, unsigned wid, enum adc_types ty)
 	for (int i = 0; i < wid; i++) {
 		r <<= 1;
 		r |= *adc_sdo[num];
+		if (i == 0)
+			neg = r == 1;
 
 		*adc_sck[num] = 1;
 		/* 1 millisecond -> 1 MHz */
@@ -43,7 +60,7 @@ adc_read(size_t num, unsigned wid, enum adc_types ty)
 		k_sleep(K_NSEC(500));
 	}
 
-	return r;
+	return sign_extend(r, neg);
 }
 
 #define DAC_SS(n, v) *dac_ctrl[(n)] |= (v & 1) << 2
@@ -72,7 +89,7 @@ dac_write_raw(size_t n, uint32_t data)
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 
-	for (int i = 0; i < 20; i++) {
+	for (int i = 0; i < 24; i++) {
 		DAC_SCK(n, 0);
 		DAC_MOSI(n, data >> 31 & 1);
 		k_sleep(K_NSEC(500));
