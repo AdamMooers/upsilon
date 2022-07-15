@@ -8,33 +8,10 @@ LOG_MODULE_REGISTER(adc_dac_io);
 #define CSR_LOCATIONS
 #include "pin_io.h"
 
-/* LT ADCs work like this:
- * 1) Send CONV signal high
- * 2) wait for conversion to happen
- * 3) read in from output (change on rising edge, read on lower)
- * The evaluation boards do not give access to the BUSY signal, so this
- * contoller cannot be interrupt driven. This is probably a blessing
- * in disguise because it's easier for me to write blocking code :-)
- */
-
-static int32_t
-sign_extend(uint32_t in, size_t neg)
-{
-	if (neg) {
-		int32_t rval = 0;
-		in &= ~((uint32_t) 0);
-		memcpy(&rval, &in, sizeof(uint32_t));
-		return rval;
-	} else {
-		return in;
-	}
-}
-
 int32_t
 adc_read(size_t num, unsigned wid)
 {
-	uint32_t r = 0;
-	size_t neg = 0;
+	uint32_t buf = 0;
 
 	if (num >= ADC_MAX) {
 		LOG_ERR("Bad ADC %d\n", num);
@@ -45,28 +22,59 @@ adc_read(size_t num, unsigned wid)
 		k_fatal_halt(K_ERR_KERNEL_OOPS);
 	}
 
+	/* SCK is set low because data is changed at the rising edge. */
 	*adc_sck[num] = 0;
 	*adc_conv[num] = 1;
 
-	// 24 bit: ~400 ns
-	// 16 bit and 18 bit: ~550 ns
+	/* Wait setup time.
+	 * The ADC sends an interrupt signal to notify the master that
+	 * the ADC is ready to read out the data, but the evaluation boards
+	 * do not expose that signal. This code relies on the maximum times
+	 * listed in the datasheets.
+	 *
+	 * The ADCs have different maximum conversion times, so the longest
+	 * one (LTC2328) is used. This number also includes t_BUSYLH.
+	 */
 	k_sleep(K_NSEC(550));
 	*adc_conv[num] = 0;
 
 	for (int i = 0; i < wid; i++) {
-		r <<= 1;
-		r |= *adc_sdo[num];
-		if (i == 0)
-			neg = r == 1;
+		k_sleep(K_NSEC(20));
+		buf <<= 1;
+		buf |= *adc_sdo[num];
 
 		*adc_sck[num] = 1;
-		/* 1 millisecond -> 1 MHz */
-		k_sleep(K_NSEC(500));
+		k_sleep(K_NSEC(20));
 		*adc_sck[num] = 0;
-		k_sleep(K_NSEC(500));
 	}
 
-	return sign_extend(r, neg);
+	/* Sign extension.
+	 * LT ADCs return twos-complement integers. They can be either positive
+	 * or negative, and this is determined by the MSB (MSB = 1 means
+	 * negative number).
+	 *
+	 * The ADCs do not send 32 bit integers, so the integers that are
+	 * received must be sign extended.
+	 *
+	 * If a number is positive, no conversion is necessary.
+	 *
+	 * If a number is negative, then all bits beyond the original MSB
+	 * must be set to 1. This can be done by ANDing the received number
+	 * with all-bits-1.
+	 *
+	 * As an example, the negative 6-bit number
+	 *   101101
+	 * can be sign extended to 8-bit by
+	 *     11111111
+	 *   & 00101101
+	 *   ==========
+	 *     11101101
+	 *      (101101)
+	 */
+	if (buf >> wid)
+		return (int32_t) (~((uint32_t) 0) & buf);
+	else
+		return (int32_t) buf;
 }
 
 #define DAC_SS(n, v) *dac_ctrl[(n)] |= (v & 1) << 2
