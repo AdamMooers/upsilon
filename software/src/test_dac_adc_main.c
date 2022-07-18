@@ -187,7 +187,7 @@ main(void)
 			(k_thread_stack_t *) name##_stk_##num,        \
 			K_THREAD_STACK_SIZEOF(&name##_stk_##num),     \
 			name##_thread, &name##_info[num], NULL, NULL, \
-			-1, 0, K_MSEC(10))
+			-1, K_FP_REGS, K_MSEC(10))
 
 	CREATE_THREAD(dac, 0);
 	CREATE_THREAD(dac, 1);
