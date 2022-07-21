@@ -139,31 +139,66 @@ io = [
                 IOStandard("LVCMOS33"))
 ]
 
-class DACThroughGPIO(Module, AutoCSR):
-    def __init__(self, pins):
-        self._miso = CSRStatus(1, description="Master In, Slave Out (Status)")
-        # Read as [MSB ... LSB]
-        self._ctrl = CSRStorage(3, description="SS, SCK, MOSI (Control)")
-        self._pins = pins
+class SPIMaster(Module, AutoCSR):
+    def __init__(self, wid, clk, pins):
+        self.pins = pins
 
-        self.comb += self._miso.status.eq(self._pins.miso)
+        self.from_slave = CSRStatus(wid, description="Data from slave (Status)")
+        self.to_slave = CSRStorage(wid, description="Data to slave (Control)")
+        self.finished = CSRStatus(1, description="Finished transmission (Status)")
+        self.arm = CSRStorage(1, description="Initiate transmission (Status)")
+        self.ss = CSRStorage(1, description="Slave Select (active high)")
 
-        self.comb += self._pins.ss.eq(~self._ctrl.storage[2])
-        self.comb += self._pins.mosi.eq(self._ctrl.storage[1])
-        self.comb += self._pins.sck.eq(self._ctrl.storage[0])
+        self.comb += self.pins.ss.eq(~self.ss.storage)
 
-class ADCThroughGPIO(Module, AutoCSR):
-    def __init__(self, pins):
-        self._pins = pins
-        self._conv = CSRStorage(1, description="Conversion Signal (Control)")
-        self._sck = CSRStorage(1, description="Serial Clock (Control)")
-        self._sdo = CSRStatus(1, description="Serial Data Output (Status)")
+        import math
 
-        self.comb += self._pins.conv.eq(self._conv.storage)
-        self.comb += self._pins.sck.eq(self._sck.storage)
+        self.specials += Instance("spi_master",
+                p_WID=wid,
+                p_WID_LEN=math.ceil(math.log2(wid)),
+                p_CYCLE_HALF_WAIT = 3, # 3 + 2 = 5, total sck = 10 cycles
+                p_TIMER_LEN = 3,
+                p_POLARITY = 0,
+                p_PHASE = 1,
+                i_clk = clk,
+                o_from_slave = self.from_slave.status,
+                i_miso = self.pins.miso,
+                i_to_slave = self.to_slave.storage,
+                o_mosi = self.pins.mosi,
+                o_sck_wire = self.pins.sck,
+                o_finished = self.finished.status,
+                i_arm = self.arm.storage
+        )
 
-        self.comb += self._sdo.status.eq(self._pins.sdo)
+class SPIMasterReadOnly(Module, AutoCSR):
+    def __init__(self, wid, clk, pins):
+        self.pins = pins
 
+        self.from_slave = CSRStatus(wid, description="Data from slave (Status)description=")
+        self.finished = CSRStatus(1, description="Finished transmission (Status)description=")
+        self.arm = CSRStorage(1, description="Initiate transmission (Status)description=")
+        self.conv = CSRStorage(1, description="Conversion (active high)description=")
+
+        self.comb += self.pins.conv.eq(self.conv.storage)
+
+        import math
+
+        self.specials += Instance("spi_master_no_write",
+                p_WID=wid,
+                p_WID_LEN=math.ceil(math.log2(wid)),
+                p_CYCLE_HALF_WAIT = 1, # 1 + 2 = 3, total sck = 6 cycles
+                p_TIMER_LEN = 3,
+                p_POLARITY = 1,
+                p_PHASE = 0,
+                i_clk = clk,
+                o_from_slave = self.from_slave.status,
+                i_miso = self.pins.sdo,
+                o_sck_wire = self.pins.sck,
+                o_finished = self.finished.status,
+                i_arm = self.arm.storage
+        )
+
+# Clock and Reset Generator
 class _CRG(Module):
     def __init__(self, platform, sys_clk_freq, with_dram=True, with_rst=True):
         self.rst = Signal()
@@ -200,6 +235,8 @@ class CryoSNOM1SoC(SoCCore):
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="symbiflow")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True)
+        platform.add_source("rtl/spi/spi_master.v")
+        platform.add_source("rtl/spi/spi_master_no_write.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -230,16 +267,16 @@ class CryoSNOM1SoC(SoCCore):
             l2_cache_size = 8192
         )
         self.submodules.ethphy = LiteEthPHYMII(
-            clock_pads = self.platform.request("eth_clocks"),
-            pads       = self.platform.request("eth"))
+            clock_pads = platform.request("eth_clocks"),
+            pads       = platform.request("eth"))
         self.add_ethernet(phy=self.ethphy, dynamic_ip=True)
 
         # Add the DAC and ADC pins as GPIO. They will be used directly
         # by Zephyr.
         platform.add_extension(io)
         for i in range(0,8):
-            setattr(self.submodules, f"dac{i}", DACThroughGPIO(platform.request("dac", i)))
-            setattr(self.submodules, f"adc{i}", ADCThroughGPIO(platform.request("adc", i)))
+            setattr(self.submodules, f"dac{i}", SPIMaster(24, ClockSignal(), platform.request("dac", i)))
+            setattr(self.submodules, f"adc{i}", SPIMasterReadOnly(24, ClockSignal(), platform.request("adc", i)))
 
 def main():
     soc = CryoSNOM1SoC("a7-35")
