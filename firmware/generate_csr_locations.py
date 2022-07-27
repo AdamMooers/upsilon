@@ -2,8 +2,8 @@
 import json
 
 reg_names = {
-        "adc" : ("conv", "sck", "sdo"),
-        "dac" : ("miso", "ctrl")
+        "adc" : ("from_slave", "finished", "arm", "conv"),
+        "dac" : ("from_slave", "to_slave", "finished", "arm", "ss")
 }
 max_num = 8
 # TODO: make dependent on adc, dac
