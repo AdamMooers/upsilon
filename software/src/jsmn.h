@@ -1,4 +1,35 @@
-/* From: https://github.com/zserge/jsmn 25647e692c7906b96ffd2b05ca54c097948e879c
+/*
+ * Jsmn is JSON parser that does not use the C standard library and
+ * does not allocate memory. Jsmn stores the structure of the JSON
+ * document in an array that records
+ * * the type of the token,
+ * * the start position and extent of the token,
+ * * and the number of elements inside the token.
+ * For example, the document
+   {"key":"val", "obj" : { "x" : 2, "y" : false }, "arr" : [1, "2", 3]}
+ * would contain parse to:
+ *   OBJECT 6, STRING "key", STRING "val", STRING "obj", OBJECT 4,
+ *   STRING "key", PRIMITIVE 2, STRING y, PRIMITIVE false,
+ *   STRING "arr", ARRAY 3, PRIMITIVE 1, STRING "2", PRIMITIVE 3
+ * The number next to OBJECT and ARRAY denote the size of each.
+ * Strings always start with a quote and end with one: primitives
+ * (numbers, booleans, null) do not.
+ *
+ * TOKENS ARE NOT NUL TERMINATED. However, because of how the JSON
+ * grammar works, the NUL terminator can be manually added.
+ * STRING ESCAPE SEQUENCES ARE NOT PARSED.
+ * Strings start at one-past the quotation mark, and the end index
+ * points to the end quotation mark.
+ *
+ * Why JSON?
+ * 1) Every language has a JSON library.
+ * 2) JSMN is perfectly suited to this program.
+ * 3) Another standard format would most likely require writing
+ *    a parser by hand.
+ * 4) A minimalistic, custom format would require more debugging.
+ *
+ * From: https://github.com/zserge/jsmn 25647e692c7906b96ffd2b05ca54c097948e879c
+ *
  * MIT License
  *
  * Copyright (c) 2010 Serge Zaitsev
