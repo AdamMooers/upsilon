@@ -20,3 +20,7 @@ The client software receives and interprets data from the hardware.
 GNU GPL v3.0 or later. Other portions are dual licensed under the CERN
 OHL-v2-S, or permissive licenses: please view all `COPYING` files for more
 legal information.
+
+## See also
+
+* SPI nodes -- <https://software.mcgoron.com/peter/spi>
