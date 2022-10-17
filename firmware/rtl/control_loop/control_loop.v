@@ -1,3 +1,5 @@
+/* TODO: move SPI masters out of the control loop design */
+
 /************ Introduction to PI Controllers
  * The continuous form of a PI loop is
  *
@@ -129,16 +131,17 @@ module control_loop
 
 	output adc_sck,
 	input adc_in,
-	output adc_conv,
+	output adc_conv, // active high
 
 	output dac_sck,
-	output dac_ss,
+	output dac_ss, // active high
 	output dac_out,
 
 	/* Informational output.
 	 * These registers are also used for storing information while
 	 * the loop is running.
 	 */
+
 	output signed [ERR_WID-1:0] err_cur,
 	output signed [CONSTS_WID-1:0] adj,
 
@@ -375,20 +378,24 @@ always @ (posedge clk) begin
 			state <= WAIT_ON_ADC;
 			timer <= 0;
 			adc_arm <= 1;
+			adc_conv <= 1;
 		end
 	end
 	WAIT_ON_ADC: if (adc_finished) begin
 			adc_arm <= 0;
+			adc_conv <= 0;
 			arm_mul <= 1;
 			state <= WAIT_ON_MUL;
 		end
 	WAIT_ON_MUL: if (mul_finished) begin
 			arm_mul <= 0;
 			dac_arm <= 1;
+			dac_ss <= 1;
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
 			state <= WAIT_ON_ARM;
+			dac_ss <= 0;
 			dac_arm <= 0;
 		end
 end
