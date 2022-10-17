@@ -1,9 +1,10 @@
-/* TODO: move SPI masters out of the control loop design */
+/* TODO: standardised access that isn't ad-hoc: wishbone
+ * bus */
 
 /************ Introduction to PI Controllers
  * The continuous form of a PI loop is
  *
- *   A(t) = P e(t) + I∫ e(t')dt'
+ *   A(t) = P e(t) + I ∫e(t')dt'
  * where e(t) is the error (setpoint - measured), and
  * the integral goes from 0 to the current time 't'.
  *
@@ -128,20 +129,20 @@ module control_loop
 ) (
 	input clk,
 	input arm,
+	output running,
 
-	output adc_sck,
-	input adc_in,
-	output adc_conv, // active high
+	input signed [ADC_WID-1:0] measured_value,
+	output adc_conv,
+	output adc_arm,
+	input adc_finished,
 
-	output dac_sck,
-	output dac_ss, // active high
-	output dac_out,
+	output signed [DAC_WID-1:0] to_dac,
+	output dac_ss,
+	output dac_arm,
+	input dac_finished
 
-	/* Informational output.
-	 * These registers are also used for storing information while
-	 * the loop is running.
-	 */
-
+	input reg read_err_cur,
+	output reg read_err_cur_finished,
 	output signed [ERR_WID-1:0] err_cur,
 	output signed [CONSTS_WID-1:0] adj,
 
@@ -220,28 +221,8 @@ reg [STATESIZ-1:0] state = WAIT_ON_ARM;
  *   --> reinterpret and write into DAC: DAC_DATA_WID.0
  */
 
-/******* Get measured value ********/
-
-reg signed [ADC_WID-1:0] measured = 0;
-reg adc_arm = 0;
-wire adc_finished;
-spi_master_no_write #(
-	.WID(ADC_WID),
-	.POLARITY(ADC_POLARITY),
-	.PHASE(ADC_PHASE),
-	.CYCLE_HALF_WAIT(1),
-	.TIMER_LEN(3)
-) adc (
-	.clk(clk),
-	.from_slave(adcbuf),
-	.miso(adc_in),
-	.sck_wire(adc_sck),
-	.arm(adc_arm),
-	.finished(adc_finished)
-);
-
 /**** Calculate Error ****/
-assign err_cur = measured - setpoint;
+assign err_cur = measured_value - setpoint;
 
 /****** Multiplication *******
  * Truncation of a fixed-point integer to a smaller buffer requires
@@ -268,7 +249,7 @@ wire signed [MUL_WID-1:0] alpha_err;
 wire p_err_prev_fin;
 wire signed [MUL_WID-1:0] p_err_prev;
 
-wire mul_finished = alpha_err_prev_fin & p_err_fin;
+wire mul_finished = alpha_err_fin & p_err_fin;
 
 /* αe */
 boothmul #(
@@ -334,28 +315,14 @@ wire signed dac_adj_val[DAC_DATA_WID-1:0];
 intsat #(
 	.IN_LEN(RTRUNC_WID),
 	.LTRUNC(DAC_DATA_WID)
-) (
+) sat_newadj_rtrunc (
 	.inp(newadj_rtrunc),
 	.outp(dac_adj_val)
 );
 
 /**** Write to DAC ****/
 
-reg dac_arm = 0;
-spi_master_no_read #(
-	.WID(DAC_WID),
-	.WID_LEN(5),
-	.CYCLE_HALF_WAIT(3),
-	.TIMER_LEN(3),
-	.POLARITY(DAC_POLARITY),
-	.PHASE(DAC_PHASE)
-) dac (
-	.clk(clk),
-	.to_slave({4'b0010,dac_adj_val}),
-	.mosi(dac_out),
-	.sck_wire(dac_sck),
-	.arm(dac_arm)
-);
+assign to_dac = {4'b0010,dac_adj_val};
 
 reg [DELAY_WID-1:0] timer = 0;
 
@@ -366,14 +333,19 @@ always @ (posedge clk) begin
 			adj_prev <= 0;
 			err_prev <= 0;
 			timer <= 0;
+			running <= 0;
 		end else if (timer == 0) begin
 			saved_delay <= delay_in;
 			timer <= 1;
+			running <= 1;
+			setpt <= setpt_in;
+			/* TODO: cl_alpha change only when loop is stopped */
+			cl_alpha_reg <= cl_alpha_in;
+			cl_p_reg <= cl_p_in;
+			state <= WAIT_LOOP_DELAY;
 		end else if (timer < saved_delay) begin
 			timer <= timer + 1;
 			setpt <= setpt_in;
-			cl_alpha_reg <= cl_alpha_in;
-			cl_p_reg <= cl_p_in;
 		end else begin
 			state <= WAIT_ON_ADC;
 			timer <= 0;
