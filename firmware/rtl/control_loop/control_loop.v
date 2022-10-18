@@ -1,6 +1,10 @@
-/* TODO: standardised access that isn't ad-hoc: wishbone
- * bus */
-
+/* TODO: The control loop outputs the adjustment value, not the
+ * total value to the DAC. Write code that gets the value from
+ * the DAC and writes the adjusted value to it.
+ *
+ * This can be in another module which only gets the value from
+ * the DAC on reset.
+ */
 /************ Introduction to PI Controllers
  * The continuous form of a PI loop is
  *
@@ -125,11 +129,10 @@ module control_loop
 	parameter ADC_POLARITY = 1,
 	parameter ADC_PHASE = 0,
 	parameter DAC_POLARITY = 0,
-	parameter DAC_PHASE = 1
+	parameter DAC_PHASE = 1,
+	parameter DATA_WID = CONSTS_WID
 ) (
 	input clk,
-	input arm,
-	output running,
 
 	input signed [ADC_WID-1:0] measured_value,
 	output adc_conv,
@@ -137,43 +140,41 @@ module control_loop
 	input adc_finished,
 
 	output signed [DAC_WID-1:0] to_dac,
+	input signed [DAC_WID-1:0] from_dac,
 	output dac_ss,
 	output dac_arm,
-	input dac_finished
+	input dac_finished,
 
-	input reg read_err_cur,
-	output reg read_err_cur_finished,
-	output signed [ERR_WID-1:0] err_cur,
-	output signed [CONSTS_WID-1:0] adj,
-
-	input signed [ADC_WID-1:0] setpt_in,
-	input signed [CONSTS_WID-1:0] cl_alpha_in,
-	input signed [CONSTS_WID-1:0] cl_p_in,
-	input [DELAY_WID-1:0] delay_in
+	/* Hacky ad-hoc read-write interface. */
+	input reg [CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
+	input reg [DATA_WIDTH-1:0] word_in,
+	output reg [DATA_WIDTH-1:0] word_out,
+	input start_cmd,
+	output reg finish_cmd
 );
 
-/* Registers used to lock in values at the start of each iteration */
 reg signed [ADC_WID-1:0] setpt = 0;
 reg signed [CONSTS_WID-1:0] cl_alpha_reg = 0;
 reg signed [CONSTS_WID-1:0] cl_p_reg = 0;
 reg [DELAY_WID-1:0] saved_delay = 0;
+reg running = 0;
 
 /* Registers for PI calculations */
 reg signed [ERR_WID-1:0] err_prev = 0;
 
 /****** State machine
  *
- * -> WAIT_ON_ARM -> WAIT_ON_ADC -> WAIT_ON_MUL -\
+ * -> CYCLE_START -> WAIT_ON_ADC -> WAIT_ON_MUL -\
  *             \------\------------ WAIT_ON_DAC </
  *
- * The loop will stop and reset all stored data if `arm` is not 1 at
- * the end of the loop.
- * The loop stores all data from the input into registers at
- * `WAIT_ON_ADC`, so the program can change constants and setpoints
- * on the fly.
+ ****** Outline
+ * There are two systems: the read-write interface and the loop.
+ * The read-write interface allows another module (i.e. the CPU)
+ * to access and change constants. When a constant is changed the
+ * loop must reset.
  */
 
-localparam WAIT_ON_ARM = 0;
+localparam CYCLE_START = 0;
 localparam WAIT_ON_ADC = 1;
 localparam WAIT_ON_MUL = 2;
 localparam WAIT_ON_DAC = 3;
@@ -181,28 +182,7 @@ localparam STATESIZ = 2;
 
 reg [STATESIZ-1:0] state = WAIT_ON_ARM;
 
-/***** Outline *****
- * The loop will only iterate when armed. If it is running and `arm`
- * is deasserted, then it will complete the iteration it is in and
- * stop.
- *
- * At the start of each loop, the constants are read into registers,
- * so the constants can change while the loop is running.
- *
- * First the loop reads from the ADC, and then computes the error
- * from the setpoint. The setpoint is specified in the same units
- * as the ADC.
- *
- * Afterwards the loop computes the multiplications in the PI loop.
- * This changes the size of the values in the loop.
- *
- * Combinatorially, the new adjusted value is calculated. The original
- * value has to be stored in the same width as the multiplied values.
- *
- * Then the value is truncated to the width of the DAC, with saturation
- * if necessary, and written out to the DAC.
- *
- **** Precision Propogation
+/**** Precision Propogation
  *
  *    Measured value: ADC_WID.0
  *    Setpoint: ADC_WID.0
@@ -222,7 +202,7 @@ reg [STATESIZ-1:0] state = WAIT_ON_ARM;
  */
 
 /**** Calculate Error ****/
-assign err_cur = measured_value - setpoint;
+wire [ERR_WID-1:0] err_cur = measured_value - setpoint;
 
 /****** Multiplication *******
  * Truncation of a fixed-point integer to a smaller buffer requires
@@ -284,7 +264,7 @@ localparam SUB_WHOLE_WID = MUL_WHOLE_WID + 1;
 localparam SUB_FRAC_WID = MUL_FRAC_WID;
 localparam SUB_WID = SUB_WHOLE_WID + SUB_FRAC_WID;
 
-reg signed [SUB_WID-1:0] adj_old;
+reg signed [SUB_WID-1:0] adj_old = 0;
 wire signed [SUB_WID-1:0] newadj = adj_old + alpha_err - p_err_prev;
 
 /**** Discard fractional bits ****
@@ -325,27 +305,96 @@ intsat #(
 assign to_dac = {4'b0010,dac_adj_val};
 
 reg [DELAY_WID-1:0] timer = 0;
+/* Reset is asserted when any change happens to the inputs.
+ * It is deasserted when the input pin is deasserted.
+ * This always takes at least 1 cycle so the loop will
+ * always halt.
+ */
+reg reset_from_input = 0;
 
 always @ (posedge clk) begin
-	case (state)
-	WAIT_ON_ARM: begin
-		if (!arm) begin
-			adj_prev <= 0;
-			err_prev <= 0;
-			timer <= 0;
-			running <= 0;
-		end else if (timer == 0) begin
-			saved_delay <= delay_in;
-			timer <= 1;
-			running <= 1;
-			setpt <= setpt_in;
-			/* TODO: cl_alpha change only when loop is stopped */
-			cl_alpha_reg <= cl_alpha_in;
-			cl_p_reg <= cl_p_in;
-			state <= WAIT_LOOP_DELAY;
-		end else if (timer < saved_delay) begin
+	if (start_cmd && !finish_cmd) begin
+		case (cmd)
+		CONTROL_LOOP_NOOP: CONTROL_LOOP_NOOP | CONTROL_LOOP_WRITE_BIT:
+			finish_cmd <= 1;
+		CONTROL_LOOP_STATUS: begin
+			word_out[DATA_WID-1:1] <= 0;
+			word_out[0] <= running;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_STATUS | CONTROL_LOOP_WRITE_BIT:
+			running <= word_in[0];
+			finish_cmd <= 1;
+			reset_from_input <= 1;
+		CONTROL_LOOP_SETPT: begin
+			word_out[DATA_WID-1:ADC_WID] <= 0;
+			word_out[ADC_WID-1:0] <= setpt;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_SETPT | CONTROL_LOOP_WRITE_BIT:
+			setpt <= word_in[ADC_WID-1:0];
+			reset_from_input <= 1;
+			finish_cmd <= 1;
+		CONTROL_LOOP_P: begin
+			word_out <= cl_p_reg;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_P | CONTROL_LOOP_WRITE_BIT: begin
+			cl_p_reg <= word_in;
+			reset_from_input <= 1;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_ALPHA: begin
+			word_out <= cl_alpha_reg;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_ALPHA | CONTROL_LOOP_WRITE_BIT: begin
+			cl_alpha_reg <= word_in;
+			reset_from_input <= 1;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_DELAY: begin
+			word_out[DATA_WID-1:DELAY_WID] <= 0;
+			word_out[DELAY_WID-1:0] <= saved_delay;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_DELAY | CONTROL_LOOP_WRITE_BIT: begin
+			saved_delay <= word_in[DELAY_WID-1:0];
+			reset_from_input <= 1;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_ERR: begin
+			word_out[DATA_WID-1:ERR_WID] <= 0;
+			word_out[ERR_WID-1:0] <= err_prev;
+			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_ADJ: begin
+			word_out[DATA_WID-1:DAC_DATA_WID] <= 0;
+			word_out[DAC_DATA_WID-1:0] <= dac_adj_val;
+			finish_cmd <= 1;
+		end
+	end else if (!start_cmd) begin
+		finish_cmd <= 0;
+		reset_from_input <= 0;
+	end
+end
+
+/* This is not a race condition as long as two variables are
+ * not being assigned at the same time. Instead, the lower
+ * assign block will use the older values (i.e. the upper assign
+ * block only takes effect next clock cycle).
+ */
+
+always @ (posedge clk) begin
+	if (reset_from_input) begin
+		state <= WAIT_ON_ARM;
+		adj_prev <= 0;
+		err_prev <= 0;
+		timer <= 0;
+	end else if (running) begin case (state)
+	CYCLE_START: begin
+		if (timer < saved_delay) begin
 			timer <= timer + 1;
-			setpt <= setpt_in;
 		end else begin
 			state <= WAIT_ON_ADC;
 			timer <= 0;
@@ -366,10 +415,14 @@ always @ (posedge clk) begin
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
-			state <= WAIT_ON_ARM;
+			state <= CYCLE_START;
 			dac_ss <= 0;
 			dac_arm <= 0;
+
+			err_prev <= err_cur;
+			adj_old <= newadj;
 		end
+	end
 end
 
 endmodule
