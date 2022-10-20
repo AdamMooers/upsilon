@@ -296,7 +296,6 @@ wire signed[RTRUNC_WID-1:0] rtrunc =
  */
 
 wire signed[DAC_DATA_WID-1:0] dac_adj_val;
-reg signed[DAC_DATA_WID-1:0] stored_dac_val;
 
 intsat #(
 	.IN_LEN(RTRUNC_WID),
@@ -304,6 +303,19 @@ intsat #(
 ) sat_newadj_rtrunc (
 	.inp(newadj_rtrunc),
 	.outp(dac_adj_val)
+);
+
+reg signed[DAC_DATA_WID-1:0] stored_dac_val;
+
+wire [DAC_DATA_WID:0] total_dac_val_add = stored_dac_val + dac_adj_val;
+wire [DAC_DATA_WID-1:0] total_dac_val;
+
+intsat #(
+	.IN_LEN(DAC_DATA_WID),
+	.LTRUNC(1)
+) total_dac_trunc (
+	.inp(total_dac_val_add),
+	.outp(total_dac_val)
 );
 
 /**** Write to DAC ****/
@@ -446,8 +458,8 @@ always @ (posedge clk) begin
 			arm_mul <= 0;
 			dac_arm <= 1;
 			dac_ss <= 1;
-			stored_dac_val <= stored_dac_val + dac_adj_val;
-			to_dac <= b'0001 << DAC_DATA_WID | (stored_dac_val + dac_adj_val);
+			stored_dac_val <= total_dac_val;
+			to_dac <= b'0001 << DAC_DATA_WID | total_dac_val;
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
