@@ -1,10 +1,3 @@
-/* TODO: The control loop outputs the adjustment value, not the
- * total value to the DAC. Write code that gets the value from
- * the DAC and writes the adjusted value to it.
- *
- * This can be in another module which only gets the value from
- * the DAC on reset.
- */
 /************ Introduction to PI Controllers
  * The continuous form of a PI loop is
  *
@@ -126,11 +119,8 @@ module control_loop
 	 * ERR_WID (ADC_WID + 1).
 	 */
 	parameter ERR_WID_SIZ = 6,
-	parameter ADC_POLARITY = 1,
-	parameter ADC_PHASE = 0,
-	parameter DAC_POLARITY = 0,
-	parameter DAC_PHASE = 1,
-	parameter DATA_WID = CONSTS_WID
+	parameter DATA_WID = CONSTS_WID,
+	parameter READ_DAC_DELAY = 5
 ) (
 	input clk,
 
@@ -139,7 +129,7 @@ module control_loop
 	output adc_arm,
 	input adc_finished,
 
-	output signed [DAC_WID-1:0] to_dac,
+	output reg signed [DAC_WID-1:0] to_dac,
 	input signed [DAC_WID-1:0] from_dac,
 	output dac_ss,
 	output dac_arm,
@@ -164,9 +154,21 @@ reg signed [ERR_WID-1:0] err_prev = 0;
 
 /****** State machine
  *
- * -> CYCLE_START -> WAIT_ON_ADC -> WAIT_ON_MUL -\
- *             \------\------------ WAIT_ON_DAC </
- *
+ *    INITIATE_READ_FROM_DAC
+ *         ↓
+ *    WAIT_FOR_DAC_READ
+ *         ↓
+ *    WAIT_FOR_DAC_RESPONSE
+ *         ↓ (when value is read)
+ * ┏━━CYCLE_START
+ * ↑       ↓ (wait time delay)
+ * ┃  WAIT_ON_ADC
+ * ┃       ↓
+ * ┃  WAIT_ON_MUL
+ * ┃       ↓
+ * ┃  WAIT_ON_DAC
+ * ┃       ↓
+ * ┗━━━━━━━┛
  ****** Outline
  * There are two systems: the read-write interface and the loop.
  * The read-write interface allows another module (i.e. the CPU)
@@ -178,7 +180,10 @@ localparam CYCLE_START = 0;
 localparam WAIT_ON_ADC = 1;
 localparam WAIT_ON_MUL = 2;
 localparam WAIT_ON_DAC = 3;
-localparam STATESIZ = 2;
+localparam INIT_READ_FROM_DAC = 4;
+localparam WAIT_FOR_DAC_READ = 5;
+localparam WAIT_FOR_DAC_RESPONSE = 6;
+localparam STATESIZ = 3;
 
 reg [STATESIZ-1:0] state = WAIT_ON_ARM;
 
@@ -279,7 +284,7 @@ localparam RTRUNC_FRAC_WID = DAC_DATA_WID - ADC_WID;
 localparam RTRUNC_WHOLE_WID = SUB_WHOLE_WID;
 localparam RTRUNC_WID = RTRUNC_WHOLE_WID + RTRUNC_FRAC_WID;
 
-wire signed rtrunc[RTRUNC_WID-1:0] =
+wire signed[RTRUNC_WID-1:0] rtrunc =
 	newadj[SUB_WID-1:SUB_FRAC_WID-RTRUNC_FRAC_WID];
 
 /**** Truncate-Saturate ****
@@ -290,7 +295,8 @@ wire signed rtrunc[RTRUNC_WID-1:0] =
  *         [DAC_DATA_WID].0
  */
 
-wire signed dac_adj_val[DAC_DATA_WID-1:0];
+wire signed[DAC_DATA_WID-1:0] dac_adj_val;
+reg signed[DAC_DATA_WID-1:0] stored_dac_val;
 
 intsat #(
 	.IN_LEN(RTRUNC_WID),
@@ -301,8 +307,6 @@ intsat #(
 );
 
 /**** Write to DAC ****/
-
-assign to_dac = {4'b0010,dac_adj_val};
 
 reg [DELAY_WID-1:0] timer = 0;
 /* Reset is asserted when any change happens to the inputs.
@@ -368,9 +372,9 @@ always @ (posedge clk) begin
 			word_out[ERR_WID-1:0] <= err_prev;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_ADJ: begin
+		CONTROL_LOOP_Z: begin
 			word_out[DATA_WID-1:DAC_DATA_WID] <= 0;
-			word_out[DAC_DATA_WID-1:0] <= dac_adj_val;
+			word_out[DAC_DATA_WID-1:0] <= stored_dac_val;
 			finish_cmd <= 1;
 		end
 	end else if (!start_cmd) begin
@@ -387,11 +391,41 @@ end
 
 always @ (posedge clk) begin
 	if (reset_from_input) begin
-		state <= WAIT_ON_ARM;
+		state <= INIT_READ_FROM_DAC;
 		adj_prev <= 0;
 		err_prev <= 0;
 		timer <= 0;
 	end else if (running) begin case (state)
+	INIT_READ_FROM_DAC: begin
+		/* 1001[0....] is read from dac register */
+		to_dac <= b'1001 << DAC_DATA_WID;
+		dac_ss <= 1;
+		dac_arm <= 1;
+		state <= WAIT_FOR_DAC_READ;
+	end
+	WAIT_FOR_DAC_READ: begin
+		if (dac_finished) begin
+			state <= WAIT_FOR_DAC_RESPONSE;
+			dac_ss <= 0;
+			dac_arm <= 0;
+			timer <= 1;
+		end
+	end
+	WAIT_FOR_DAC_RESPONSE: begin
+		if (timer < READ_DAC_DELAY && timer != 0) begin
+			timer <= timer + 1;
+		end else if (timer == READ_DAC_DELAY) begin
+			dac_ss <= 1;
+			dac_arm <= 1;
+			to_dac <= 0;
+			timer <= 0;
+		end else if (dac_finished) begin
+			state <= CYCLE_START;
+			dac_ss <= 0;
+			dac_arm <= 0;
+			stored_dac_val <= from_dac;
+		end
+	end
 	CYCLE_START: begin
 		if (timer < saved_delay) begin
 			timer <= timer + 1;
@@ -412,6 +446,8 @@ always @ (posedge clk) begin
 			arm_mul <= 0;
 			dac_arm <= 1;
 			dac_ss <= 1;
+			stored_dac_val <= stored_dac_val + dac_adj_val;
+			to_dac <= b'0001 << DAC_DATA_WID | (stored_dac_val + dac_adj_val);
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
