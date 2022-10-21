@@ -143,24 +143,38 @@ module control_loop
 	output reg finish_cmd
 );
 
+/* The loop variables can be modified on the fly. Each
+ * modification takes effect on the next loop cycle.
+ * When a caller modifies a variable, the modified
+ * variable is saved in [name]_buffer and loaded at CYCLE_START.
+ */
+
 reg signed [ADC_WID-1:0] setpt = 0;
+reg signed [ADC_WID-1:0] setpt_buffer = 0;
+
 reg signed [CONSTS_WID-1:0] cl_alpha_reg = 0;
+reg signed [CONSTS_WID-1:0] cl_alpha_reg_buffer = 0;
+
 reg signed [CONSTS_WID-1:0] cl_p_reg = 0;
-reg [DELAY_WID-1:0] saved_delay = 0;
+reg signed [CONSTS_WID-1:0] cl_p_reg_buffer = 0;
+
+reg [DELAY_WID-1:0] dely = 0;
+reg [DELAY_WID-1:0] dely_buffer = 0;
 reg running = 0;
 
 /* Registers for PI calculations */
 reg signed [ERR_WID-1:0] err_prev = 0;
 
 /****** State machine
- *
- *    INITIATE_READ_FROM_DAC
- *         ↓
- *    WAIT_FOR_DAC_READ
- *         ↓
- *    WAIT_FOR_DAC_RESPONSE
- *         ↓ (when value is read)
- * ┏━━CYCLE_START
+ * ┏━━━━━━━┓
+ * ┃       ↓
+ * ┗←━INITIATE_READ_FROM_DAC━━←━━━━┓
+ *         ↓                       ┃
+ *    WAIT_FOR_DAC_READ            ┃
+ *         ↓                       ┃
+ *    WAIT_FOR_DAC_RESPONSE        ┃ (on reset)
+ *         ↓ (when value is read)  ┃
+ * ┏━━CYCLE_START━━→━━━━━━━━━━━━━━━┛
  * ↑       ↓ (wait time delay)
  * ┃  WAIT_ON_ADC
  * ┃       ↓
@@ -173,7 +187,14 @@ reg signed [ERR_WID-1:0] err_prev = 0;
  * There are two systems: the read-write interface and the loop.
  * The read-write interface allows another module (i.e. the CPU)
  * to access and change constants. When a constant is changed the
- * loop must reset.
+ * loop must reset the values that are preserved between loops
+ * (previous adjustment and previous delay).
+ *
+ * When the loop starts it must find the current value from the
+ * DAC and write to it. The value from the DAC is then adjusted
+ * with the output of the control loop. Afterwards it does not
+ * need to query the DAC for the updated value since it was the one
+ * that updated the value in the first place.
  */
 
 localparam CYCLE_START = 0;
@@ -185,7 +206,7 @@ localparam WAIT_FOR_DAC_READ = 5;
 localparam WAIT_FOR_DAC_RESPONSE = 6;
 localparam STATESIZ = 3;
 
-reg [STATESIZ-1:0] state = WAIT_ON_ARM;
+reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
 
 /**** Precision Propogation
  *
@@ -318,15 +339,9 @@ intsat #(
 	.outp(total_dac_val)
 );
 
-/**** Write to DAC ****/
-
 reg [DELAY_WID-1:0] timer = 0;
-/* Reset is asserted when any change happens to the inputs.
- * It is deasserted when the input pin is deasserted.
- * This always takes at least 1 cycle so the loop will
- * always halt.
- */
-reg reset_from_input = 0;
+
+/**** Read-Write control interface. ****/
 
 always @ (posedge clk) begin
 	if (start_cmd && !finish_cmd) begin
@@ -341,23 +356,20 @@ always @ (posedge clk) begin
 		CONTROL_LOOP_STATUS | CONTROL_LOOP_WRITE_BIT:
 			running <= word_in[0];
 			finish_cmd <= 1;
-			reset_from_input <= 1;
 		CONTROL_LOOP_SETPT: begin
 			word_out[DATA_WID-1:ADC_WID] <= 0;
 			word_out[ADC_WID-1:0] <= setpt;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_SETPT | CONTROL_LOOP_WRITE_BIT:
-			setpt <= word_in[ADC_WID-1:0];
-			reset_from_input <= 1;
+			setpt_buffer <= word_in[ADC_WID-1:0];
 			finish_cmd <= 1;
 		CONTROL_LOOP_P: begin
 			word_out <= cl_p_reg;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_P | CONTROL_LOOP_WRITE_BIT: begin
-			cl_p_reg <= word_in;
-			reset_from_input <= 1;
+			cl_p_reg_buffer <= word_in;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_ALPHA: begin
@@ -365,18 +377,16 @@ always @ (posedge clk) begin
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_ALPHA | CONTROL_LOOP_WRITE_BIT: begin
-			cl_alpha_reg <= word_in;
-			reset_from_input <= 1;
+			cl_alpha_reg_buffer <= word_in;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_DELAY: begin
 			word_out[DATA_WID-1:DELAY_WID] <= 0;
-			word_out[DELAY_WID-1:0] <= saved_delay;
+			word_out[DELAY_WID-1:0] <= dely;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_DELAY | CONTROL_LOOP_WRITE_BIT: begin
-			saved_delay <= word_in[DELAY_WID-1:0];
-			reset_from_input <= 1;
+			dely_buffer <= word_in[DELAY_WID-1:0];
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_ERR: begin
@@ -391,7 +401,6 @@ always @ (posedge clk) begin
 		end
 	end else if (!start_cmd) begin
 		finish_cmd <= 0;
-		reset_from_input <= 0;
 	end
 end
 
@@ -402,18 +411,15 @@ end
  */
 
 always @ (posedge clk) begin
-	if (reset_from_input) begin
-		state <= INIT_READ_FROM_DAC;
-		adj_prev <= 0;
-		err_prev <= 0;
-		timer <= 0;
-	end else if (running) begin case (state)
+	case (state)
 	INIT_READ_FROM_DAC: begin
-		/* 1001[0....] is read from dac register */
-		to_dac <= b'1001 << DAC_DATA_WID;
-		dac_ss <= 1;
-		dac_arm <= 1;
-		state <= WAIT_FOR_DAC_READ;
+		if (running) begin
+			/* 1001[0....] is read from dac register */
+			to_dac <= b'1001 << DAC_DATA_WID;
+			dac_ss <= 1;
+			dac_arm <= 1;
+			state <= WAIT_FOR_DAC_READ;
+		end
 	end
 	WAIT_FOR_DAC_READ: begin
 		if (dac_finished) begin
@@ -439,9 +445,23 @@ always @ (posedge clk) begin
 		end
 	end
 	CYCLE_START: begin
-		if (timer < saved_delay) begin
+		if (!running) begin
+			state <= INIT_READ_FROM_DAC;
+		end else if (timer < dely) begin
 			timer <= timer + 1;
 		end else begin
+			/* On change of constants, previous values are invalidated. */
+			if (setpt != setpt_buffer ||
+			  cl_alpha_reg != cl_alpha_reg_buffer ||
+			  cl_p_reg != cl_p_reg_buffer) begin
+				setpt <= setpt_buffer;
+				dely <= dely_buf;
+				cl_alpha_reg <= cl_alpha_reg_buffer;
+				cl_p_reg <= cl_p_reg_buffer;
+				adj_prev <= 0;
+				err_prev <= 0;
+			end
+
 			state <= WAIT_ON_ADC;
 			timer <= 0;
 			adc_arm <= 1;
