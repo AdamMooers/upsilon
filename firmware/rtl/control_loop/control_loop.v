@@ -95,10 +95,6 @@
  * bits).
  */
 
-/*
- * 0x3214*78e-6 = 0.9996 + lower order (storable as 15 whole bits)
- */
-
 `define ERR_WID (ADC_WID + 1)
 
 module control_loop
@@ -160,7 +156,10 @@ reg signed [CONSTS_WID-1:0] cl_p_reg_buffer = 0;
 
 reg [DELAY_WID-1:0] dely = 0;
 reg [DELAY_WID-1:0] dely_buffer = 0;
+
+
 reg running = 0;
+reg signed[DAC_DATA_WID-1:0] stored_dac_val = 0;
 
 /* Registers for PI calculations */
 reg signed [ERR_WID-1:0] err_prev = 0;
@@ -220,8 +219,9 @@ reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
  * x ----------------------------|        x-----------------------------
  *   αe: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC  -   Pe_p: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC
  *              + A_p: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC
+ *              + stored_dac_val << CONSTS_FRAC: DAC_DATA_WID.CONSTS_FRAC
  * --------------------------------------------------------------
- *   A_p + αe - Pe_p: CONSTS_WHOLE+ERR_WID+1.CONSTS_FRAC
+ *   A_p + αe - Pe_p + stored_dac_val: CONSTS_WHOLE+ERR_WID+1.CONSTS_FRAC
  *   --> discard fractional bits: CONSTS_WHOLE+ADC_WID+1.(DAC_DATA_WID - ADC_WID)
  *   --> Saturate-truncate: ADC_WID.(DAC_DATA_WID-ADC_WID)
  *   --> reinterpret and write into DAC: DAC_DATA_WID.0
@@ -291,7 +291,8 @@ localparam SUB_FRAC_WID = MUL_FRAC_WID;
 localparam SUB_WID = SUB_WHOLE_WID + SUB_FRAC_WID;
 
 reg signed [SUB_WID-1:0] adj_old = 0;
-wire signed [SUB_WID-1:0] newadj = adj_old + alpha_err - p_err_prev;
+wire signed [SUB_WID-1:0] newadj = adj_old + alpha_err - p_err_prev
+                                 + (stored_dac_val << CONSTS_FRAC);
 
 /**** Discard fractional bits ****
  * The truncation of the subtraction result first takes off the lower
@@ -322,21 +323,8 @@ intsat #(
 	.IN_LEN(RTRUNC_WID),
 	.LTRUNC(DAC_DATA_WID)
 ) sat_newadj_rtrunc (
-	.inp(newadj_rtrunc),
+	.inp(rtrunc),
 	.outp(dac_adj_val)
-);
-
-reg signed[DAC_DATA_WID-1:0] stored_dac_val;
-
-wire [DAC_DATA_WID:0] total_dac_val_add = stored_dac_val + dac_adj_val;
-wire [DAC_DATA_WID-1:0] total_dac_val;
-
-intsat #(
-	.IN_LEN(DAC_DATA_WID),
-	.LTRUNC(1)
-) total_dac_trunc (
-	.inp(total_dac_val_add),
-	.outp(total_dac_val)
 );
 
 reg [DELAY_WID-1:0] timer = 0;
@@ -478,8 +466,8 @@ always @ (posedge clk) begin
 			arm_mul <= 0;
 			dac_arm <= 1;
 			dac_ss <= 1;
-			stored_dac_val <= total_dac_val;
-			to_dac <= b'0001 << DAC_DATA_WID | total_dac_val;
+			stored_dac_val <= dac_adj_val;
+			to_dac <= b'0001 << DAC_DATA_WID | dac_adj_val;
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
