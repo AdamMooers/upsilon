@@ -28,7 +28,8 @@ cycle, which in turn requires knowing the ADC and DAC timings.  This
 is done outside the Verilog code.  and can be calculated from
 simulating one iteration of the control loop.
 
-************** Fixed Point Integers************
+# Fixed Point Integers
+
 A regular number is stored in decimal: 123056.
 This is equal to
 
