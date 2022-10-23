@@ -35,6 +35,7 @@
  * bits).
  */
 
+`include control_loop_cmds.vh
 `define ERR_WID (ADC_WID + 1)
 
 module control_loop
@@ -56,7 +57,8 @@ module control_loop
 	 */
 	parameter ERR_WID_SIZ = 6,
 	parameter DATA_WID = CONSTS_WID,
-	parameter READ_DAC_DELAY = 5
+	parameter READ_DAC_DELAY = 5,
+	parameter CYCLE_COUNT_WID = 16
 ) (
 	input clk,
 
@@ -269,6 +271,18 @@ intsat #(
 
 reg [DELAY_WID-1:0] timer = 0;
 
+reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
+reg [CYCLE_COUNT_WID-1:0] debug_timer = 0;
+/**** Timing debug. ****/
+always @ (posedge clk) begin
+	if (state == INIT_READ_FROM_DAC) begin
+		debug_timer <= 1;
+		last_timer <= debug_timer;
+	end else begin
+		debug_timer <= debug_timer + 1;
+	end
+end
+
 /**** Read-Write control interface. ****/
 
 always @ (posedge clk) begin
@@ -326,6 +340,11 @@ always @ (posedge clk) begin
 			word_out[DATA_WID-1:DAC_DATA_WID] <= 0;
 			word_out[DAC_DATA_WID-1:0] <= stored_dac_val;
 			finish_cmd <= 1;
+		end
+		CONTROL_LOOP_CYCLES: begin
+			word_out[DATA_WID-1:CYCLE_COUNT_WID] <= 0;
+			word_out[CYCLE_COUNT_WID-1:0] <= last_timer;
+			finish_cmd <= 0;
 		end
 	end else if (!start_cmd) begin
 		finish_cmd <= 0;
