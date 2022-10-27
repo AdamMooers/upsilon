@@ -1,5 +1,6 @@
 # Functions for converting to and from fixed point in Python.
 from math import log10, floor
+from decimal import *
 
 def string_to_fixed_point(s, fracnum):
 	l = s.split('.')
@@ -11,10 +12,8 @@ def string_to_fixed_point(s, fracnum):
 	dec = 10
 	frac = 0
 
-	frac_decimal = int(l[1])
+	frac_decimal = Decimal(f'0.{l[1]}')
 	# get the smallest power of ten higher then frac_decimal
-	frac_decimal_len = floor(log10(frac_decimal) + 1)
-	pow10 = 10**frac_decimal_len
 	frac = 0
 
 	# Example:
@@ -24,13 +23,14 @@ def string_to_fixed_point(s, fracnum):
 	# 0.9134 = a.bcdefgh ...
 	# therefore a = 0. Then remove the most significant digit.
 	# Then multiply by 2 again. Then
-	# 18268 = b.cdefgh ...
+	# 1.8268 = b.cdefgh ...
 	# therefore b = 1. Then take 8268, and so on.
 	for i in range(0,fracnum):
-		frac_decimal = frac_decimal * 2
-		div, mod = divmod(frac_decimal, pow10)
+		frac_decimal = frac_decimal * 2	
+		div = floor(frac_decimal)
+
 		frac = div | (frac << 1)
-		frac_decimal = mod
+		frac_decimal = frac_decimal - div
 
 	whole = int(l[0])
 	if whole < 0:
