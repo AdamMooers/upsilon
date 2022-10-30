@@ -34,7 +34,7 @@
 module control_loop_math #(
 	parameter CONSTS_WHOLE = 8,
 	parameter CONSTS_FRAC = 40,
-	parameter CONSTS_WID = CONSTS_WHOLE + CONSTS_FRAC,
+`define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
 	/* This number is the conversion from ADC voltage units to
 	 * a fixed-point number.
 	 * A micro-optimization could roll the ADC reading and the multiplier
@@ -59,13 +59,13 @@ module control_loop_math #(
 
 	input [ADC_WID-1:0] setpt,
 	input [ADC_WID-1:0] measured,
-	input [CONSTS_WID-1:0] cl_P,
-	input [CONSTS_WID-1:0] cl_I,
-	input [CONSTS_WID-1:0] e_prev,
+	input [`CONSTS_WID-1:0] cl_P,
+	input [`CONSTS_WID-1:0] cl_I,
+	input [`CONSTS_WID-1:0] e_prev,
 	input [CYCLE_COUNT_WID-1:0] cycles,
 	input [DELAY_WID-1:0] dely,
 
-	output reg [CONSTS_WID-1:0] e_cur,
+	output reg [`CONSTS_WID-1:0] e_cur,
 	output reg [DAC_DATA_WID-1:0] adjval
 );
 
@@ -77,17 +77,17 @@ module control_loop_math #(
  *   e_scaled_unsat: ERR_WID + INT_TO_REAL_WID
  */
 
-localparam ERR_WID = ADC_WID + 1;
-wire [ERR_WID-1:0] e_unscaled = setpt - measured;
+`define ERR_WID (ADC_WID + 1)
+wire [`ERR_WID-1:0] e_unscaled = setpt - measured;
 
 reg arm_stage_1 = 0;
 wire mul_scale_err_fin;
 
-localparam E_UNTRUNC_WID = ERR_WID + INT_TO_REAL_WID;
-wire [E_UNTRUNC_WID-1:0] e_scaled_unsat;
+`define E_UNTRUNC_WID (`ERR_WID + INT_TO_REAL_WID)
+wire [`E_UNTRUNC_WID-1:0] e_scaled_unsat;
 boothmul #(
 	.A1_LEN(INT_TO_REAL_WID),
-	.A2_LEN(ERR_WID)
+	.A2_LEN(`ERR_WID)
 ) mul_scale_err (
 	.clk(clk),
 	.arm(arm_stage_1),
@@ -97,19 +97,19 @@ boothmul #(
 	.fin(mul_scale_err_fin)
 );
 
-localparam E_WID = E_UNTRUNC_WID > CONSTS_WID ? CONSTS_WID : E_UNTRUNC_WID;
-wire [E_WID-1:0] e;
+`define E_WID (`E_UNTRUNC_WID > `CONSTS_WID ? `CONSTS_WID : `E_UNTRUNC_WID)
+wire [`E_WID-1:0] e;
 
-localparam E_FRAC = E_WID < CONSTS_FRAC ? E_WID : E_WID - CONSTS_FRAC;
-localparam E_WHOLE = E_WID - E_FRAC;
+`define E_FRAC (`E_WID < `CONSTS_FRAC ? `E_WID : `E_WID - `CONSTS_FRAC)
+`define E_WHOLE (`E_WID - `E_FRAC)
 
 /* Don't bother keeping numbers larger than the constant width
  * since the value will always fit in it. */
 
-generate if (E_UNTRUNC_WID > CONSTS_WID) begin
+generate if (`E_UNTRUNC_WID > `CONSTS_WID) begin
 	intsat #(
-		.IN_LEN(E_UNTRUNC_WID),
-		.LTRUNC(E_UNTRUNC_WID - CONSTS_WHOLE)
+		.IN_LEN(`E_UNTRUNC_WID),
+		.LTRUNC(`E_UNTRUNC_WID - `CONSTS_WHOLE)
 	) sat_mul_scale_err (
 		.inp(e_scaled_unsat),
 		.outp(e)
@@ -126,8 +126,8 @@ end endgenerate
  * Optimization note: the total width can be capped to below 1.
  */
 
-localparam DT_UNSAT_WID = CYCLE_COUNT_WID + SEC_PER_CYCLE_WID;
-wire [DT_UNSAT_WID-1:0] dt_unsat;
+`define DT_UNSAT_WID (CYCLE_COUNT_WID + SEC_PER_CYCLE_WID)
+wire [`DT_UNSAT_WID-1:0] dt_unsat;
 wire mul_dt_fin;
 boothmul #(
 	.A1_LEN(CYCLE_COUNT_WID),
@@ -141,16 +141,16 @@ boothmul #(
 	.fin(mul_dt_fin)
 );
 
-localparam DT_WID = DT_UNSAT_WID > CONSTS_WID ? CONSTS_WID : DT_UNSAT_WID;
-wire [DT_WID-1:0] dt;
+`define DT_WID (`DT_UNSAT_WID > `CONSTS_WID ? `CONSTS_WID : `DT_UNSAT_WID)
+wire [`DT_WID-1:0] dt;
 
-localparam DT_WHOLE = DT_WID < CONSTS_FRAC ? 0 : CONSTS_FRAC - DT_WID;
-localparam DT_FRAC = DT_WID - DT_WHOLE;
+`define DT_WHOLE (`DT_WID < `CONSTS_FRAC ? 0 : `CONSTS_FRAC - `DT_WID)
+`define DT_FRAC(`DT_WID - `DT_WHOLE)
 
-generate if (DT_UNSAT_WID > CONSTS_WID) begin
+generate if (`DT_UNSAT_WID > `CONSTS_WID) begin
 	intsat #(
-		.IN_LEN(DT_UNSAT_WID),
-		.LTRUNC(DT_UNSAT_WID - CONSTS_WID)
+		.IN_LEN(`DT_UNSAT_WID),
+		.LTRUNC(`DT_UNSAT_WID - `CONSTS_WID)
 	) insat_dt (
 		.inp(dt_unsat),
 		.outp(dt)
@@ -173,14 +173,14 @@ end endgenerate
 
 wire stage2_finished;
 reg arm_stage2 = 0;
-wire [CONSTS_WID-1:0] idt;
+wire [`CONSTS_WID-1:0] idt;
 
 mul_const #(
 /* TODO: does this autoinfer CONSTS_WID? */
 	.CONSTS_WHOLE(CONSTS_WHOLE),
 	.CONSTS_FRAC(CONSTS_FRAC),
-	.IN_WHOLE(DT_WHOLE),
-	.IN_FRAC(DT_FRAC)
+	.IN_WHOLE(`DT_WHOLE),
+	.IN_FRAC(`DT_FRAC)
 ) mul_const_idt (
 	.clk(clk),
 	.inp(dt),
@@ -190,9 +190,9 @@ mul_const #(
 	.finished(stage2_finished)
 );
 
-wire [CONSTS_WID:0] pidt_untrunc = cl_P + idt;
+wire [`CONSTS_WID:0] pidt_untrunc = cl_P + idt;
 /* Assuming that the constraints on cl_P, I, and dt hold */
-wire [CONSTS_WID-1:0] pidt = pidt_untrunc[CONSTS_WID-1:0];
+wire [`CONSTS_WID-1:0] pidt = pidt_untrunc[`CONSTS_WID-1:0];
 
 /**** Stage 3: calculate e_t(P + IΔt) and P e_{t-1} ****/
 
@@ -201,12 +201,12 @@ reg arm_stage3 = 0;
 wire epidt_finished;
 wire pe_finished;
 
-wire [CONSTS_WID-1:0] epidt;
+wire [`CONSTS_WID-1:0] epidt;
 mul_const #(
-	.CONSTS_WHOLE(CONSTS_WHOLE),
-	.CONSTS_FRAC(CONSTS_FRAC),
-	.IN_WHOLE(E_WHOLE),
-	.IN_FRAC(E_FRAC)
+	.CONSTS_WHOLE(`CONSTS_WHOLE),
+	.CONSTS_FRAC(`CONSTS_FRAC),
+	.IN_WHOLE(`E_WHOLE),
+	.IN_FRAC(`E_FRAC)
 ) mul_const_epidt (
 	.clk(clk),
 	.inp(e),
@@ -216,12 +216,12 @@ mul_const #(
 	.finished(epidt_finished)
 );
 
-wire [CONSTS_WID-1:0] pe;
+wire [`CONSTS_WID-1:0] pe;
 mul_const #(
-	.COSNTS_WHOLE(CONSTS_WHOLE),
-	.CONSTS_FRAC(CONSTS_FRAC),
-	.IN_WHOLE(E_WHOLE),
-	.IN_FRAC(E_FRAC)
+	.CONSTS_WHOLE(`CONSTS_WHOLE),
+	.CONSTS_FRAC(`CONSTS_FRAC),
+	.IN_WHOLE(`E_WHOLE),
+	.IN_FRAC(`E_FRAC)
 ) mul_const_pe (
 	.clk(clk),
 	.inp(e),
