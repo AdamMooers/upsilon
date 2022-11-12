@@ -62,3 +62,12 @@ same for fixed point binary and regular decimals.
 Addition: W1.F1 + W2.F2 = [max(W1,W2)+1].[max(F1,F2)]
 
 Multiplication: W1.F1W2.F2 = [W1+W2].[F1+F2]
+
+
+When multiplying two fixed point integers, where the decimal points
+do not correspond to the same points, then:
+
+* the output has the same number of bits as a normal addition/multiplication
+* for multiplication, the LSB is interpreted as position `m+n`, where
+  `m` is the interpretation of the LSB of the first integer and `n` as
+  the LSB of the second.

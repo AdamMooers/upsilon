@@ -2,8 +2,8 @@ module sign_extend #(
 	parameter WID1 = 18,
 	parameter WID2 = 24
 ) (
-	input signed [WID1-1:0] b1,
-	output signed [WID2-1:0] b2
+	input [WID1-1:0] b1,
+	output [WID2-1:0] b2
 );
 
 assign b2[WID1-1:0] = b1;

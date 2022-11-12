@@ -1,26 +1,69 @@
+`include control_loop_cmds.vh
+
 module top
 #(
 	parameter ADC_WID = 18,
-	parameter DAC_WID = 24,
+	parameter ADC_WID_LEN = 5,
 	parameter ADC_POLARITY = 1,
 	parameter ADC_PHASE = 0,
+	parameter ADC_CYCLE_HALF_WAIT = 5,
+	parameter ADC_TIMER_LEN = 3,
+
+	parameter DAC_POLARITY = 0,
+	parameter DAC_PHASE = 1,
 	parameter DAC_DATA_WID = 20,
+	parameter DAC_WID = 24,
+	parameter DAC_WID_LEN = 5,
+	parameter DAC_CYCLE_HALF_WAIT = 10,
+	parameter DAC_TIMER_LEN = 4,
+
 	parameter CONSTS_WID = 48,
 	parameter DELAY_WID = 16
 )(
 	input clk,
-	input arm,
 
 	input signed [ADC_WID-1:0] measured_data,
-	output signed [DAC_WID-1:0] output_data,
-	input signed [ADC_WID-1:0] setpt,
-	input signed [CONSTS_WID-1:0] alpha,
-	input signed [CONSTS_WID-1:0] cl_p,
-	input [DELAY_WID-1:0] dy,
+	input [DAC_DATA_WID-1:0] dac_in,
+	output [DAC_DATA_WID-1:0] dac_out,
+	output dac_input_ready,
 
-	output signed [ADC_WID:0] err,
-	output signed [CONSTS_WID-1:0] adj
+	input [CONSTS_WID-1:0] word_into_loop,
+	output [CONSTS_WID-1:0] word_outof_loop,
+	input start_cmd,
+	output finish_cmd,
+	input [CONTROL_LOOP_CMD_WIDTH-1:0] cmd
 );
+
+wire dac_miso;
+wire dac_mosi;
+wire dac_sck;
+wire ss_L;
+
+spi_slave #(
+	.WID(DAC_WID),
+	.WID_LEN(DAC_WID_LEN),
+	.POLARITY(DAC_POLARITY),
+	.PHASE(DAC_PHASE)
+) dac_slave (
+	.clk(clk),
+	.sck(dac_sck),
+	.mosi(dac_mosi),
+	.miso(dac_miso),
+);
+
+spi_master #(
+	.WID(DAC_WID),
+	.WID_LEN(DAC_WID_LEN),
+	.POLARITY(DAC_POLARITY),
+	.PHASE(DAC_PHASE),
+	.CYCLE_HALF_WAIT(DAC_CYCLE_HALF_WAIT),
+	.TIMER_LEN(DAC_TIMER_LEN)
+) dac_master (
+	.clk(clk),
+	.from_slave(dac_set_data),
+	.miso(dac_miso),
+	.to_slave(
+	.mosi(dac_mosi),
 
 wire adc_sck;
 wire adc_ss;
@@ -80,23 +123,7 @@ control_loop #(
 	.DAC_PHASE(DAC_PHASE)
 ) cloop (
 	.clk(clk),
-	.arm(arm),
 
-	.adc_sck(adc_sck),
-	.adc_in(adc_miso),
-	.adc_conv(adc_ss),
-
-	.dac_sck(dac_sck),
-	.dac_ss(dac_ss),
-	.dac_out(dac_mosi),
-
-	.setpt_in(setpt),
-	.cl_alpha_in(alpha),
-	.cl_p_in(cl),
-	.delay_in(dy),
-
-	.err(err_cur),
-	.adj(adj)
 );
 
 endmodule

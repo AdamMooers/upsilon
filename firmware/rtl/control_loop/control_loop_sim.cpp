@@ -157,17 +157,23 @@ static int64_t I_const, dt_const, P_const, setpt;
 static unsigned long seed, ;
 
 static void usage(char *argv0, int code) {
-	std::cout << argv0 << " -I I -t dt -d delay -s seed -S setpt -P p [+verilator...]" << std::endl;
+	std::cout << argv0 << " -d deviation -m mean -I I -t dt -d delay -s seed -S setpt -P p [+verilator...]" << std::endl;
 	exit(code);
 }
 
 static void parse_args(int argc, char *argv[]) {
-	const char *optstring = "I:t:s:P:h";
+	const char *optstring = "I:t:s:P:d:m:h";
 	int opt;
 	Verilated::commandArgs(argc, argv);
 
 	while ((opt = getopt(argc, argv, optstring)) != -1) {
 		switch (opt) {
+		case 'm':
+			noise_mean = strtod(optstring, NULL);
+			break;
+		case 'd':
+			dev_mean = strtod(optstring, NULL);
+			break;
 		case 'I':
 			I_const = signed_to_fxp(optarg);
 			break;
@@ -203,9 +209,4 @@ int main(int argc, char **argv) {
 	mod = new Vtop;
 
 	mod->clk = 0;
-	mod->arm = 1;
-	mod->setpt = setpt;
-	mod->alpha = I_const * dt_const + P_const;
-	mod->cl_p = P_const;
-	mod->dy = 5;
 }

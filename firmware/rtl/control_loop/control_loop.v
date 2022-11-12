@@ -1,40 +1,3 @@
-/*************** Precision **************
- * The control loop is designed around these values, but generally
- * does not hardcode them.
- *
- * Since α and P are precalculated outside of the loop, their
- * conversion to numbers the loop understands is done outside of
- * the loop and in the kernel.
- *
- * The 18-bit ADC is twos-compliment, -10.24V to 10.24V,
- * with 78μV per increment.
- * The 20-bit DAC is twos-compliment, -10V to 10V.
- *
- * The `P` constant has a minimum value of 1e-7 with a precision
- * of 1e-9, and a maxmimum value of 1.
- *
- * The `I` constant has a minimum value of 1e-4 with a precision
- * of 1e-6 and a maximum value of 100.
- *
- * Δt is cycles/100MHz. This makes Δt at least 10 ns, with a
- * maximum of 1 ms.
- *
- * Intermediate values are 48-bit fixed-point integers multiplied
- * by the step size of the ADC. The first 18 bits are the whole
- * number and sign bits. This means intermediate values correspond
- * exactly to values as understood by the ADC, with extra precision.
- *
- * To get the normal fixed-point value of an intermediate value,
- * multiply it by 78e-6. To convert a normal fixed-point integer
- * to an intermediate value, multiply it by 1/78e-6. In both
- * cases, the conversion constant is a normal fixed-point integer.
- *
- * For instance, to encode the value 78e-6 as an intermediate
- * value, multiply it by 1/78e-6 to obtain 1. Thus the value
- * should be stored as 1 (whole bit) followed by zeros (fractional
- * bits).
- */
-
 `include control_loop_cmds.vh
 `define ERR_WID (ADC_WID + 1)
 
@@ -58,7 +21,7 @@ module control_loop
 	parameter ERR_WID_SIZ = 6,
 	parameter DATA_WID = CONSTS_WID,
 	parameter READ_DAC_DELAY = 5,
-	parameter CYCLE_COUNT_WID = 16
+	parameter CYCLE_COUNT_WID = 18
 ) (
 	input clk,
 
@@ -98,7 +61,6 @@ reg signed [CONSTS_WID-1:0] cl_p_reg_buffer = 0;
 
 reg [DELAY_WID-1:0] dely = 0;
 reg [DELAY_WID-1:0] dely_buffer = 0;
-
 
 reg running = 0;
 reg signed[DAC_DATA_WID-1:0] stored_dac_val = 0;
@@ -154,7 +116,13 @@ reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
  *    Measured value: ADC_WID.0
  *    Setpoint: ADC_WID.0
  * - ----------------------------|
- *      e: ERR_WID.0
+ *      e_unsc: ERR_WID.0
+ *  x   78e-6: 0.CONSTS_FRAC
+ * - ----------------------------|
+ *      e_uncropped: ERR_WID.CONSTS_FRAC
+ * -------------------------------------
+ *      e: CONSTS_WID.CONSTS_FRAC
+ *
  *
  *   α: CONSTS_WHOLE.CONSTS_FRAC |         P: CONSTS_WHOLE.CONSTS_FRAC
  *   e: ERR_WID.0                |         e_p: ERR_WID.0
@@ -170,7 +138,34 @@ reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
  */
 
 /**** Calculate Error ****/
-wire [ERR_WID-1:0] err_cur = measured_value - setpoint;
+wire [ERR_WID-1:0] e_unsc = measured_value - setpoint;
+
+/**** convert error value to real value ****/
+
+wire [ERR_WID+CONSTS_FRAC-1:0] e_uncrop;
+reg mul_scale_err_fin = 0;
+
+boothmul #(
+	.A1_LEN(ERR_WID),
+	.A2_LEN(CONSTS_FRAC)
+) mul_scale_err (
+	.clk(clk),
+	.arm(arm_err_scale),
+	.a1(e_unsc),
+	.a2(adc_int_to_real),
+	.outn(e_uncrop),
+	.fin(mul_scale_err_fin)
+);
+
+wire [CONSTS_WID-1:0] e;
+
+intsat #(
+	.A1_LEN(ERR_WID + CONSTS_FRAC),
+	.A2_LEN(CONSTS_WID)
+) mul_scale_err_crop (
+	.inp(e_uncrop),
+	.outp(e)
+);
 
 /****** Multiplication *******
  * Truncation of a fixed-point integer to a smaller buffer requires

@@ -29,12 +29,15 @@ static void init(int argc, char **argv) {
 
 static void satmul(int64_t const_in, int64_t inp) {
 	int64_t r = const_in * inp;
-	if (r >= BITMASK(48))
+	if (r >= BITMASK(48)) {
 		return BITMASK(48);
-	else if (r <= -BITMASK(48))
-		return -BITMASK(48);
-	else
+	} else if (r <= -BITMASK(48)) {
+		V allzero = ~((V) 0);
+		// make (siz - 1) zero bits
+		return allzero & (allzero << (siz - 1));
+	} else {
 		return r; 
+	}
 }
 
 #define RUNS 10000
