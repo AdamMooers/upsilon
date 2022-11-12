@@ -28,11 +28,7 @@ module control_loop_math #(
 	parameter CONSTS_WHOLE = 8,
 	parameter CONSTS_FRAC = 40,
 `define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
-	/* This number is 1/(clock cycle).
-	   The number is interpreted so the least significant bit
-	   coincides with the LSB of a constant. */
-	parameter SEC_PER_CYCLE_WID = 14,
-	parameter [SEC_PER_CYCLE_WID-1:0] SEC_PER_CYCLE = 'b10101011110011,
+
 	parameter DAC_DATA_WID = 20,
 	parameter ADC_WID = 18,
 `define E_WID (ADC_WID + 1)
@@ -41,9 +37,8 @@ module control_loop_math #(
 	 * The OUT_FRAC value should usually but not always be the same as CONSTS_FRAC.
 	 */
 	parameter OUT_WHOLE = 20,
-	parameter OUT_FRAC = 40,
+	parameter OUT_FRAC = 40
 `define OUT_WID (OUT_WHOLE + OUT_FRAC)
-	parameter CYCLE_COUNT_WID = 18
 ) (
 	input clk,
 	input arm,

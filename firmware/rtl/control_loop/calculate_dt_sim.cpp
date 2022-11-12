@@ -44,6 +44,14 @@ int main(int argc, char **argv) {
 			goto end;
 		}
 
+		struct fixed_point fxp = {
+			.val = real_dt,
+			.whole_len = 0,
+			.frac_len = 40
+		};
+
+		printf("%s\n", fxp_to_string(fxp).c_str());
+
 		run_clock();
 	}
 
