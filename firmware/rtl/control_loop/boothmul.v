@@ -1,5 +1,18 @@
-/* Booth Multiplication v0.1
+/* Booth Multiplication v1.0
  * Written by Peter McGoron, 2022.
+ *
+ * This source describes Open Hardware and is licensed under the
+ * CERN-OHL-W v2.
+ * You may redistribute and modify this documentation and make products using
+ * it under the terms of the CERN-OHL-W v2 (https:/cern.ch/cern-ohl), or, at
+ * your option, any later version.
+ *
+ * This documentation is distributed WITHOUT ANY EXPRESS OR IMPLIED WARRANTY,
+ * INCLUDING OF MERCHANTABILITY, SATISFACTORY QUALITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE. Please see the CERN-OHL-W v2 for applicable
+ * conditions.
+ *
+ * Source location: https://software.mcgoron.com/peter/boothmul
  */
 
 module boothmul
@@ -16,6 +29,12 @@ module boothmul
 	input [A1_LEN-1:0] a1,
 	input [A2_LEN-1:0] a2,
 	output [A1_LEN+A2_LEN-1:0] outn,
+`ifdef DEBUG
+	output [A1_LEN+A2_LEN+1:0] debug_a,
+	output [A1_LEN+A2_LEN+1:0] debug_s,
+	output [A1_LEN+A2_LEN+1:0] debug_p,
+	output [A2LEN_SIZ-1:0] debug_state,
+`endif
 	output reg fin
 );
 
@@ -23,8 +42,8 @@ module boothmul
  * Booth Parameters
  **********************/
 
-localparam OUT_LEN = A1_LEN + A2_LEN;
-localparam REG_LEN = OUT_LEN + 2;
+`define OUT_LEN (A1_LEN + A2_LEN)
+`define REG_LEN (`OUT_LEN + 2)
 
 /* The Booth multiplication algorithm is a sequential algorithm for
  * twos-compliment integers.
@@ -50,17 +69,39 @@ localparam REG_LEN = OUT_LEN + 2;
  * [M][     A1_LEN      ][       A2_LEN       ][0]
  */
 
-reg signed [REG_LEN-1:0] a;
-reg signed [REG_LEN-1:0] s;
-reg signed [REG_LEN-1:0] p = 0;
+reg [A1_LEN-1:0] a1_reg;
 
-assign outn[OUT_LEN-1:0] = p[REG_LEN-2:1];
+wire [`REG_LEN-1:0] a;
+assign a[A2_LEN:0] = 0;
+assign a[`REG_LEN-2:A2_LEN+1] = a1_reg;
+assign a[`REG_LEN-1] = a1_reg[A1_LEN-1];
+wire signed [`REG_LEN-1:0] a_signed;
+assign a_signed = a;
+
+wire [`REG_LEN-1:0] s;
+assign s[A2_LEN:0] = 0;
+assign s[`REG_LEN-1:A2_LEN+1] = ~{a1_reg[A1_LEN-1],a1_reg} + 1;
+wire signed [`REG_LEN-1:0] s_signed;
+assign s_signed = s;
+
+reg [`REG_LEN-1:0] p;
+wire signed [`REG_LEN-1:0] p_signed;
+assign p_signed = p;
+
+assign outn = p[`REG_LEN-2:1];
 
 /**********************
  * Loop Implementation
  *********************/
 
 reg[A2LEN_SIZ-1:0] loop_accul = 0;
+
+`ifdef DEBUG
+assign debug_a = a;
+assign debug_s = s;
+assign debug_p = p;
+assign debug_state = loop_accul;
+`endif
 
 always @ (posedge clk) begin
 	if (!arm) begin
@@ -69,18 +110,14 @@ always @ (posedge clk) begin
 	end else if (loop_accul == 0) begin
 		p[0] <= 0;
 		p[A2_LEN:1] <= a2;
-		p[REG_LEN-1:A2_LEN+1] <= 0;
+		p[`REG_LEN-1:A2_LEN+1] <= 0;
 
-		a[A2_LEN:0] <= 0;
-		a[REG_LEN-2:A2_LEN + 1] <= a1;
-		a[REG_LEN-1] <= a1[A1_LEN-1]; // Sign extension
-
-		s[A2_LEN:0] <= 0;
-		// Extend before negation to ensure size
-		s[REG_LEN-1:A2_LEN+1] <= ~{a1[A1_LEN-1],a1} + 1;
+		a1_reg <= a1;
 
 		loop_accul <= loop_accul + 1;
+	/* verilator lint_off WIDTH */
 	end else if (loop_accul < A2_LEN + 1) begin
+	/* verilator lint_on WIDTH */	
 		/* The loop counter starts from 1, so it must go to
 		 * A2_LEN + 1 exclusive.
 		 *         (i = 0; i < len;     i++)
@@ -88,9 +125,9 @@ always @ (posedge clk) begin
 		 */
 		loop_accul <= loop_accul + 1;
 		case (p[1:0])
-		2'b00, 2'b11: p <= p >>> 1;
-		2'b10: p <= (p + s) >>> 1;
-		2'b01: p <= (p + a) >>> 1;
+		2'b00, 2'b11: p <= p_signed >>> 1;
+		2'b10: p <= (p_signed + s_signed) >>> 1;
+		2'b01: p <= (p_signed + a_signed) >>> 1;
 		endcase
 	end else begin
 		fin <= 1;

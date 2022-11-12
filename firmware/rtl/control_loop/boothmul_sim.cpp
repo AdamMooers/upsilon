@@ -71,6 +71,7 @@ int main(int argc, char **argv) {
 	mod->final();
 
 	delete mod;
+	std::cout << "done" << std::endl;
 
 	return 0;
 }
