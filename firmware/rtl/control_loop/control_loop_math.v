@@ -1,4 +1,3 @@
-`undefineall
 /*************** Precision **************
  * The control loop is designed around these values, but generally
  * does not hardcode them.
@@ -20,225 +19,216 @@
  * Δt is cycles/100MHz. This makes Δt at least 10 ns, with a
  * maximum of 1 ms.
  *
- * [1 : sign][7: whole][40: fractional]
- * This is 127 to -128, with a resolution of 9.095e-13.
+ * [1 : sign][20: whole][43: fractional]
  */
 
 module control_loop_math #(
-	parameter CONSTS_WHOLE = 8,
-	parameter CONSTS_FRAC = 40,
+	parameter CONSTS_WHOLE = 21,
+	parameter CONSTS_FRAC = 43,
 `define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
+	parameter CONSTS_SIZ=7,
 
-	parameter DAC_DATA_WID = 20,
 	parameter ADC_WID = 18,
+	parameter [`CONSTS_WID-1:0] SEC_PER_CYCLE = 'b10101011110011000,
+	parameter CYCLE_COUNT_WID = 18
 `define E_WID (ADC_WID + 1)
-	/* How large the intermediate value should be. This should hold the ADC
-	 * value /as an integer/ along with the P, I values.
-	 * The OUT_FRAC value should usually but not always be the same as CONSTS_FRAC.
-	 */
-	parameter OUT_WHOLE = 20,
-	parameter OUT_FRAC = 40
-`define OUT_WID (OUT_WHOLE + OUT_FRAC)
 ) (
 	input clk,
 	input arm,
 	output reg finished,
 
-	input [ADC_WID-1:0] setpt,
-	input [ADC_WID-1:0] measured,
-	input [`CONSTS_WID-1:0] cl_P,
-	input [`CONSTS_WID-1:0] cl_I,
-	input [CYCLE_COUNT_WID-1:0] cycles,
-	input [`ERR_WID-1:0] e_prev,
-	input [`OUT_WID-1:0] adjval_prev,
+	input signed [ADC_WID-1:0] setpt,
+	input signed [ADC_WID-1:0] measured,
+	input signed [`CONSTS_WID-1:0] cl_P,
+	input signed [`CONSTS_WID-1:0] cl_I,
+	input signed [CYCLE_COUNT_WID-1:0] cycles,
+	input signed [`E_WID-1:0] e_prev,
+	input signed [`CONSTS_WID-1:0] adjval_prev,
 
-	output reg [`ERR_WID-1:0] e_cur,
-	output [`OUT_WID-1:0] adj_val
+`ifdef DEBUG_CONTROL_LOOP_MATH
+	output reg [`CONSTS_WID-1:0] dt_reg,
+	output reg [`CONSTS_WID-1:0] idt_reg,
+	output reg [`CONSTS_WID-1:0] epidt_reg,
+	output reg [`CONSTS_WID-1:0] ep_reg,
+`endif
+
+	output reg signed [`E_WID-1:0] e_cur,
+	output signed [`CONSTS_WID-1:0] adj_val
 );
 
-/* Calculate current error */
-assign e_cur = setpt - measured;
-
-/**** Stage 1: calculate Δt = cycles/100MHz
- *    cycles: CYCLE_COUNT_WID.0
- *    SEC_PER_CYCLE: 0....SEC_PER_CYCLE_WID
- * -x--------------------------------
- *    dt_unsat: CYCLE_COUNT_WID + SEC_PER_CYCLE_WID
- *
- * Optimization note: the total width can be capped to below 1.
+/*******
+ * Multiplier segment.
+ * Multiplies two 64 bit numbers and right-saturate + truncates it
+ * to be a 64 bit output, according to fixed-point rules.
  */
 
-reg arm_stage_1 = 0;
-
-`define DT_UNSAT_WID (CYCLE_COUNT_WID + SEC_PER_CYCLE_WID)
-wire [`DT_UNSAT_WID-1:0] dt_unsat;
-wire mul_dt_fin;
+reg signed [`CONSTS_WID-1:0] a1;
+reg signed [`CONSTS_WID-1:0] a2;
+/* verilator lint_off UNUSED */
+wire signed [`CONSTS_WID+`CONSTS_WID-1:0] out_untrunc;
+wire mul_fin;
+reg mul_arm;
 
 boothmul #(
-	.A1_LEN(CYCLE_COUNT_WID),
-	.A2_LEN(SEC_PER_CYCLE_WID)
-) mul_dt (
+	.A1_LEN(`CONSTS_WID),
+	.A2_LEN(`CONSTS_WID),
+	.A2LEN_SIZ(CONSTS_SIZ)
+) multiplier (
+	.a1(a1),
+	.a2(a2),
 	.clk(clk),
-	.arm(arm_stage_1),
-	.a1(cycles),
-	.a2(SEC_PER_CYCLE),
-	.outn(dt_unsat),
-	.fin(mul_dt_fin)
+	.outn(out_untrunc),
+	.fin(mul_fin),
+	.arm(mul_arm)
 );
 
-`define DT_WID (`DT_UNSAT_WID > `CONSTS_WID ? `CONSTS_WID : `DT_UNSAT_WID)
-wire [`DT_WID-1:0] dt;
-
-`define DT_WHOLE (`DT_WID < `CONSTS_FRAC ? 0 : `CONSTS_FRAC - `DT_WID)
-`define DT_FRAC (`DT_WID - `DT_WHOLE)
-
-generate if (`DT_UNSAT_WID > `CONSTS_WID) begin
-	intsat #(
-		.IN_LEN(`DT_UNSAT_WID),
-		.LTRUNC(`DT_UNSAT_WID - `CONSTS_WID)
-	) insat_dt (
-		.inp(dt_unsat),
-		.outp(dt)
-	);
-end else begin
-	assign dt = dt_unsat;
-end endgenerate
-
-/**** Stage 2: Calculate P + IΔt
- *     I: CONSTS_WHOLE.CONSTS_FRAC
- *  x  dt: DT_WHOLE.DT_FRAC
- *-- -------------------------------
- *     Idt_unscaled:
- *-- --------------------------------
- *     Idt: CONSTS_WHOLE.CONSTS_FRAC
- *
- * Right-truncate DT_FRAC bits to ensure CONSTS_FRAC
- * Integer-sature the DT_WHOLE bits if it extends far enough
+/****************************
+ * QX.Y * QX.Y = Q(2X).(2Y)
+ * This right-truncation gets rid of the lowest Y bits.
+ * Q(2X).Y
  */
 
-wire stage2_finished;
-reg arm_stage2 = 0;
-wire [`CONSTS_WID-1:0] idt;
+`define OUT_RTRUNC_WID (`CONSTS_WID+`CONSTS_WID-CONSTS_FRAC)
+wire signed [`OUT_RTRUNC_WID-1:0] out_rtrunc
+	= out_untrunc[`CONSTS_WID+`CONSTS_WID-1:CONSTS_FRAC];
 
-mul_const #(
-	.CONSTS_WHOLE(CONSTS_WHOLE),
-	.CONSTS_FRAC(CONSTS_FRAC),
-	.IN_WHOLE(`DT_WHOLE),
-	.IN_FRAC(`DT_FRAC),
-	.OUT_WHOLE(CONSTS_WHOLE),
-	.OUT_FRAC(CONSTS_FRAC)
-) mul_const_idt (
-	.clk(clk),
-	.inp(dt),
-	.const_in(cl_I),
-	.arm(arm_stage2),
-	.outp(idt),
-	.finished(stage2_finished)
-);
+wire signed [`CONSTS_WID-1:0] mul_out;
 
-reg [`CONSTS_WID:0] pidt_untrunc;
-/* Assuming that the constraints on cl_P, I, and dt hold */
-wire [`CONSTS_WID-1:0] pidt = pidt_untrunc[`CONSTS_WID-1:0];
-
-/**** Stage 3: calculate e_t(P + IΔt) and P e_{t-1} ****/
-
-reg arm_stage3 = 0;
-
-wire epidt_finished;
-wire pe_finished;
-
-wire [`OUT_WID-1:0] epidt;
-mul_const #(
-	.CONSTS_WHOLE(`CONSTS_WHOLE),
-	.CONSTS_FRAC(`CONSTS_FRAC),
-	.IN_WHOLE(`E_WID),
-	.IN_FRAC(0),
-	.OUT_WHOLE(OUT_WHOLE),
-	.OUT_FRAC(OUT_FRAC)
-) mul_const_epidt (
-	.clk(clk),
-	.inp(e_cur),
-	.const_in(idt),
-	.arm(arm_stage3),
-	.outp(epidt),
-	.finished(epidt_finished)
-);
-
-wire [`OUT_WID-1:0] pe;
-mul_const #(
-	.CONSTS_WHOLE(`CONSTS_WHOLE),
-	.CONSTS_FRAC(`CONSTS_FRAC),
-	.IN_WHOLE(`ERR_WID),
-	.IN_FRAC(0),
-	.OUT_WHOLE(OUT_WHOLE),
-	.OUT_FRAC(OUT_FRAC)
-) mul_const_pe (
-	.clk(clk),
-	.inp(e_prev),
-	.const_in(idt),
-	.arm(arm_stage3),
-	.outp(pe),
-	.finished(epidt_finished)
-);
-
-reg [`OUT_WID+1:0] adj_val_utrunc;
-/* = prev_adj + epidt - pe; */
+/***************************
+ * Saturate higher X bits away.
+ * Q(2X).Y -> QX.Y
+ */
 
 intsat #(
-	.IN_LEN(`OUT_WID + 2),
-	.LTRUNC(2)
-) adj_val_sat (
-	.inp(adj_val_utrunc),
-	.outp(adj_val)
+	.IN_LEN(`OUT_RTRUNC_WID),
+	.LTRUNC(CONSTS_WHOLE)
+) multiplier_saturate (
+	.inp(out_rtrunc),
+	.outp(mul_out)
 );
 
-/******* State machine ********/
-localparam WAIT_ON_ARM = 0;
-localparam WAIT_ON_STAGE_1 = 1;
-localparam WAIT_ON_STAGE_2 = 2;
-localparam WAIT_ON_STAGE_3 = 3;
-localparam WAIT_ON_DISARM = 4;
+/*************************
+ * Safely get rid of high bit in addition.
+ ************************/
 
-localparam STATE_SIZ = 3;
-reg [STATE_SIZ-1:0] state = WAIT_ON_ARM;
+reg signed [`CONSTS_WID+1-1:0] add_sat;
+wire signed [`CONSTS_WID-1:0] saturated_add;
+
+intsat #(
+	.IN_LEN(`CONSTS_WID + 1),
+	.LTRUNC(1)
+) addition_saturate (
+	.inp(add_sat),
+	.outp(saturated_add)
+);
+
+localparam WAIT_ON_ARM = 0;
+localparam WAIT_ON_CALCULATE_DT = 1;
+localparam CALCULATE_IDT = 2;
+localparam CALCULATE_EPIDT = 3;
+localparam CALCULATE_EP = 4;
+localparam CALCULATE_A_PART_1 = 5;
+localparam CALCULATE_A_PART_2 = 6;
+localparam WAIT_ON_DISARM = 7;
+
+reg [4:0] state = WAIT_ON_ARM;
+reg signed [`CONSTS_WID+1-1:0] tmpstore = 0;
+wire signed [`CONSTS_WID-1:0] tmpstore_view = tmpstore[`CONSTS_WID-1:0];
 
 always @ (posedge clk) begin
-	case (state) begin
-	WAIT_ON_ARM: begin
+	case (state)
+	WAIT_ON_ARM:
 		if (arm) begin
-			arm_stage_1 <= 1;
-			state <= WAIT_ON_STAGE_1;
+			e_cur <= setpt - measured;
+
+			a1 <= SEC_PER_CYCLE;
+			/* No sign extension, cycles is positive */
+			a2 <= {{(CONSTS_WHOLE - CYCLE_COUNT_WID){1'b0}}, cycles, {(CONSTS_FRAC){1'b0}}};
+			mul_arm <= 1;
+			state <= WAIT_ON_CALCULATE_DT;
+		end else begin
+			finished <= 0;
 		end
+	WAIT_ON_CALCULATE_DT:
+		if (mul_fin) begin
+			mul_arm <= 0;
+
+			`ifdef DEBUG_CONTROL_LOOP_MATH
+				dt_reg <= mul_out;
+			`endif
+
+			a1 <= mul_out; /* a1 = Δt */
+			a2 <= cl_I;
+			state <= CALCULATE_IDT;
+		end
+	CALCULATE_IDT:
+		if (!mul_arm) begin
+			mul_arm <= 1;
+		end else if (mul_fin) begin
+			mul_arm <= 0;
+			add_sat <= (mul_out + cl_P);
+
+			`ifdef DEBUG_CONTROL_LOOP_MATH
+				idt_reg <= mul_out;
+			`endif
+
+			a2 <= {{(CONSTS_WHOLE-`E_WID){e_cur[`E_WID-1]}},e_cur, {(CONSTS_FRAC){1'b0}}};
+			state <= CALCULATE_EPIDT;
+		end
+	CALCULATE_EPIDT:
+		if (!mul_arm) begin
+			a1 <= saturated_add;
+			mul_arm <= 1;
+		end else if (mul_fin) begin
+			mul_arm <= 0;
+			tmpstore <= {mul_out[`CONSTS_WID-1],mul_out};
+
+			`ifdef DEBUG_CONTROL_LOOP_MATH
+				epidt_reg <= mul_out;
+			`endif
+
+			a1 <= cl_P;
+			a2 <= {{(CONSTS_WHOLE-`E_WID){e_prev[`E_WID-1]}},e_prev, {(CONSTS_FRAC){1'b0}}};
+			state <= CALCULATE_EP;
+		end
+	CALCULATE_EP:
+		if (!mul_arm) begin
+			mul_arm <= 1;
+		end else if (mul_fin) begin
+			`ifdef DEBUG_CONTROL_LOOP_MATH
+				ep_reg <= mul_out;
+			`endif
+
+			mul_arm <= 0;
+			add_sat <= (tmpstore_view - mul_out);
+			state <= CALCULATE_A_PART_1;
+		end
+	CALCULATE_A_PART_1: begin
+		tmpstore <= saturated_add + adjval_prev;
+		state <= CALCULATE_A_PART_2;
 	end
-	WAIT_ON_STAGE_1: begin
-		if (mul_scale_err_fin && mul_dt_fin) begin
-			arm_stage_1 <= 0;
-			arm_stage_2 <= 1;
-			state <= WAIT_ON_STAGE_2;
-		end
-	end
-	WAIT_ON_STAGE_2: begin
-		if (stage2_finished) begin
-			pidt_untrunc <= cl_P + idt;
-			arm_stage_2 <= 0;
-			arm_stage_3 <= 1;
-			state <= WAIT_ON_STAGE_3;
-		end
-	end
-	WAIT_ON_STAGE_3: begin
-		if (epidt_finished && pe_finished) begin
-			adj_val_utrunc <= prev_adj + epidt - pe;
-			arm_stage3 <= 0;
-			finished <= 1;
-			state <= WAIT_ON_DISARM;
-		end
+	CALCULATE_A_PART_2: begin
+		add_sat <= tmpstore;
+		state <= WAIT_ON_DISARM;
 	end
 	WAIT_ON_DISARM: begin
+		adj_val <= saturated_add;
 		if (!arm) begin
-			finished <= 0;
 			state <= WAIT_ON_ARM;
+			finished <= 0;
+		end else begin
+			finished <= 1;
 		end
 	end
+	endcase
 end
 
+`ifdef VERILATOR
+initial begin
+	$dumpfile("control_loop_math.fst");
+	$dumpvars;
+end
+`endif
+
 endmodule
+`undefineall

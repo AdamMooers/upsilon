@@ -2,7 +2,14 @@
 
 #define BITMASK(n) (((V)1 << (n)) - 1)
 
-static V sat(V r, unsigned siz) {
+/* only works on 64 bit GCC/Clang, can use boost (eww boost) */
+
+static V sat(__int128_t r, unsigned siz, unsigned discard) {
+	r >>= discard;
+	/* Since this is signed numbers, the actual number of bits of
+	 * the largest number is one less than the bit size. */
+	siz -= 1;
+
 	if (r >= BITMASK(siz)) {
 		return BITMASK(siz);
 	} else if (r <= -BITMASK(siz)) {
@@ -10,19 +17,18 @@ static V sat(V r, unsigned siz) {
 		// make (siz - 1) zero bits
 		return allzero & (allzero << (siz - 1));
 	} else {
-		return r; 
+		return r;
 	}
 }
 
+V mulsat(V x, V y, unsigned siz, unsigned discard) {
+	__int128_t v = (__int128_t)x * (__int128_t)y;
 
-V calculate_dt(V cycles, unsigned siz) {
-	constexpr V sec_per_cycle = 0b10101011110011;
-
-	return sat(sec_per_cycle * cycles, siz);
+	return sat(v, siz, discard);
 }
 
-static char d2c(int c) {
-	switch (c % 10) {
+static int d2c(unsigned d) {
+	switch (d) {
 	case 0: return '0';
 	case 1: return '1';
 	case 2: return '2';
@@ -36,7 +42,6 @@ static char d2c(int c) {
 	default: return '?';
 	}
 }
-
 std::string fxp_to_string(const struct fixed_point &fxp) {
 	std::string r = std::to_string((fxp.val >> fxp.frac_len) & BITMASK(fxp.whole_len));
 	V frac = fxp.val & BITMASK(fxp.frac_len);
@@ -50,4 +55,28 @@ std::string fxp_to_string(const struct fixed_point &fxp) {
 	}
 
 	return r;
+}
+
+#if 0
+V asr (V x, unsigned len) {
+	if (x >= 0)
+		return x >> len;
+	x >>= len;
+
+	/* x is shifted-right by N bits. This makes a mask of
+	 * N bits, and shifts it to the highest position.
+	 */
+	V mask = ((1 << len) - 1) << (sizeof(x) * CHAR_BITS - len);
+	return mask | x;
+}
+#endif
+
+V sign_extend(V x, unsigned len) {
+	/* if high bit is 1 */
+	if (x >> (len - 1) & 1) {
+		V mask = (1 << len) - 1;
+		return ~mask | x;
+	} else {
+		return x;
+	}
 }

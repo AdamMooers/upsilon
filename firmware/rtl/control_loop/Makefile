@@ -1,32 +1,26 @@
 # Makefile for tests and hardware verification.
 
+.PHONY: test clean
 COMMON_CPP = control_loop_math_implementation.cpp
-
 COMMON= ${COMMON_CPP} control_loop_math_implementation.h
 
-obj_dir/Vmul_const.mk: mul_const_sim.cpp mul_const.v boothmul.v intsat.v
+CONSTS_FRAC=43
+E_WID=19
+
+test: obj_dir/Vcontrol_loop_math
+	obj_dir/Vcontrol_loop_math
+clean:
+	rm -rf obj_dir
+
+obj_dir/Vcontrol_loop_math.mk: control_loop_math_sim.cpp ${COMMON} \
+                               control_loop_math.v
 	verilator --cc --exe -Wall --trace --trace-fst \
-		--top-module mul_const \
-		mul_const.v mul_const_sim.cpp
+		--top-module control_loop_math \
+		-GCONSTS_FRAC=${CONSTS_FRAC} -DDEBUG_CONTROL_LOOP_MATH \
+		-CFLAGS -DCONSTS_FRAC=${CONSTS_FRAC} \
+		-CFLAGS -DE_WID=${E_WID} \
+		control_loop_math.v control_loop_math_sim.cpp ${COMMON_CPP}
 
-obj_dir/Vmul_const: obj_dir/Vmul_const.mk
-	cd obj_dir && make -f Vmul_const.mk
+obj_dir/Vcontrol_loop_math: obj_dir/Vcontrol_loop_math.mk
+	cd obj_dir && make -f Vcontrol_loop_math.mk
 
-SEC_PER_CYCLE_WID=15
-CYCLE_COUNT_WID=18
-UNSAT_WID=(${SEC_PER_CYCLE_WID} + ${CYCLE_COUNT_WID})
-MAX_WID=48
-DT_WID=$(shell echo $$((${UNSAT_WID} > ${MAX_WID} ? ${MAX_WID} : ${UNSAT_WID})))
-
-obj_dir/Vcalculate_dt.mk: calculate_dt_sim.cpp calculate_dt.v ${COMMON}
-	verilator --cc --exe -Wall --trace --trace-fst \
-		--top-module calculate_dt \
-		-GSEC_PER_CYCLE_WID=${SEC_PER_CYCLE_WID} \
-		-GCYCLE_COUNT_WID=${CYCLE_COUNT_WID} \
-		-CFLAGS -DDT_WID=${DT_WID} \
-		calculate_dt.v calculate_dt_sim.cpp ${COMMON_CPP}
-obj_dir/Vcalculate_dt: obj_dir/Vcalculate_dt.mk
-	cd obj_dir && make -f Vcalculate_dt.mk
-
-test: obj_dir/Vcalculate_dt
-	obj_dir/Vcalculate_dt
