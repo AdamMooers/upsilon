@@ -1,4 +1,4 @@
-/* (c) Peter McGoron 2022 v0.1
+/* (c) Peter McGoron 2022 v0.2
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v.2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -24,7 +24,7 @@ spi_slave
 	input ss_L,
 `ifndef SPI_SLAVE_NO_READ
 	output reg [WID-1:0] from_master,
-	input reg mosi,
+	input mosi,
 `endif
 `ifndef SPI_SLAVE_NO_WRITE
 	input [WID-1:0] to_master,
@@ -34,6 +34,17 @@ spi_slave
 	input rdy,
 	output reg err
 );
+
+`ifndef SPI_SLAVE_NO_READ
+/* MOSI is almost always an external wire, so buffer it. */
+reg mosi_hot = 0;
+reg read_mosi = 0;
+
+always @ (posedge clk) begin
+	read_mosi <= mosi_hot;
+	mosi_hot <= mosi;
+end
+`endif
 
 wire ss = !ss_L;
 reg sck_delay = 0;
@@ -48,7 +59,7 @@ reg [WID-1:0] send_buf = 0;
 task read_data();
 `ifndef SPI_SLAVE_NO_READ
 	from_master <= from_master << 1;
-	from_master[0] <= mosi;
+	from_master[0] <= read_mosi;
 `endif
 endtask
 
@@ -77,7 +88,7 @@ task setup_bits();
 endtask
 
 task check_counter();
-	if (bit_counter == WID) begin
+	if (bit_counter == WID[WID_LEN-1:0]) begin
 		err <= ready_at_start;
 	end else begin
 		bit_counter <= bit_counter + 1;

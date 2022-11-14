@@ -1,5 +1,12 @@
-/* SPI master.
- * Written by Peter McGoron, 2022.
+/* (c) Peter McGoron 2022 v0.2
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v.2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+/* CYCLE_HALF_WAIT should take into account the setup time of the slave
+ * device, and also master buffering (MISO is one cycle off to stabilize
+ * the input).
  */
 
 module
@@ -12,11 +19,11 @@ spi_master_no_write
 spi_master
 `endif
 `endif
-
 #(
 	parameter WID = 24, // Width of bits per transaction.
 	parameter WID_LEN = 5, // Length in bits required to store WID
-	parameter CYCLE_HALF_WAIT = 1, // Half of the wait time of a cycle
+	parameter CYCLE_HALF_WAIT = 1, // Half of the wait time of a cycle minus 1.
+	                               // One SCK cycle is 2*(CYCLE_HALF_WAIT + 1) clock cycles.
 	parameter TIMER_LEN = 3, // Length in bits required to store CYCLE_HALF_WAIT
 	parameter POLARITY = 0, // 0 = sck idle low, 1 = sck idle high
 	parameter PHASE = 0 // 0 = rising-read falling-write, 1 = rising-write falling-read.
@@ -29,12 +36,29 @@ spi_master
 `endif
 `ifndef SPI_MASTER_NO_WRITE
 	input [WID-1:0] to_slave,
-	output mosi,
+	output reg mosi,
 `endif
-	output sck_wire,
-	output finished,
+	output reg sck_wire,
+	output reg finished,
 	input arm
 );
+
+`ifndef SPI_MASTER_NO_READ
+/* MISO is almost always an external wire, so buffer it.
+ * This might not be necessary, since the master and slave do not respond
+ * immediately to changes in the wires, but this is just to be safe.
+ * It is trivial to change, just do
+ *    wire read_miso = miso;
+ */
+
+reg miso_hot = 0;
+reg read_miso = 0;
+
+always @ (posedge clk) begin
+	read_miso <= miso_hot;
+	miso_hot <= miso;
+end
+`endif
 
 parameter WAIT_ON_ARM = 0;
 parameter ON_CYCLE = 1;
@@ -68,7 +92,7 @@ endtask
 task read_data();
 `ifndef SPI_MASTER_NO_READ
 	from_slave <= from_slave << 1;
-	from_slave[0] <= miso;
+	from_slave[0] <= read_miso;
 `endif
 endtask
 
@@ -96,6 +120,16 @@ task setup_bits();
 `ifndef SPI_MASTER_NO_WRITE
 		send_buf <= to_slave;
 `endif
+		state <= ON_CYCLE;
+	end
+endtask
+
+task cycle_change();
+	// Stop transfer when the clock returns to its original polarity.
+	if (bit_counter == WID[WID_LEN-1:0] && sck == POLARITY[0]) begin
+		state <= WAIT_FINISHED;
+	end else begin
+		sck <= !sck;
 		state <= ON_CYCLE;
 	end
 endtask
@@ -132,19 +166,17 @@ always @ (posedge clk) begin
 				bit_counter <= bit_counter + 1;
 			end
 		end
-		state <= CYCLE_WAIT;
+
+		if (CYCLE_HALF_WAIT == 0) begin
+			cycle_change();
+		end else begin
+			state <= CYCLE_WAIT;
+		end
 	end
 	CYCLE_WAIT: begin
 		if (timer == CYCLE_HALF_WAIT) begin
-			timer <= 0;
-			// Stop transfer when the clock returns
-			// to its original polarity.
-			if (bit_counter == WID && sck == POLARITY) begin
-				state <= WAIT_FINISHED;
-			end else begin
-				state <= ON_CYCLE;
-				sck <= !sck;
-			end
+			timer <= 1;
+			cycle_change();
 		end else begin
 			timer <= timer + 1;
 		end
