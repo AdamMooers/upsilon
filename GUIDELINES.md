@@ -10,14 +10,15 @@ See also [Dan Gisselquist][1]'s rules for FPGA development.
   synthesizes it incorrectly.
 * Do not use parameters that are calculated from other parameters (yosys
   will not parse them correctly). Use macros instead.
-* Simulate *every* module, even the trivial ones using Verilator. Do not
-  write tests in Verilog. Put test code in the same directory as the
-  Verilog module, unless the Verilog module is external.
+* Simulate *every* module, even the trivial ones using Verilator.
+  Simulation must be simulatable with open-source software (Verilator is
+  preferred, but Icarus Verilog and similar are fine). Put test code in the same
+  directory as the Verilog module, unless the Verilog module is external.
 * Synthesize and verify large modules independently on hardware using
   the LiteX SoC generator. Put the generator source code (along with
   the hardware test driver) in the repository.
-* Write *only* synthesizable verilog (except for test shims, like commands
-  to dump a trace), even for modules that will not be synthesized.
+* Write *only* synthesizable verilog (except for direct test-bench code), even
+  for modules that will not be synthesized.
 * Dump traces using `.fst` format.
 * Use only one clock.
 * Only transition on the *positive edge* of the *system clock*.
