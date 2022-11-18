@@ -155,11 +155,11 @@ always @ (posedge clk) begin
 end
 
 /**** Read-Write control interface.
- * Make less expensive comparison by adding dirty register. Dirty register
- * is written to for writes that change the control loop, but writes will
- * not be processed when the loop is checking the dirty bit, avoiding
- * race condition.
+ * `write_control` ensures that writes to the dirty bit do not happen when
+ * the main loop is clearing the dirty bit.
  */
+
+reg dirty_bit = 0;
 
 always @ (posedge clk) begin
 	if (start_cmd && !finish_cmd) begin
@@ -172,31 +172,43 @@ always @ (posedge clk) begin
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_STATUS | CONTROL_LOOP_WRITE_BIT:
-			running <= word_in[0];
-			finish_cmd <= 1;
+			if (write_control) begin
+				running <= word_in[0];
+				finish_cmd <= 1;
+				dirty_bit <= 1;
+			end
 		CONTROL_LOOP_SETPT: begin
 			word_out[DATA_WID-1:ADC_WID] <= 0;
 			word_out[ADC_WID-1:0] <= setpt;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_SETPT | CONTROL_LOOP_WRITE_BIT:
-			setpt_buffer <= word_in[ADC_WID-1:0];
-			finish_cmd <= 1;
+			if (write_control) begin
+				setpt_buffer <= word_in[ADC_WID-1:0];
+				finish_cmd <= 1;
+				dirty_bit <= 1;
+			end
 		CONTROL_LOOP_P: begin
 			word_out <= cl_p_reg;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_P | CONTROL_LOOP_WRITE_BIT: begin
-			cl_p_reg_buffer <= word_in;
-			finish_cmd <= 1;
+			if (write_control) begin
+				cl_p_reg_buffer <= word_in;
+				finish_cmd <= 1;
+				dirty_bit <= 1;
+			end
 		end
 		CONTROL_LOOP_ALPHA: begin
 			word_out <= cl_alpha_reg;
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_ALPHA | CONTROL_LOOP_WRITE_BIT: begin
-			cl_alpha_reg_buffer <= word_in;
-			finish_cmd <= 1;
+			if (write_control) begin
+				cl_alpha_reg_buffer <= word_in;
+				finish_cmd <= 1;
+				dirty_bit <= 1;
+			end
 		end
 		CONTROL_LOOP_DELAY: begin
 			word_out[DATA_WID-1:DELAY_WID] <= 0;
@@ -204,8 +216,11 @@ always @ (posedge clk) begin
 			finish_cmd <= 1;
 		end
 		CONTROL_LOOP_DELAY | CONTROL_LOOP_WRITE_BIT: begin
-			dely_buffer <= word_in[DELAY_WID-1:0];
-			finish_cmd <= 1;
+			if (write_control) begin
+				dely_buffer <= word_in[DELAY_WID-1:0];
+				finish_cmd <= 1;
+				dirty_bit <= 1;
+			end
 		end
 		CONTROL_LOOP_ERR: begin
 			word_out[DATA_WID-1:ERR_WID] <= 0;
@@ -226,12 +241,6 @@ always @ (posedge clk) begin
 		finish_cmd <= 0;
 	end
 end
-
-/* This is not a race condition as long as two variables are
- * not being assigned at the same time. Instead, the lower
- * assign block will use the older values (i.e. the upper assign
- * block only takes effect next clock cycle).
- */
 
 always @ (posedge clk) begin
 	case (state)
@@ -274,15 +283,15 @@ always @ (posedge clk) begin
 			timer <= timer + 1;
 		end else begin
 			/* On change of constants, previous values are invalidated. */
-			if (setpt != setpt_buffer ||
-			  cl_alpha_reg != cl_alpha_reg_buffer ||
-			  cl_p_reg != cl_p_reg_buffer) begin
+			if (dirty_bit) begin
 				setpt <= setpt_buffer;
 				dely <= dely_buf;
 				cl_alpha_reg <= cl_alpha_reg_buffer;
 				cl_p_reg <= cl_p_reg_buffer;
 				adj_prev <= 0;
 				err_prev <= 0;
+
+				dirty_bit <= 0;
 			end
 
 			state <= WAIT_ON_ADC;
