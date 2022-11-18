@@ -71,3 +71,12 @@ do not correspond to the same points, then:
 * for multiplication, the LSB is interpreted as position `m+n`, where
   `m` is the interpretation of the LSB of the first integer and `n` as
   the LSB of the second.
+
+# Hardware
+
+The DAC is *not* ramped in software: the updated value is directly written
+without smoothing the change. In the setup for which this code was designed
+for, this is not a problem because the DAC is connected to an amplifier which
+cannot respond that quickly
+and will smooth out changes itself. For your design, you may need to use
+code found in `firmware/rtl/spi/ramp.v`.

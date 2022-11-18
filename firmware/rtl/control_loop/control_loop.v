@@ -9,17 +9,20 @@ module control_loop
 	 */
 	parameter DAC_WID = 24,
 	/* Analog Devices DACs have a register code in the upper 4 bits.
-	 * The data follows it.
+	 * The data follows it. There may be some padding, but the length
+	 * of a message is always 24 bits.
 	 */
 	parameter DAC_DATA_WID = 20,
-	parameter CONSTS_WID = 48, // larger than ADC_WID
-	parameter CONSTS_FRAC_WID = CONSTS_WID-15,
+	parameter CONSTS_WHOLE = 21,
+	parameter CONSTS_FRAC = 43,
+`define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
 	parameter DELAY_WID = 16,
 	/* [ERR_WID_SIZ-1:0] must be able to store
-	 * ERR_WID (ADC_WID + 1).
+	 * ERR_WID (= ADC_WID + 1).
 	 */
 	parameter ERR_WID_SIZ = 6,
-	parameter DATA_WID = CONSTS_WID,
+`define DATA_WID `CONSTS_WID
+`define E_WID (ADC_WID + 1)
 	parameter READ_DAC_DELAY = 5,
 	parameter CYCLE_COUNT_WID = 18
 ) (
@@ -53,20 +56,49 @@ module control_loop
 reg signed [ADC_WID-1:0] setpt = 0;
 reg signed [ADC_WID-1:0] setpt_buffer = 0;
 
-reg signed [CONSTS_WID-1:0] cl_alpha_reg = 0;
-reg signed [CONSTS_WID-1:0] cl_alpha_reg_buffer = 0;
+reg signed [`CONSTS_WID-1:0] cl_I_reg = 0;
+reg signed [`CONSTS_WID-1:0] cl_I_reg_buffer = 0;
 
-reg signed [CONSTS_WID-1:0] cl_p_reg = 0;
-reg signed [CONSTS_WID-1:0] cl_p_reg_buffer = 0;
+reg signed [`CONSTS_WID-1:0] cl_p_reg = 0;
+reg signed [`CONSTS_WID-1:0] cl_p_reg_buffer = 0;
 
 reg [DELAY_WID-1:0] dely = 0;
 reg [DELAY_WID-1:0] dely_buffer = 0;
 
 reg running = 0;
-reg signed[DAC_DATA_WID-1:0] stored_dac_val = 0;
 
-/* Registers for PI calculations */
-reg signed [ERR_WID-1:0] err_prev = 0;
+reg signed [DAC_DATA_WID-1:0] stored_dac_val = 0;
+reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
+reg [CYCLE_COUNT_WID-1:0] debug_timer = 0;
+reg [`CONSTS_WID-1:0] adjval_prev = 0;
+
+/* Misc. registers for PI calculations */
+reg signed [`E_WID-1:0] err_prev = 0;
+reg signed [`E_WID-1:0] e_cur = 0;
+reg signed [`CONSTS_WID-1:0] adj_val = 0;
+
+reg arm_math = 0;
+reg math_finished = 0;
+control_loop_math #(
+	.CONSTS_WHOLE(CONSTS_WHOLE),
+	.CONSTS_FRAC(CONSTS_FRAC),
+	.CONSTS_SIZ(CONSTS_SIZ),
+	.ADC_WID(ADC_WID),
+	.CYCLE_COUNT_WID(CYCLE_COUNT_WID)
+) math (
+	.clk(clk),
+	.arm(arm_math),
+	.finished(math_finished),
+	.setpt(setpt),
+	.measured(measured_value),
+	.cl_P(cl_p_reg),
+	.cl_I(cl_I_reg),
+	.cycles(last_timer),
+	.e_prev(err_prev),
+	.adjval_prev(adjval_prev),
+	.e_cur(e_cur),
+	.adj_val(adj_val)
+);
 
 /****** State machine
  * ┏━━━━━━━┓
@@ -102,183 +134,32 @@ reg signed [ERR_WID-1:0] err_prev = 0;
 
 localparam CYCLE_START = 0;
 localparam WAIT_ON_ADC = 1;
-localparam WAIT_ON_MUL = 2;
-localparam WAIT_ON_DAC = 3;
-localparam INIT_READ_FROM_DAC = 4;
-localparam WAIT_FOR_DAC_READ = 5;
-localparam WAIT_FOR_DAC_RESPONSE = 6;
+localparam WAIT_ON_MATH = 2;
+localparam INIT_READ_FROM_DAC = 3;
+localparam WAIT_FOR_DAC_READ = 4;
+localparam WAIT_FOR_DAC_RESPONSE = 5;
 localparam STATESIZ = 3;
 
-reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
-
-/**** Precision Propogation
- *
- *    Measured value: ADC_WID.0
- *    Setpoint: ADC_WID.0
- * - ----------------------------|
- *      e_unsc: ERR_WID.0
- *  x   78e-6: 0.CONSTS_FRAC
- * - ----------------------------|
- *      e_uncropped: ERR_WID.CONSTS_FRAC
- * -------------------------------------
- *      e: CONSTS_WID.CONSTS_FRAC
- *
- *
- *   α: CONSTS_WHOLE.CONSTS_FRAC |         P: CONSTS_WHOLE.CONSTS_FRAC
- *   e: ERR_WID.0                |         e_p: ERR_WID.0
- * x ----------------------------|        x-----------------------------
- *   αe: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC  -   Pe_p: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC
- *              + A_p: CONSTS_WHOLE+ERR_WID.CONSTS_FRAC
- *              + stored_dac_val << CONSTS_FRAC: DAC_DATA_WID.CONSTS_FRAC
- * --------------------------------------------------------------
- *   A_p + αe - Pe_p + stored_dac_val: CONSTS_WHOLE+ERR_WID+1.CONSTS_FRAC
- *   --> discard fractional bits: CONSTS_WHOLE+ADC_WID+1.(DAC_DATA_WID - ADC_WID)
- *   --> Saturate-truncate: ADC_WID.(DAC_DATA_WID-ADC_WID)
- *   --> reinterpret and write into DAC: DAC_DATA_WID.0
- */
-
-/**** Calculate Error ****/
-wire [ERR_WID-1:0] e_unsc = measured_value - setpoint;
-
-/**** convert error value to real value ****/
-
-wire [ERR_WID+CONSTS_FRAC-1:0] e_uncrop;
-reg mul_scale_err_fin = 0;
-
-boothmul #(
-	.A1_LEN(ERR_WID),
-	.A2_LEN(CONSTS_FRAC)
-) mul_scale_err (
-	.clk(clk),
-	.arm(arm_err_scale),
-	.a1(e_unsc),
-	.a2(adc_int_to_real),
-	.outn(e_uncrop),
-	.fin(mul_scale_err_fin)
-);
-
-wire [CONSTS_WID-1:0] e;
-
-intsat #(
-	.A1_LEN(ERR_WID + CONSTS_FRAC),
-	.A2_LEN(CONSTS_WID)
-) mul_scale_err_crop (
-	.inp(e_uncrop),
-	.outp(e)
-);
-
-/****** Multiplication *******
- * Truncation of a fixed-point integer to a smaller buffer requires
- * 1) truncating higher order bits
- * 2) removing lower order bits
- *
- * The ADC number has no fractional digits, so the fixed point output
- * is [CONSTS_WHOLE + ERR_WID].CONSTS_FRAC_WID
- * with total width CONSTS_WID + ERR_WID
- *
- * Both multipliers are armed at the same time.
- * Their output wires are ANDed together so the state machine
- * progresses when both are finished.
- */
-
-localparam MUL_WHOLE_WID = CONSTS_WHOLE + ERR_WID;
-localparam MUL_FRAC_WID = CONSTS_FRAC;
-localparam MUL_WID = MUL_WHOLE_WID + MUL_FRAC_WID;
-
-reg arm_mul = 0;
-
-wire alpha_err_fin;
-wire signed [MUL_WID-1:0] alpha_err;
-wire p_err_prev_fin;
-wire signed [MUL_WID-1:0] p_err_prev;
-
-wire mul_finished = alpha_err_fin & p_err_fin;
-
-/* αe */
-boothmul #(
-	.A1_LEN(CONSTS_WID),
-	.A2_LEN(ERR_WID),
-	.A2LEN_SIZ(ERR_WID_SIZ)
-) boothmul_alpha_err_mul (
-	.clk(clk),
-	.arm(arm_mul),
-	.a1(cl_alpha_reg),
-	.a2(err),
-	.outn(alpha_err),
-	.fin(alpha_err_fin)
-);
-
-/* Pe_p */
-boothmul #(
-	.A1_LEN(CONSTS_WID),
-	.A2_LEN(ERR_WID),
-	.A2LEN_SIZ(ERR_WID_SIZ)
-) booth_mul_P_err_mul (
-	.clk(clk),
-	.arm(arm_mul),
-	.a1(cl_p_reg),
-	.a2(err_prev),
-	.outn(p_err_prev),
-	.fin(p_err_prev_fin)
-);
-
-/**** Subtraction after multiplication ****/
-localparam SUB_WHOLE_WID = MUL_WHOLE_WID + 1;
-localparam SUB_FRAC_WID = MUL_FRAC_WID;
-localparam SUB_WID = SUB_WHOLE_WID + SUB_FRAC_WID;
-
-reg signed [SUB_WID-1:0] adj_old = 0;
-wire signed [SUB_WID-1:0] newadj = adj_old + alpha_err - p_err_prev
-                                 + (stored_dac_val << CONSTS_FRAC);
-
-/**** Discard fractional bits ****
- * The truncation of the subtraction result first takes off the lower
- * order bits:
- * [      SUB_WHOLE_WID      ].[        SUB_FRAC_WID       ]
- * [      SUB_WHOLE_WID      ].[RTRUNC_FRAC_WID]############
- *                         (SUB_FRAC_WID - RTRUNC_FRAC_WID)^
- */
-
-localparam RTRUNC_FRAC_WID = DAC_DATA_WID - ADC_WID;
-localparam RTRUNC_WHOLE_WID = SUB_WHOLE_WID;
-localparam RTRUNC_WID = RTRUNC_WHOLE_WID + RTRUNC_FRAC_WID;
-
-wire signed[RTRUNC_WID-1:0] rtrunc =
-	newadj[SUB_WID-1:SUB_FRAC_WID-RTRUNC_FRAC_WID];
-
-/**** Truncate-Saturate ****
- * Truncate the result into a value acceptable to the DAC.
- * [      SUB_WHOLE_WID      ].[RTRUNC_FRAC_WID]############
- *         [ADC_WID].[DAC_DATA_WID - ADC_WID]
- *         reinterpreted as
- *         [DAC_DATA_WID].0
- */
-
-wire signed[DAC_DATA_WID-1:0] dac_adj_val;
-
-intsat #(
-	.IN_LEN(RTRUNC_WID),
-	.LTRUNC(DAC_DATA_WID)
-) sat_newadj_rtrunc (
-	.inp(rtrunc),
-	.outp(dac_adj_val)
-);
+reg [STATESIZ-1:0] state = CYCLE_START;
 
 reg [DELAY_WID-1:0] timer = 0;
 
-reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
-reg [CYCLE_COUNT_WID-1:0] debug_timer = 0;
-/**** Timing debug. ****/
+/**** Timing. ****/
 always @ (posedge clk) begin
-	if (state == INIT_READ_FROM_DAC) begin
-		debug_timer <= 1;
-		last_timer <= debug_timer;
+	if (state == CYCLE_START) begin
+		counting_timer <= 1;
+		last_timer <= counting_timer;
 	end else begin
-		debug_timer <= debug_timer + 1;
+		counting_timer <= counting_timer + 1;
 	end
 end
 
-/**** Read-Write control interface. ****/
+/**** Read-Write control interface.
+ * Make less expensive comparison by adding dirty register. Dirty register
+ * is written to for writes that change the control loop, but writes will
+ * not be processed when the loop is checking the dirty bit, avoiding
+ * race condition.
+ */
 
 always @ (posedge clk) begin
 	if (start_cmd && !finish_cmd) begin
@@ -413,15 +294,15 @@ always @ (posedge clk) begin
 	WAIT_ON_ADC: if (adc_finished) begin
 			adc_arm <= 0;
 			adc_conv <= 0;
-			arm_mul <= 1;
-			state <= WAIT_ON_MUL;
+			arm_math <= 1;
+			state <= WAIT_ON_MATH;
 		end
-	WAIT_ON_MUL: if (mul_finished) begin
-			arm_mul <= 0;
+	WAIT_ON_MATH: if (math_finished) begin
+			arm_math <= 0;
 			dac_arm <= 1;
 			dac_ss <= 1;
-			stored_dac_val <= dac_adj_val;
-			to_dac <= b'0001 << DAC_DATA_WID | dac_adj_val;
+			stored_dac_val <= (stored_dac_val + dac_adj_val);
+			to_dac <= b'0001 << DAC_DATA_WID | (dac_adj_val + stored_dac_val);
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
