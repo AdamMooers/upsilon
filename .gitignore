@@ -7,4 +7,5 @@ firmware/overlay.dts
 firmware/pin_io.h
 misc/
 software/build/
-
+*.fst
+obj_dir
