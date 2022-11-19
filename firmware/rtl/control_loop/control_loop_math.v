@@ -2,7 +2,7 @@
  * The control loop is designed around these values, but generally
  * does not hardcode them.
  *
- * Since α and P are precalculated outside of the loop, their
+ * Since I and P are precalculated outside of the loop, their
  * conversion to numbers the loop understands is done outside of
  * the loop and in the kernel.
  *
@@ -72,7 +72,7 @@ reg signed [`CONSTS_WID-1:0] a2;
 /* verilator lint_off UNUSED */
 wire signed [`CONSTS_WID+`CONSTS_WID-1:0] out_untrunc;
 wire mul_fin;
-reg mul_arm;
+reg mul_arm = 0;
 
 boothmul #(
 	.A1_LEN(`CONSTS_WID),
@@ -128,6 +128,7 @@ intsat #(
 );
 
 localparam WAIT_ON_ARM = 0;
+localparam CALCULATE_ERR = 9;
 localparam CALCULATE_DAC_E = 7;
 localparam WAIT_ON_CALCULATE_DT = 1;
 localparam CALCULATE_IDT = 2;
@@ -140,7 +141,6 @@ localparam WAIT_ON_DISARM = 8;
 reg [4:0] state = WAIT_ON_ARM;
 reg signed [`CONSTS_WID+1-1:0] tmpstore = 0;
 wire signed [`CONSTS_WID-1:0] tmpstore_view = tmpstore[`CONSTS_WID-1:0];
-wire [ADC_WID+1-1:0] e_before_scale = setpt - measured;
 
 
 always @ (posedge clk) begin
@@ -148,15 +148,20 @@ always @ (posedge clk) begin
 	WAIT_ON_ARM:
 		if (arm) begin
 			a1[CONSTS_FRAC-1:0] <= 0;
-			a1[CONSTS_FRAC+ADC_WID + 1-1:CONSTS_FRAC] <= e_before_scale;
-			a1[`CONSTS_WID-1:CONSTS_FRAC + ADC_WID + 1] <=
-				{(`CONSTS_WID-(CONSTS_FRAC + ADC_WID + 1)){e_before_scale[ADC_WID+1-1]}};
-			a2 <= ADC_TO_DAC;
-			mul_arm <= 1;
-			state <= CALCULATE_DAC_E;
+			a1[CONSTS_FRAC+ADC_WID + 1-1:CONSTS_FRAC] <= setpt - measured;
+			state <= CALCULATE_ERR;
 		end else begin
 			finished <= 0;
+			mul_arm <= 0;
 		end
+	CALCULATE_ERR: begin
+		/* Sign-extend */
+		a1[`CONSTS_WID-1:CONSTS_FRAC + ADC_WID + 1] <=
+			{(`CONSTS_WID-(CONSTS_FRAC + ADC_WID + 1)){a1[ADC_WID+1-1+CONSTS_FRAC]}};
+		a2 <= ADC_TO_DAC;
+		mul_arm <= 1;
+		state <= CALCULATE_DAC_E;
+	end
 	CALCULATE_DAC_E:
 		if (mul_fin) begin
 			/* Discard other bits. This works without saturation because

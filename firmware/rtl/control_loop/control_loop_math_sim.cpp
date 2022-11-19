@@ -1,3 +1,4 @@
+/* TODO: add ADC_TO_DAC multiplication and verify */
 #include <cstdio>
 #include <cstdint>
 #include "control_loop_math_implementation.h"
@@ -30,12 +31,13 @@ static void init(int argc, char **argv) {
 using V = int64_t;
 
 constexpr V per100 = 0b010101011110011000;
+constexpr V adc_to_dac = 0b0100000110001001001101110100101111000110101;
 
 static void calculate() {
 	/* Multiplication adds an extra CONSTS_FRAC bits to the end,
 	 * truncate them. */
 
-	V err_cur = (V)mod->setpt - (V)mod->measured;
+	V err_cur = mulsat((V)mod->setpt - (V)mod->measured, adc_to_dac, 64, CONSTS_FRAC);
 	V dt = mulsat(per100, (V)mod->cycles << CONSTS_FRAC, 64, CONSTS_FRAC);
 	V idt = mulsat(dt, mod->cl_I, 64, CONSTS_FRAC);
 	V epidt = mulsat(err_cur << CONSTS_FRAC, mod->cl_P + idt, 64, CONSTS_FRAC);
@@ -52,7 +54,6 @@ static void calculate() {
 	run_clock();
 	run_clock();
 
-#if 0
 	/* Stupid bug: verilator does not sign-extend signed ports */
 
 	printf("err_cur %ld %ld\n", err_cur, sign_extend(mod->e_cur, E_WID));
@@ -61,7 +62,6 @@ static void calculate() {
 	printf("epidt %ld %ld\n", epidt, mod->epidt_reg);
 	printf("ep %ld %ld\n", ep, mod->ep_reg);
 	printf("adj %ld %ld\n", new_adjval, mod->adj_val);
-#endif
 }
 
 int main(int argc, char **argv) {
