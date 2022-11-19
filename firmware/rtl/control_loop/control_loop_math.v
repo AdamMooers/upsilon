@@ -33,7 +33,7 @@ module control_loop_math #(
 	/* The conversion between the ADC bit (20/2**18) and DAC bit (20.48/2**20)
 	 * is 0.256.
 	 */
-	parameter [`CONSTS_WID-1:0] ADC_TO_DAC = 'b0100000110001001001101110100101111000110101,
+	parameter logic [`CONSTS_WID-1:0] ADC_TO_DAC = {32'b01000001100, 32'b01001001101110100101111000110101},
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 20
 `define E_WID (DAC_WID + 1)
@@ -140,12 +140,17 @@ localparam WAIT_ON_DISARM = 8;
 reg [4:0] state = WAIT_ON_ARM;
 reg signed [`CONSTS_WID+1-1:0] tmpstore = 0;
 wire signed [`CONSTS_WID-1:0] tmpstore_view = tmpstore[`CONSTS_WID-1:0];
+wire [ADC_WID+1-1:0] e_before_scale = setpt - measured;
+
 
 always @ (posedge clk) begin
 	case (state)
 	WAIT_ON_ARM:
 		if (arm) begin
-			a1 <= setpt - measured;
+			a1[CONSTS_FRAC-1:0] <= 0;
+			a1[CONSTS_FRAC+ADC_WID + 1-1:CONSTS_FRAC] <= e_before_scale;
+			a1[`CONSTS_WID-1:CONSTS_FRAC + ADC_WID + 1] <=
+				{(`CONSTS_WID-(CONSTS_FRAC + ADC_WID + 1)){e_before_scale[ADC_WID+1-1]}};
 			a2 <= ADC_TO_DAC;
 			mul_arm <= 1;
 			state <= CALCULATE_DAC_E;
@@ -153,10 +158,10 @@ always @ (posedge clk) begin
 			finished <= 0;
 		end
 	CALCULATE_DAC_E:
-		if (mul_finished) begin
+		if (mul_fin) begin
 			/* Discard other bits. This works without saturation because
 			 * CONSTS_WHOLE = E_WID. */
-			e_cur <= mul_out[`CONSTS_WHOLE-1:CONSTS_FRAC];
+			e_cur <= mul_out[`CONSTS_WID-1:CONSTS_FRAC];
 
 			a1 <= SEC_PER_CYCLE;
 			/* No sign extension, cycles is positive */

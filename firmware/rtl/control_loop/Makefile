@@ -5,12 +5,12 @@ COMMON_CPP = control_loop_math_implementation.cpp
 COMMON= ${COMMON_CPP} control_loop_math_implementation.h
 
 CONSTS_FRAC=43
-E_WID=19
+E_WID=21
 
 test: obj_dir/Vcontrol_loop_math
 	obj_dir/Vcontrol_loop_math
 clean:
-	rm -rf obj_dir
+	rm -rf obj_dir *.fst
 
 obj_dir/Vcontrol_loop_math.mk: control_loop_math_sim.cpp ${COMMON} \
                                control_loop_math.v
