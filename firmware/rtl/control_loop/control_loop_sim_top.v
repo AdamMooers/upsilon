@@ -39,18 +39,6 @@ wire dac_mosi;
 wire dac_sck;
 wire ss_L;
 
-spi_slave #(
-	.WID(DAC_WID),
-	.WID_LEN(DAC_WID_LEN),
-	.POLARITY(DAC_POLARITY),
-	.PHASE(DAC_PHASE)
-) dac_slave (
-	.clk(clk),
-	.sck(dac_sck),
-	.mosi(dac_mosi),
-	.miso(dac_miso),
-);
-
 spi_master #(
 	.WID(DAC_WID),
 	.WID_LEN(DAC_WID_LEN),

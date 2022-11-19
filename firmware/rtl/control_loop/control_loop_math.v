@@ -30,8 +30,13 @@ module control_loop_math #(
 
 	parameter ADC_WID = 18,
 	parameter [`CONSTS_WID-1:0] SEC_PER_CYCLE = 'b10101011110011000,
-	parameter CYCLE_COUNT_WID = 18
-`define E_WID (ADC_WID + 1)
+	/* The conversion between the ADC bit (20/2**18) and DAC bit (20.48/2**20)
+	 * is 0.256.
+	 */
+	parameter [`CONSTS_WID-1:0] ADC_TO_DAC = 'b0100000110001001001101110100101111000110101,
+	parameter CYCLE_COUNT_WID = 18,
+	parameter DAC_WID = 20
+`define E_WID (DAC_WID + 1)
 ) (
 	input clk,
 	input arm,
@@ -123,13 +128,14 @@ intsat #(
 );
 
 localparam WAIT_ON_ARM = 0;
+localparam CALCULATE_DAC_E = 7;
 localparam WAIT_ON_CALCULATE_DT = 1;
 localparam CALCULATE_IDT = 2;
 localparam CALCULATE_EPIDT = 3;
 localparam CALCULATE_EP = 4;
 localparam CALCULATE_A_PART_1 = 5;
 localparam CALCULATE_A_PART_2 = 6;
-localparam WAIT_ON_DISARM = 7;
+localparam WAIT_ON_DISARM = 8;
 
 reg [4:0] state = WAIT_ON_ARM;
 reg signed [`CONSTS_WID+1-1:0] tmpstore = 0;
@@ -139,18 +145,29 @@ always @ (posedge clk) begin
 	case (state)
 	WAIT_ON_ARM:
 		if (arm) begin
-			e_cur <= setpt - measured;
+			a1 <= setpt - measured;
+			a2 <= ADC_TO_DAC;
+			mul_arm <= 1;
+			state <= CALCULATE_DAC_E;
+		end else begin
+			finished <= 0;
+		end
+	CALCULATE_DAC_E:
+		if (mul_finished) begin
+			/* Discard other bits. This works without saturation because
+			 * CONSTS_WHOLE = E_WID. */
+			e_cur <= mul_out[`CONSTS_WHOLE-1:CONSTS_FRAC];
 
 			a1 <= SEC_PER_CYCLE;
 			/* No sign extension, cycles is positive */
 			a2 <= {{(CONSTS_WHOLE - CYCLE_COUNT_WID){1'b0}}, cycles, {(CONSTS_FRAC){1'b0}}};
-			mul_arm <= 1;
+			mul_arm <= 0;
 			state <= WAIT_ON_CALCULATE_DT;
-		end else begin
-			finished <= 0;
 		end
 	WAIT_ON_CALCULATE_DT:
-		if (mul_fin) begin
+	if (!mul_arm) begin
+			mul_arm <= 1;
+	end else if (mul_fin) begin
 			mul_arm <= 0;
 
 			`ifdef DEBUG_CONTROL_LOOP_MATH
@@ -160,7 +177,7 @@ always @ (posedge clk) begin
 			a1 <= mul_out; /* a1 = Δt */
 			a2 <= cl_I;
 			state <= CALCULATE_IDT;
-		end
+	end
 	CALCULATE_IDT:
 		if (!mul_arm) begin
 			mul_arm <= 1;
@@ -210,7 +227,7 @@ always @ (posedge clk) begin
 	CALCULATE_A_PART_2: begin
 		add_sat <= tmpstore;
 		state <= WAIT_ON_DISARM;
-	end
+	end	
 	WAIT_ON_DISARM: begin
 		adj_val <= saturated_add;
 		if (!arm) begin
