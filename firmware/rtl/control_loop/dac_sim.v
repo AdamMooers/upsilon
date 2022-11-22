@@ -25,8 +25,6 @@ reg [WID-4-1:0] ctrl_register = 0;
 always @ (posedge clk) begin
 	if (spi_fin) begin
 		rdy <= 0;
-		/* read current value. TODO: lower bit DACs have zero
-		 * padding between register and DAC value. */
 		case (from_master[WID-1:WID-4])
 		4'b1001: begin
 			to_master <= {4'b1001, curset};
@@ -42,7 +40,7 @@ always @ (posedge clk) begin
 		4'b1010: begin
 			to_master <= {4'b1010, ctrl_register};
 		end
-		default: ;
+		default: to_master <= 0;
 		endcase
 	end else if (!rdy) begin
 		rdy <= 1;

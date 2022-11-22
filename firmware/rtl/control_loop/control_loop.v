@@ -34,7 +34,7 @@ module control_loop
 	parameter DAC_PHASE = 1,
 	parameter DAC_CYCLE_HALF_WAIT = 10,
 	parameter DAC_CYCLE_HALF_WAIT_SIZ = 4,
-	parameter DAC_SS_WAIT = 2,
+	parameter DAC_SS_WAIT = 5,
 	parameter DAC_SS_WAIT_SIZ = 3
 ) (
 	input clk,
@@ -60,8 +60,6 @@ module control_loop
 
 reg dac_arm;
 reg dac_finished;
-reg dac_ss = 0;
-assign dac_ss_L = !dac_ss;
 
 reg [DAC_WID-1:0] to_dac;
 /* verilator lint_off UNUSED */
@@ -351,7 +349,6 @@ always @ (posedge clk) begin
 			timer <= 0;
 		end else if (dac_finished) begin
 			state <= CYCLE_START;
-			dac_ss <= 0;
 			dac_arm <= 0;
 			timer <= 0;
 			stored_dac_val <= from_dac[DAC_DATA_WID-1:0];
