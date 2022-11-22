@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 	set_value(10000, CONTROL_LOOP_SETPT);
 	set_value(1, CONTROL_LOOP_STATUS);
 
-	for (int tick = 0; tick < 10000; tick++) {
+	for (int tick = 0; tick < 100000; tick++) {
 		std::cout << tick << std::endl;
 		run_clock();
 		if (mod->request && !mod->fulfilled) {
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
 			mod->fulfilled = 0;
 		}
 
-		if (tick == 5000) {
+		if (tick == 50000) {
 			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_P;
 			mod->word_into_loop = 0b010111000010100011110101110000101000111;
 			mod->start_cmd = 1;

@@ -83,6 +83,7 @@ int main(int argc, char **argv) {
 	printf("running\n");
 	for (int i = 0; i < 200; i++) {
 		mod->measured = func.val(setting);
+		mod->stored_dac_val = setting;
 
 		calculate();
 		mod->e_prev = mod->e_cur;
@@ -100,6 +101,7 @@ int main(int argc, char **argv) {
 		printf("#%d: setting: %ld, measured: %ld, setpt: %ld, adj: %ld\n", i, setting, mod->measured, mod->setpt, adj);
 
 		setting += adj;
+		printf("new_dac_val %ld %ld\n", setting, mod->new_dac_val);
 	}
 
 	mod->final();

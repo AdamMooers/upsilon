@@ -130,6 +130,19 @@ intsat #(
 );
 
 /************************
+ * Safely truncate down adjustment value.
+ ***********************/
+reg signed [CONSTS_WHOLE-1:0] adj_sat;
+wire signed [DAC_WID-1:0] adj_final;
+intsat #(
+	.IN_LEN(CONSTS_WHOLE),
+	.LTRUNC(CONSTS_WHOLE - DAC_WID)
+) adj_saturate (
+	.inp(adj_sat),
+	.outp(adj_final)
+);
+
+/************************
  * Safely calculate new DAC value.
  ************************/
 reg signed [DAC_WID+1-1:0] add_sat_dac;
@@ -150,7 +163,8 @@ localparam CALCULATE_EPIDT = 3;
 localparam CALCULATE_EP = 4;
 localparam CALCULATE_A_PART_1 = 5;
 localparam CALCULATE_A_PART_2 = 6;
-localparam CALCULATE_NEW_DAC_VALUE = 10;
+localparam CALCULATE_NEW_DAC_VALUE_PART_1 = 10;
+localparam CALCULATE_NEW_DAC_VALUE_PART_2 = 11;
 localparam WAIT_ON_DISARM = 8;
 
 reg [4:0] state = WAIT_ON_ARM;
@@ -251,12 +265,15 @@ always @ (posedge clk) begin
 	end
 	CALCULATE_A_PART_2: begin
 		add_sat <= tmpstore;
-		state <= CALCULATE_NEW_DAC_VALUE;
+		state <= CALCULATE_NEW_DAC_VALUE_PART_1;
 	end
-	CALCULATE_NEW_DAC_VALUE: begin
-		add_sat_dac <= saturated_add[CONSTS_FRAC+DAC_WID-1:CONSTS_FRAC]
-		             + stored_dac_val;
+	CALCULATE_NEW_DAC_VALUE_PART_1: begin
+		adj_sat <= saturated_add[`CONSTS_WID-1:CONSTS_FRAC];
 		adj_val <= saturated_add;
+		state <= CALCULATE_NEW_DAC_VALUE_PART_2;
+	end
+	CALCULATE_NEW_DAC_VALUE_PART_2: begin
+		add_sat_dac <= adj_final + stored_dac_val;
 		state <= WAIT_ON_DISARM;
 	end
 	WAIT_ON_DISARM: begin
