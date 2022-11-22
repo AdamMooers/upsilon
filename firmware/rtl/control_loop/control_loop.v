@@ -229,7 +229,7 @@ always @ (posedge clk) begin
 	if (state == CYCLE_START && timer == 0) begin
 		counting_timer <= 1;
 		last_timer <= counting_timer;
-	end else begin
+	end else if (running) begin
 		counting_timer <= counting_timer + 1;
 	end
 end
@@ -353,6 +353,7 @@ always @ (posedge clk) begin
 			state <= CYCLE_START;
 			dac_ss <= 0;
 			dac_arm <= 0;
+			timer <= 0;
 			stored_dac_val <= from_dac[DAC_DATA_WID-1:0];
 		end
 	end
