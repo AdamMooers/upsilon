@@ -226,7 +226,7 @@ reg [DELAY_WID-1:0] timer = 0;
 
 /**** Timing. ****/
 always @ (posedge clk) begin
-	if (state == CYCLE_START) begin
+	if (state == CYCLE_START && timer == 0) begin
 		counting_timer <= 1;
 		last_timer <= counting_timer;
 	end else begin

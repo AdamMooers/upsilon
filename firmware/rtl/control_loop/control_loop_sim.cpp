@@ -56,6 +56,7 @@ int main(int argc, char **argv) {
 	set_value(0b11010111000010100011110101110000101000111, CONTROL_LOOP_P);
 	set_value((V)12 << CONSTS_FRAC, CONTROL_LOOP_I);
 	set_value(20, CONTROL_LOOP_DELAY);
+	set_value(10000, CONTROL_LOOP_SETPT);
 	set_value(1, CONTROL_LOOP_STATUS);
 
 	for (int tick = 0; tick < 10000; tick++) {

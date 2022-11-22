@@ -39,8 +39,8 @@ always @ (posedge clk) begin
 		data <= indat;
 		fulfilled_raised <= 1;
 		request <= 0;
-	end else if (ss_raised && request && !fulfilled && fulfilled_raised) begin
 		rdy <= 1;
+	end else if (ss_raised && !fulfilled && fulfilled_raised) begin
 		fulfilled_raised <= 0;
 		ss_buf_L <= 0;
 	end else if (spi_fin) begin
