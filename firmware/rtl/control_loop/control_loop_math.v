@@ -33,7 +33,7 @@ module control_loop_math #(
 	/* The conversion between the ADC bit (20/2**18) and DAC bit (20.48/2**20)
 	 * is 0.256.
 	 */
-	parameter logic [`CONSTS_WID-1:0] ADC_TO_DAC = {32'b01000001100, 32'b01001001101110100101111000110101},
+	parameter [`CONSTS_WID-1:0] ADC_TO_DAC = 64'b0100000110001001001101110100101111000110101,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 20
 `define E_WID (DAC_WID + 1)
@@ -49,6 +49,7 @@ module control_loop_math #(
 	input signed [CYCLE_COUNT_WID-1:0] cycles,
 	input signed [`E_WID-1:0] e_prev,
 	input signed [`CONSTS_WID-1:0] adjval_prev,
+	input signed [DAC_WID-1:0] stored_dac_val,
 
 `ifdef DEBUG_CONTROL_LOOP_MATH
 	output reg [`CONSTS_WID-1:0] dt_reg,
@@ -58,6 +59,7 @@ module control_loop_math #(
 `endif
 
 	output reg signed [`E_WID-1:0] e_cur,
+	output signed [DAC_WID-1:0] new_dac_val,
 	output signed [`CONSTS_WID-1:0] adj_val
 );
 
@@ -127,6 +129,18 @@ intsat #(
 	.outp(saturated_add)
 );
 
+/************************
+ * Safely calculate new DAC value.
+ ************************/
+reg signed [DAC_WID+1-1:0] add_sat_dac;
+intsat #(
+	.IN_LEN(DAC_WID+1),
+	.LTRUNC(1)
+) dac_saturate (
+	.inp(add_sat_dac),
+	.outp(new_dac_val)
+);
+
 localparam WAIT_ON_ARM = 0;
 localparam CALCULATE_ERR = 9;
 localparam CALCULATE_DAC_E = 7;
@@ -136,6 +150,7 @@ localparam CALCULATE_EPIDT = 3;
 localparam CALCULATE_EP = 4;
 localparam CALCULATE_A_PART_1 = 5;
 localparam CALCULATE_A_PART_2 = 6;
+localparam CALCULATE_NEW_DAC_VALUE = 10;
 localparam WAIT_ON_DISARM = 8;
 
 reg [4:0] state = WAIT_ON_ARM;
@@ -236,8 +251,14 @@ always @ (posedge clk) begin
 	end
 	CALCULATE_A_PART_2: begin
 		add_sat <= tmpstore;
+		state <= CALCULATE_NEW_DAC_VALUE;
+	end
+	CALCULATE_NEW_DAC_VALUE: begin
+		add_sat_dac <= saturated_add[CONSTS_FRAC+DAC_WID-1:CONSTS_FRAC]
+		             + stored_dac_val;
+		adj_val <= saturated_add;
 		state <= WAIT_ON_DISARM;
-	end	
+	end
 	WAIT_ON_DISARM: begin
 		adj_val <= saturated_add;
 		if (!arm) begin

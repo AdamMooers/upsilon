@@ -1,5 +1,4 @@
-`include control_loop_cmds.vh
-`define ERR_WID (ADC_WID + 1)
+`include "control_loop_cmds.vh"
 
 module control_loop
 #(
@@ -17,14 +16,10 @@ module control_loop
 
 	parameter CONSTS_WHOLE = 21,
 	parameter CONSTS_FRAC = 43,
+	parameter CONSTS_SIZ = 7,
 `define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
 	parameter DELAY_WID = 16,
-	/* [ERR_WID_SIZ-1:0] must be able to store
-	 * ERR_WID (= ADC_WID + 1).
-	 */
-	parameter ERR_WID_SIZ = 6,
 `define DATA_WID `CONSTS_WID
-`define E_WID (ADC_WID + 1)
 	parameter READ_DAC_DELAY = 5,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 24,
@@ -34,6 +29,7 @@ module control_loop
 	 */
 	parameter DAC_WID_SIZ = 5,
 	parameter DAC_DATA_WID = 20,
+`define E_WID (DAC_DATA_WID + 1)
 	parameter DAC_POLARITY = 0,
 	parameter DAC_PHASE = 1,
 	parameter DAC_CYCLE_HALF_WAIT = 10,
@@ -49,13 +45,13 @@ module control_loop
 	output dac_sck,
 
 	input adc_miso,
-	output adc_conv,
+	output adc_conv_L,
 	output adc_sck,
 
 	/* Hacky ad-hoc read-write interface. */
-	input reg [CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
-	input reg [DATA_WIDTH-1:0] word_in,
-	output reg [DATA_WIDTH-1:0] word_out,
+	input reg [`CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
+	input reg [`DATA_WID-1:0] word_in,
+	output reg [`DATA_WID-1:0] word_out,
 	input start_cmd,
 	output reg finish_cmd
 );
@@ -64,8 +60,13 @@ module control_loop
 
 reg dac_arm;
 reg dac_finished;
+reg dac_ss = 0;
+assign dac_ss_L = !dac_ss;
+
 reg [DAC_WID-1:0] to_dac;
+/* verilator lint_off UNUSED */
 wire [DAC_WID-1:0] from_dac;
+/* verilator lint_on UNUSED */
 spi_master_ss #(
 	.WID(DAC_WID),
 	.WID_LEN(DAC_WID_SIZ),
@@ -77,7 +78,6 @@ spi_master_ss #(
 	.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
 ) dac_master (
 	.clk(clk),
-	.arm(dac_arm),
 	.mosi(dac_mosi),
 	.miso(dac_miso),
 	.sck_wire(dac_sck),
@@ -92,7 +92,7 @@ reg adc_arm;
 reg adc_finished;
 wire [ADC_WID-1:0] measured_value;
 
-localparam [3-1:0] DAC_REGISTER = 3b'001;
+localparam [3-1:0] DAC_REGISTER = 3'b001;
 
 spi_master_ss_no_write #(
 	.WID(ADC_WID),
@@ -109,7 +109,7 @@ spi_master_ss_no_write #(
 	.from_slave(measured_value),
 	.miso(adc_miso),
 	.sck_wire(adc_sck),
-	.ss_L(!ss_conv),
+	.ss_L(adc_conv_L),
 	.finished(adc_finished)
 );
 
@@ -143,12 +143,13 @@ reg running = 0;
 
 reg signed [DAC_DATA_WID-1:0] stored_dac_val = 0;
 reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
-reg [CYCLE_COUNT_WID-1:0] debug_timer = 0;
+reg [CYCLE_COUNT_WID-1:0] counting_timer = 0;
 reg [`CONSTS_WID-1:0] adjval_prev = 0;
 
 reg signed [`E_WID-1:0] err_prev = 0;
-wire signed [`E_WID-1:0] e_cur = 0;
-wire signed [`CONSTS_WID-1:0] adj_val = 0;
+wire signed [`E_WID-1:0] e_cur;
+wire signed [`CONSTS_WID-1:0] adj_val;
+wire signed [DAC_DATA_WID-1:0] new_dac_val;
 
 reg arm_math = 0;
 reg math_finished = 0;
@@ -157,7 +158,10 @@ control_loop_math #(
 	.CONSTS_FRAC(CONSTS_FRAC),
 	.CONSTS_SIZ(CONSTS_SIZ),
 	.ADC_WID(ADC_WID),
-	.CYCLE_COUNT_WID(CYCLE_COUNT_WID)
+	.DAC_WID(DAC_DATA_WID),
+	.CYCLE_COUNT_WID(CYCLE_COUNT_WID),
+	.SEC_PER_CYCLE('b10101011110011000),
+	.ADC_TO_DAC({32'b01000001100, 32'b01001001101110100101111000110101})
 ) math (
 	.clk(clk),
 	.arm(arm_math),
@@ -169,6 +173,8 @@ control_loop_math #(
 	.cycles(last_timer),
 	.e_prev(err_prev),
 	.adjval_prev(adjval_prev),
+	.stored_dac_val(stored_dac_val),
+	.new_dac_val(new_dac_val),
 	.e_cur(e_cur),
 	.adj_val(adj_val)
 );
@@ -208,12 +214,13 @@ control_loop_math #(
 localparam CYCLE_START = 0;
 localparam WAIT_ON_ADC = 1;
 localparam WAIT_ON_MATH = 2;
+localparam WAIT_ON_DAC = 6;
 localparam INIT_READ_FROM_DAC = 3;
 localparam WAIT_FOR_DAC_READ = 4;
 localparam WAIT_FOR_DAC_RESPONSE = 5;
 localparam STATESIZ = 3;
 
-reg [STATESIZ-1:0] state = CYCLE_START;
+reg [STATESIZ-1:0] state = INIT_READ_FROM_DAC;
 
 reg [DELAY_WID-1:0] timer = 0;
 
@@ -232,85 +239,88 @@ end
  * the main loop is clearing the dirty bit.
  */
 
-wire write_control = state == CYCLE_START;
+wire write_control = state == CYCLE_START || !running;
 reg dirty_bit = 0;
 
 always @ (posedge clk) begin
 	if (start_cmd && !finish_cmd) begin
 		case (cmd)
-		CONTROL_LOOP_NOOP: CONTROL_LOOP_NOOP | CONTROL_LOOP_WRITE_BIT:
+		`CONTROL_LOOP_NOOP:
 			finish_cmd <= 1;
-		CONTROL_LOOP_STATUS: begin
-			word_out[DATA_WID-1:1] <= 0;
+		`CONTROL_LOOP_NOOP | `CONTROL_LOOP_WRITE_BIT:
+			finish_cmd <= 1;
+		`CONTROL_LOOP_STATUS: begin
+			word_out[`DATA_WID-1:1] <= 0;
 			word_out[0] <= running;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_STATUS | CONTROL_LOOP_WRITE_BIT:
+		`CONTROL_LOOP_STATUS | `CONTROL_LOOP_WRITE_BIT:
 			if (write_control) begin
 				running <= word_in[0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
-		CONTROL_LOOP_SETPT: begin
-			word_out[DATA_WID-1:ADC_WID] <= 0;
+		`CONTROL_LOOP_SETPT: begin
+			word_out[`DATA_WID-1:ADC_WID] <= 0;
 			word_out[ADC_WID-1:0] <= setpt;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_SETPT | CONTROL_LOOP_WRITE_BIT:
+		`CONTROL_LOOP_SETPT | `CONTROL_LOOP_WRITE_BIT:
 			if (write_control) begin
 				setpt_buffer <= word_in[ADC_WID-1:0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
-		CONTROL_LOOP_P: begin
+		`CONTROL_LOOP_P: begin
 			word_out <= cl_p_reg;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_P | CONTROL_LOOP_WRITE_BIT: begin
+		`CONTROL_LOOP_P | `CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				cl_p_reg_buffer <= word_in;
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		CONTROL_LOOP_I: begin
+		`CONTROL_LOOP_I: begin
 			word_out <= cl_I_reg;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_I | CONTROL_LOOP_WRITE_BIT: begin
+		`CONTROL_LOOP_I | `CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				cl_I_reg_buffer <= word_in;
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		CONTROL_LOOP_DELAY: begin
-			word_out[DATA_WID-1:DELAY_WID] <= 0;
+		`CONTROL_LOOP_DELAY: begin
+			word_out[`DATA_WID-1:DELAY_WID] <= 0;
 			word_out[DELAY_WID-1:0] <= dely;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_DELAY | CONTROL_LOOP_WRITE_BIT: begin
+		`CONTROL_LOOP_DELAY | `CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				dely_buffer <= word_in[DELAY_WID-1:0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		CONTROL_LOOP_ERR: begin
-			word_out[DATA_WID-1:ERR_WID] <= 0;
-			word_out[ERR_WID-1:0] <= err_prev;
+		`CONTROL_LOOP_ERR: begin
+			word_out[`DATA_WID-1:`E_WID] <= 0;
+			word_out[`E_WID-1:0] <= err_prev;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_Z: begin
-			word_out[DATA_WID-1:DAC_DATA_WID] <= 0;
+		`CONTROL_LOOP_Z: begin
+			word_out[`DATA_WID-1:DAC_DATA_WID] <= 0;
 			word_out[DAC_DATA_WID-1:0] <= stored_dac_val;
 			finish_cmd <= 1;
 		end
-		CONTROL_LOOP_CYCLES: begin
-			word_out[DATA_WID-1:CYCLE_COUNT_WID] <= 0;
+		`CONTROL_LOOP_CYCLES: begin
+			word_out[`DATA_WID-1:CYCLE_COUNT_WID] <= 0;
 			word_out[CYCLE_COUNT_WID-1:0] <= last_timer;
 			finish_cmd <= 0;
 		end
+		endcase
 	end else if (!start_cmd) begin
 		finish_cmd <= 0;
 	end
@@ -320,7 +330,7 @@ always @ (posedge clk) begin
 	case (state)
 	INIT_READ_FROM_DAC: begin
 		if (running) begin
-			to_dac <= {1, DAC_REGISTER, 20b'0};
+			to_dac <= {1'b1, DAC_REGISTER, 20'b0};
 			dac_arm <= 1;
 			state <= WAIT_FOR_DAC_READ;
 		end
@@ -337,13 +347,13 @@ always @ (posedge clk) begin
 			timer <= timer + 1;
 		end else if (timer == READ_DAC_DELAY) begin
 			dac_arm <= 1;
-			to_dac <= 24b'0;
+			to_dac <= 24'b0;
 			timer <= 0;
 		end else if (dac_finished) begin
 			state <= CYCLE_START;
 			dac_ss <= 0;
 			dac_arm <= 0;
-			stored_dac_val <= from_dac;
+			stored_dac_val <= from_dac[DAC_DATA_WID-1:0];
 		end
 	end
 	CYCLE_START: begin
@@ -355,10 +365,10 @@ always @ (posedge clk) begin
 			/* On change of constants, previous values are invalidated. */
 			if (dirty_bit) begin
 				setpt <= setpt_buffer;
-				dely <= dely_buf;
-				cl_alpha_reg <= cl_alpha_reg_buffer;
+				dely <= dely_buffer;
+				cl_I_reg <= cl_I_reg_buffer;
 				cl_p_reg <= cl_p_reg_buffer;
-				adj_prev <= 0;
+				adjval_prev <= 0;
 				err_prev <= 0;
 
 				dirty_bit <= 0;
@@ -377,19 +387,19 @@ always @ (posedge clk) begin
 	WAIT_ON_MATH: if (math_finished) begin
 			arm_math <= 0;
 			dac_arm <= 1;
-			stored_dac_val <= (stored_dac_val + adj_val[`CONSTS_WID-1:CONSTS_FRAC]);
-			to_dac <= {0, DAC_REGISTER, (dac_adj_val + adj_val[`CONSTS_WID-1:CONSTS_FRAC]);
+			stored_dac_val <= new_dac_val;
+			to_dac <= {1'b0, DAC_REGISTER, new_dac_val};
 			state <= WAIT_ON_DAC;
 		end
 	WAIT_ON_DAC: if (dac_finished) begin
 			state <= CYCLE_START;
-			dac_ss <= 0;
 			dac_arm <= 0;
 
-			err_prev <= err_cur;
-			adj_old <= newadj;
+			err_prev <= e_cur;
+			adjval_prev <= adj_val;
 		end
-	end
+	endcase
 end
 
 endmodule
+`undefineall
