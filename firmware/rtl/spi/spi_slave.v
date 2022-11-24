@@ -138,9 +138,14 @@ always @ (posedge clk) begin
 		default: ;
 		endcase
 	end
-	2'b00: if (!rdy) begin
-		finished <= 0;
-		err <= 0;
+	2'b00: begin
+		if (!rdy) begin
+			finished <= 0;
+			err <= 0;
+		end
+`ifndef SPI_SLAVE_NO_WRITE
+		miso <= 0;
+`endif
 	end
 	endcase
 end

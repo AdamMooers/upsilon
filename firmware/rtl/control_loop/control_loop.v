@@ -4,8 +4,8 @@ module control_loop
 #(
 	parameter ADC_WID = 18,
 	parameter ADC_WID_SIZ = 5,
-	parameter ADC_CYCLE_HALF_WAIT = 1,
-	parameter ADC_CYCLE_HALF_WAIT_SIZ = 1,
+	parameter ADC_CYCLE_HALF_WAIT = 5,
+	parameter ADC_CYCLE_HALF_WAIT_SIZ = 3,
 	parameter ADC_POLARITY = 1,
 	parameter ADC_PHASE = 0,
 	/* The ADC takes maximum 527 ns to capture a value.

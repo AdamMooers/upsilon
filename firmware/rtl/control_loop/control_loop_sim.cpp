@@ -52,18 +52,20 @@ int main(int argc, char **argv) {
 
 	mod->clk = 0;
 
-	set_value(10000, CONTROL_LOOP_STATUS);
 	set_value(0b11010111000010100011110101110000101000111, CONTROL_LOOP_P);
-	set_value((V)12 << CONSTS_FRAC, CONTROL_LOOP_I);
+	set_value((V)6 << CONSTS_FRAC, CONTROL_LOOP_I);
 	set_value(20, CONTROL_LOOP_DELAY);
 	set_value(10000, CONTROL_LOOP_SETPT);
 	set_value(1, CONTROL_LOOP_STATUS);
+	mod->curset = 0;
 
-	for (int tick = 0; tick < 100000; tick++) {
-		std::cout << tick << std::endl;
+	for (int tick = 0; tick < 500000; tick++) {
 		run_clock();
 		if (mod->request && !mod->fulfilled) {
-			mod->measured_value = func.val(mod->curset);
+			V ext = sign_extend(mod->curset, 20);
+			V val = func.val(ext);
+			printf("setting: %ld, val: %ld\n", ext, val);
+			mod->measured_value = val;
 			mod->fulfilled = 1;
 		} else if (mod->fulfilled && !mod->request) {
 			mod->fulfilled = 0;
@@ -72,6 +74,14 @@ int main(int argc, char **argv) {
 		if (tick == 50000) {
 			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_P;
 			mod->word_into_loop = 0b010111000010100011110101110000101000111;
+			mod->start_cmd = 1;
+			printf("adjust P\n");
+		}
+		if (tick == 100000) {
+			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_I;
+			/* 0.5 */
+			mod->word_into_loop = 1 << (CONSTS_FRAC - 1);
+			printf("adjust I\n");
 			mod->start_cmd = 1;
 		}
 		if (mod->finish_cmd) {
