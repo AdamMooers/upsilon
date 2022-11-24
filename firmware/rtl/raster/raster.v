@@ -261,7 +261,7 @@ always @ (posedge clk) begin
 
 	SEND_VALUE: if (mem_finished) begin
 		if (!arm) state <= WAIT_ON_ARM;
-		state <= SCAN_ADC_VALUES;
+		else state <= SCAN_ADC_VALUES;
 	end
 	ADVANCE_DAC_WRITE: begin
 		if (!x_arm || !y_arm) begin
