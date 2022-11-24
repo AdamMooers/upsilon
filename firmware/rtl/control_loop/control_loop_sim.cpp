@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 		if (tick == 100000) {
 			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_I;
 			/* 0.5 */
-			mod->word_into_loop = 1 << (CONSTS_FRAC - 1);
+			mod->word_into_loop = (V)1 << (CONSTS_FRAC - 1);
 			printf("adjust I\n");
 			mod->start_cmd = 1;
 		}
