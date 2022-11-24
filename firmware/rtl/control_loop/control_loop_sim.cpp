@@ -73,7 +73,8 @@ int main(int argc, char **argv) {
 
 		if (tick == 50000) {
 			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_P;
-			mod->word_into_loop = 0b010111000010100011110101110000101000111;
+			/* 0.60 */
+			mod->word_into_loop = 0b1001100110011001100110011001100110011001100;
 			mod->start_cmd = 1;
 			printf("adjust P\n");
 		}
