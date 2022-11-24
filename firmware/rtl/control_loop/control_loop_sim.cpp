@@ -53,6 +53,9 @@ int main(int argc, char **argv) {
 	mod->clk = 0;
 
 	set_value(0b11010111000010100011110101110000101000111, CONTROL_LOOP_P);
+	/* Constant values must be sized to 64 bits, or else the compiler
+	 * will think they are 32 bit and silently mess things up
+	 */
 	set_value((V)6 << CONSTS_FRAC, CONTROL_LOOP_I);
 	set_value(20, CONTROL_LOOP_DELAY);
 	set_value(10000, CONTROL_LOOP_SETPT);
@@ -62,6 +65,9 @@ int main(int argc, char **argv) {
 	for (int tick = 0; tick < 500000; tick++) {
 		run_clock();
 		if (mod->request && !mod->fulfilled) {
+			/* Verilator values are not sign-extended to the
+			 * size of type, so we have to do that ourselves.
+			 */
 			V ext = sign_extend(mod->curset, 20);
 			V val = func.val(ext);
 			printf("setting: %ld, val: %ld\n", ext, val);
@@ -71,6 +77,7 @@ int main(int argc, char **argv) {
 			mod->fulfilled = 0;
 		}
 
+		/* Test changing constants mid-loop. */
 		if (tick == 50000) {
 			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_P;
 			/* 0.60 */
