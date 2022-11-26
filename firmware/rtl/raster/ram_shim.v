@@ -28,20 +28,20 @@ localparam WAIT_ON_COMMIT_DEASSERT = 3;
 reg [2:0] state = WAIT_ON_COMMIT;
 
 reg [MAX_BYTE_WID-1:0] offset = 0;
-assign addr = BASE_ADDR + offset;
+assign addr = BASE_ADDR + {{(RAM_WID - MAX_BYTE_WID){1'b0}}, offset};
 
 always @ (posedge clk) begin
 	case (state)
 	WAIT_ON_COMMIT: if (commit) begin
 		word <= data[RAM_WORD-1:0];
 		write <= 1;
-		state <= HIGH_WORD;
+		state <= HIGH_WORD_LOAD;
 	end
 	HIGH_WORD_LOAD: if (valid) begin
 		offset <= offset + (RAM_WORD/2);
 		write <= 0;
-		word <= {(RAM_WORD*2 - DAT_WID){word[DAT_WID-1]},
-		         word[DAT_WID-1:RAM_WORD]};
+		word <= {{(RAM_WORD*2 - DAT_WID){data[DAT_WID-1]}},
+		         data[DAT_WID-1:RAM_WORD]};
 		state <= WAIT_ON_HIGH_WORD;
 	end
 	WAIT_ON_HIGH_WORD: if (!write) begin
