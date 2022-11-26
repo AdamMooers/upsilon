@@ -168,9 +168,6 @@ end endgenerate
 always @ (posedge clk) begin
 	case (state)
 	WAIT_ON_ARM: begin if (arm) begin
-		if (adc_used_in != 0) begin
-			state <= REQUEST_DAC_VALUES;
-		end
 		adc_used <= adc_used_in;
 		dx <= dx_in;
 		dy <= dy_in;
@@ -221,7 +218,7 @@ always @ (posedge clk) begin
 	end
 
 	WAIT_ADVANCE: begin
-		if (counter < settle_time_in) begin
+		if (counter < settle_time) begin
 			if (!arm) state <= WAIT_ON_ARM;
 			counter <= counter + 1;
 		end else begin
