@@ -5,11 +5,12 @@ module raster #(
 	parameter DAC_WAIT_BETWEEN_CMD = 10,
 	parameter TIMER_WID = 4,
 	parameter STEPWID = 16,
+	parameter ADCNUM = 9,
 	parameter MAX_ADC_DATA_WID = 24
 ) (
 	input clk,
 	input arm,
-	output reg finshed,
+	output reg finished,
 	output reg running,
 
 	/* Amount of steps per sample. */
@@ -19,7 +20,7 @@ module raster #(
 	/* Amount of lines in the output. */
 	input [SAMPLEWID-1:0] max_lines_in,
 	/* Wait time after each step. */
-	input [TIMER_WID-1:0] settle_time,
+	input [TIMER_WID-1:0] settle_time_in,
 
 	/* Each step goes (x,y) -> (x + dx, y + dy) forward for each line of
 	 * the output. */
@@ -32,14 +33,16 @@ module raster #(
 
 	/* X and Y DAC piezos */
 	output x_arm,
-	output [DAC_DATA_WID-1:0] x_to_dac,
-	input [DAC_DATA_WID-1:0] x_from_dac,
-	output x_finished,
+	output [DAC_WID-1:0] x_to_dac,
+	/* verilator lint_off UNUSED */
+	input [DAC_WID-1:0] x_from_dac,
+	input x_finished,
 
 	output y_arm,
-	output [DAC_DATA_WID-1:0] y_to_dac,
-	input [DAC_DATA_WID-1:0] y_from_dac,
-	output y_finished,
+	output [DAC_WID-1:0] y_to_dac,
+	/* verilator lint_off UNUSED */
+	input [DAC_WID-1:0] y_from_dac,
+	input y_finished,
 
 	/* Connections to all possible ADCs. These are connected to SPI masters
 	 * and they will automatically extend ADC value lengths to their highest
@@ -136,12 +139,13 @@ reg [ADCNUM-1:0] adc_used_tmp = 0;
 reg [MAX_ADC_DATA_WID-1:0] adc_data_tmp [ADCNUM-1:0];
 
 /********** Loop Parameters *************/
-reg [ADCNUM-1:0] adc_used_in = 0;
+reg [ADCNUM-1:0] adc_used = 0;
 reg is_reverse = 0;
 reg signed [DAC_DATA_WID-1:0] dx = 0;
 reg signed [DAC_DATA_WID-1:0] dy = 0;
 reg signed [DAC_DATA_WID-1:0] dx_vert = 0;
 reg signed [DAC_DATA_WID-1:0] dy_vert = 0;
+reg [TIMER_WID-1:0] settle_time = 0;
 
 reg [SAMPLEWID-1:0] max_samples = 0;
 reg [SAMPLEWID-1:0] max_lines = 0;
@@ -175,6 +179,7 @@ always @ (posedge clk) begin
 		max_samples <= max_samples_in;
 		max_lines <= max_lines_in;
 		steps_per_sample <= steps_per_sample_in;
+		settle_time <= settle_time_in;
 
 		is_reverse <= 0;
 		sample <= 0;
@@ -195,11 +200,11 @@ always @ (posedge clk) begin
 			y_to_dac <= 0;
 			x_arm <= 0;
 			y_arm <= 0;
-			state <= OBTAIN_DAC_VALUES;
+			state <= GET_DAC_VALUES;
 			counter <= 0;
 		end
 	end
-	OBTAIN_DAC_VALUES: begin if (counter < DAC_WAIT_BETWEEN_CMD) begin
+	GET_DAC_VALUES: if (counter < DAC_WAIT_BETWEEN_CMD) begin
 		counter <= counter + 1;
 		if (!arm) state <= WAIT_ON_ARM;
 	end else if (!x_arm || !y_arm) begin
@@ -216,7 +221,7 @@ always @ (posedge clk) begin
 	end
 
 	WAIT_ADVANCE: begin
-		if (counter < settle_time) begin
+		if (counter < settle_time_in) begin
 			if (!arm) state <= WAIT_ON_ARM;
 			counter <= counter + 1;
 		end else begin
@@ -267,8 +272,8 @@ always @ (posedge clk) begin
 		if (!x_arm || !y_arm) begin
 			x_val <= x_val + dx;
 			y_val <= y_val + dy;
-			x_to_dac <= {4b'0001, x_val + dx};
-			y_to_dac <= {4b'0001, y_val + dy};
+			x_to_dac <= {4'b0001, x_val + dx};
+			y_to_dac <= {4'b0001, y_val + dy};
 			x_arm <= 1;
 			y_arm <= 1;
 			sample <= sample + 1;
@@ -288,20 +293,21 @@ always @ (posedge clk) begin
 				running <= 0;
 			end else begin
 				x_val <= x_val + dx_vert;
-				x_to_dac <= {4b'0001, x_val + dx_vert};
+				x_to_dac <= {4'b0001, x_val + dx_vert};
 				x_arm <= 1;
 				y_val <= y_val + dy_vert;
-				y_to_dac <= {4b'0001, y_val + dy_vert};
+				y_to_dac <= {4'b0001, y_val + dy_vert};
 				y_arm <= 1;
 				line <= line + 1;
 			end
 		end else if (x_finished && y_finished) begin
 			counter <= 0;
-			state <= WAIT_ADVANCE_LINE;
+			state <= WAIT_ADVANCE;
 			x_arm <= 0;
 			y_arm <= 0;
 		end
 	end
+
 	WAIT_ON_ARM_DEASSERT: begin
 		if (!arm) begin
 			state <= WAIT_ON_ARM;
