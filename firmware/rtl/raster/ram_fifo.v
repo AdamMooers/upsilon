@@ -43,9 +43,9 @@ reg [FIFO_DEPTH_WID-1:0] write_ptr = 0;
 always @ (posedge WCLK) begin
 	if (rst) begin
 		write_ptr <= 0;
-	if (write_enable) begin
+	end else if (write_enable) begin
 		memory[write_ptr] <= write_dat;
-		wite_dat <= writr_dat + 1;
+		write_ptr <= write_ptr + 1;
 	end
 end
 
