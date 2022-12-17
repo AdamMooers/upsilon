@@ -49,8 +49,8 @@ module control_loop
 	output adc_sck,
 
 	/* Hacky ad-hoc read-write interface. */
-	input reg [`CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
-	input reg [`DATA_WID-1:0] word_in,
+	input [`CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
+	input [`DATA_WID-1:0] word_in,
 	output reg [`DATA_WID-1:0] word_out,
 	input start_cmd,
 	output reg finish_cmd
@@ -150,7 +150,7 @@ wire signed [`CONSTS_WID-1:0] adj_val;
 wire signed [DAC_DATA_WID-1:0] new_dac_val;
 
 reg arm_math = 0;
-reg math_finished = 0;
+wire math_finished;
 control_loop_math #(
 	.CONSTS_WHOLE(CONSTS_WHOLE),
 	.CONSTS_FRAC(CONSTS_FRAC),
