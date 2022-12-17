@@ -10,6 +10,7 @@ module ram_fifo #(
 	input write_enable,
 
 	input signed [DAT_WID-1:0] write_dat,
+	output reg [FIFO_DEPTH_WID-1:0] fifo_size,
 	output signed [DAT_WID-1:0] read_dat
 );
 
@@ -26,5 +27,25 @@ ram_fifo_dual_port #(
 	.write_dat(write_dat),
 	.read_dat(read_dat)
 );
+
+always @ (posedge clk) begin
+	if (rst) begin
+		fifo_size <= 0;
+	end else if (read_enable && !write_enable) begin
+		fifo_size <= fifo_size - 1;
+`ifdef VERILATOR
+		if (fifo_size == 0) begin
+			$error("fifo underflow");
+		end
+`endif
+	end else if (write_enable && !read_enable) begin
+		fifo_size <= fifo_size + 1;
+`ifdef VERILATOR
+		if (fifo_size == FIFO_DEPTH) begin
+			$error("fifo overflow");
+		end
+`endif
+	end
+end
 
 endmodule
