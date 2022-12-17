@@ -13,8 +13,6 @@ module raster #(
 	output reg finished,
 	output reg running,
 
-	/* Amount of steps per sample. */
-	input [STEPWID-1:0] steps_per_sample_in,
 	/* Amount of samples in one line (forward) */
 	input [SAMPLEWID-1:0] max_samples_in,
 	/* Amount of lines in the output. */
@@ -26,10 +24,6 @@ module raster #(
 	 * the output. */
 	input signed [DAC_DATA_WID-1:0] dx_in,
 	input signed [DAC_DATA_WID-1:0] dy_in,
-
-	/* Vertical steps to go to the next line. */
-	input signed [DAC_DATA_WID-1:0] dx_vert_in,
-	input signed [DAC_DATA_WID-1:0] dy_vert_in,
 
 	/* X and Y DAC piezos */
 	output x_arm,
@@ -124,8 +118,8 @@ reg [STATE_WID-1:0] state = WAIT_ON_ARM;
 reg [SAMPLEWID-1:0] sample = 0;
 reg [SAMPLEWID-1:0] line = 0;
 reg [TIMER_WID-1:0] counter = 0;
-reg [DAC_DATA_WID-1:0] x_val = 0;
-reg [DAC_DATA_WID-1:0] y_val = 0;
+reg signed [DAC_DATA_WID-1:0] x_val = 0;
+reg signed [DAC_DATA_WID-1:0] y_val = 0;
 
 /* Buffer to store all measured ADC values. This
  * is shifted until it is all zeros to determine
@@ -143,8 +137,6 @@ reg [ADCNUM-1:0] adc_used = 0;
 reg is_reverse = 0;
 reg signed [DAC_DATA_WID-1:0] dx = 0;
 reg signed [DAC_DATA_WID-1:0] dy = 0;
-reg signed [DAC_DATA_WID-1:0] dx_vert = 0;
-reg signed [DAC_DATA_WID-1:0] dy_vert = 0;
 reg [TIMER_WID-1:0] settle_time = 0;
 
 reg [SAMPLEWID-1:0] max_samples = 0;
@@ -171,11 +163,8 @@ always @ (posedge clk) begin
 		adc_used <= adc_used_in;
 		dx <= dx_in;
 		dy <= dy_in;
-		dx_vert <= dx_vert_in;
-		dy_vert <= dy_vert_in;
 		max_samples <= max_samples_in;
 		max_lines <= max_lines_in;
-		steps_per_sample <= steps_per_sample_in;
 		settle_time <= settle_time_in;
 
 		is_reverse <= 0;
@@ -289,10 +278,11 @@ always @ (posedge clk) begin
 				finished <= 1;
 				running <= 0;
 			end else begin
-				x_val <= x_val + dx_vert;
+				/* rotation of (dx,dy) by 90° -> (dy, -dx) */
+				x_val <= x_val + dy;
 				x_to_dac <= {4'b0001, x_val + dx_vert};
 				x_arm <= 1;
-				y_val <= y_val + dy_vert;
+				y_val <= y_val - dx;
 				y_to_dac <= {4'b0001, y_val + dy_vert};
 				y_arm <= 1;
 				line <= line + 1;

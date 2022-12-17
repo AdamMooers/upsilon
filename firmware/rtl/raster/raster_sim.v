@@ -1,3 +1,4 @@
+`timescale 10ns/10ns
 module raster_sim #(
 	parameter SAMPLEWID = 9,
 	parameter DAC_DATA_WID = 20,
@@ -12,15 +13,16 @@ module raster_sim #(
 	parameter MAX_BYTE_WID = 13,
 	parameter DAT_WID = 24,
 	parameter RAM_WORD = 16,
-	parameter RAM_WID = 32
+	parameter RAM_WID = 32,
+
+	parameter RAM_SIM_WAIT_TIME = 54,
+	parameter ADC_SIM_WAIT_TIME = 54
 ) (
 	input clk,
 	input arm,
 	output reg finished,
 	output reg running,
 
-	/* Amount of steps per sample. */
-	input [STEPWID-1:0] steps_per_sample_in,
 	/* Amount of samples in one line (forward) */
 	input [SAMPLEWID-1:0] max_samples_in,
 	/* Amount of lines in the output. */
@@ -37,18 +39,7 @@ module raster_sim #(
 	input signed [DAC_DATA_WID-1:0] dx_vert_in,
 	input signed [DAC_DATA_WID-1:0] dy_vert_in,
 
-	/* X and Y DAC piezos */
-	output x_arm,
-	output [DAC_WID-1:0] x_to_dac,
-	/* verilator lint_off UNUSED */
-	input [DAC_WID-1:0] x_from_dac,
-	input x_finished,
-
-	output y_arm,
-	output [DAC_WID-1:0] y_to_dac,
-	/* verilator lint_off UNUSED */
-	input [DAC_WID-1:0] y_from_dac,
-	input y_finished,
+	output reg [DAC_DATA_WID-1:0] coord_dac [1:0],
 
 	/* Connections to all possible ADCs. These are connected to SPI masters
 	 * and they will automatically extend ADC value lengths to their highest
@@ -63,13 +54,94 @@ module raster_sim #(
 	/* DMA interface */
 	output [RAM_WORD-1:0] word,
 	output [RAM_WID-1:0] addr,
-	output ram_write,
+	output reg ram_write,
 	input ram_valid
 );
+
+/**** DAC simulation ****/
+
+reg [DAC_WID-1:0] coord_write_buf [1:0];
+reg [DAC_WID-1:0] coord_to_dac [1:0];
+reg [DAC_WID-1:0] coord_from_dac [1:0];
+wire coord_arm [1:0];
+reg coord_finished [1:0];
+
+genvar ci;
+generate for (ci = 0; ci < 2; ci = ci + 1) begin
+	initial begin
+		coord_write_buf[ci] = 0;
+		coord_to_dac[ci] = 0;
+		coord_from_dac[ci] = 0;
+		coord_finished[ci] = 0;
+	end
+
+	always @ (posedge clk) begin
+		if (coord_arm[ci] && !coord_finished[ci]) begin
+			coord_to_dac[ci] <= coord_write_buf[ci];
+			coord_finished[ci] <= 1;
+
+			case (coord_from_dac[ci][DAC_WID-1:DAC_WID-4])
+			4'b1001: begin
+				coord_write_buf[ci] <= {4'b1001, coord_dac[ci]};
+			end
+			4'b0001: begin
+				coord_write_buf[ci] <= 0;
+				coord_dac[ci] <= coord_from_dac[ci][DAC_WID-4-1:0];
+			end
+			endcase
+
+		end else if (!coord_arm[ci]) begin
+			coord_finished[ci] <= 0;
+		end
+	end
+end endgenerate
+
+/**** ADC Shim ****/
+
+wire adc_arm_internal;
+reg [31:0] adc_wait_cntr = 0;
+
+always @ (posedge clk) begin
+	if (adc_arm_internal != 0) begin
+		if (adc_wait_cntr < ADC_SIM_WAIT_TIME) begin
+			adc_wait_cntr <= adc_wait_cntr + 1;
+		end else begin
+			adc_arm <= adc_arm_internal;
+		end
+	end else begin
+		adc_wait_cntr <= 0;
+	end
+end
+
+/**** RAM Shim ****/
+
+/* Check all addresses are valid. */
+property address_in_range;
+	@(posedge clk)
+	ram_commit |->
+	BASE_ADDR <= addr && addr < BASE_ADDR + (1 << MAX_BYTE_WID);
+endproperty
+address_in_range_assert: assert property (address_in_range);
 
 wire signed [DAT_WID-1:0] ram_data;
 wire ram_commit;
 wire ram_write_finished;
+
+wire ram_write_internal = 0;
+reg [31:0] ram_cntr = 0;
+
+always @ (posedge clk) begin
+	if (ram_commit) begin
+		if (ram_cntr < RAM_SIM_WAIT_TIME) begin
+			ram_cntr <= ram_cntr + 1;
+		end else begin
+			ram_write <= 1;
+		end
+	end else begin
+		ram_cntr <= 0;
+		ram_write <= 0;
+	end
+end
 
 ram_shim #(
 	.BASE_ADDR(BASE_ADDR),
@@ -84,7 +156,7 @@ ram_shim #(
 	.finished(ram_write_finished),
 	.word(word),
 	.addr(addr),
-	.write(ram_write),
+	.write(ram_write_internal),
 	.valid(ram_valid)
 );
 
@@ -120,7 +192,7 @@ raster #(
 	.y_from_dac(y_from_dac),
 	.y_finished(y_finished),
 
-	.adc_arm(adc_arm),
+	.adc_arm(adc_arm_internal),
 	.adc_data(adc_data),
 	.adc_finished(adc_finished),
 
