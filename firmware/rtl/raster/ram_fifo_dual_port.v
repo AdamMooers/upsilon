@@ -24,7 +24,7 @@ module ram_fifo_dual_port #(
 );
 
 reg [DAT_WID-1:0] memory [FIFO_DEPTH-1:0];
-initial memory[0] <= 24'b0;
+initial memory[0] = 24'b0;
 
 /* Read domain */
 
