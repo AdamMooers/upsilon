@@ -34,7 +34,10 @@ always @ (posedge RCLK) begin
 		read_ptr <= 0;
 	end else if (read_enable) begin
 		read_dat <= memory[read_ptr];
-		read_ptr <= read_ptr + 1;
+		if (read_ptr == FIFO_DEPTH-1)
+			read_ptr <= 0;
+		else
+			read_ptr <= read_ptr + 1;
 	end
 end
 
@@ -45,7 +48,10 @@ always @ (posedge WCLK) begin
 		write_ptr <= 0;
 	end else if (write_enable) begin
 		memory[write_ptr] <= write_dat;
-		write_ptr <= write_ptr + 1;
+		if (write_ptr == FIFO_DEPTH-1)
+			write_ptr <= 0;
+		else
+			write_ptr <= write_ptr + 1;
 	end
 end
 

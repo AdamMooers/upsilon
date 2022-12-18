@@ -1,7 +1,7 @@
 module ram_fifo #(
 	parameter DAT_WID = 24,
-	parameter FIFO_DEPTH = 1500,
-	parameter FIFO_DEPTH_WID = 11
+	parameter FIFO_DEPTH_WID = 11,
+	parameter [FIFO_DEPTH_WID-1:0] FIFO_DEPTH = 1500
 ) (
 	input clk,
 	input rst,
@@ -10,9 +10,15 @@ module ram_fifo #(
 	input write_enable,
 
 	input signed [DAT_WID-1:0] write_dat,
-	output reg [FIFO_DEPTH_WID-1:0] fifo_size,
-	output signed [DAT_WID-1:0] read_dat
+	output signed [DAT_WID-1:0] read_dat,
+	output empty,
+	output full
 );
+
+reg [FIFO_DEPTH_WID-1:0] fifo_size;
+initial fifo_size = 0;
+assign empty = fifo_size == 0;
+assign full = fifo_size == FIFO_DEPTH;
 
 ram_fifo_dual_port #(
 	.DAT_WID(DAT_WID),
@@ -47,5 +53,14 @@ always @ (posedge clk) begin
 `endif
 	end
 end
+
+/*
+`ifdef VERILATOR
+initial begin
+	$dumpfile("ram_fifo.vcd");
+	$dumpvars;
+end
+`endif
+*/
 
 endmodule
