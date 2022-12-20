@@ -135,6 +135,10 @@ add that case to the simulation.
 
 ## Test Synthesis
 
+**Yosys only accepts a subset of the Verilog that Verilator supports. You
+might write a bunch of code that Verilator will happily simulate but that
+will fail to go through Yosys.**
+
 Once you have simulated your design, you should use yosys to synthesize it.
 This will allow you to understand how much and what resources the module
 is taking up. To do this, you can put the follwing in a script file:
@@ -161,3 +165,21 @@ The open source toolchain that Upsilon uses is novel and unstable.
 This is really a Yosys (and really, really, an abc bug). F4PGA defaults
 to using the ABC flow, which can break, especially for block RAM. To
 fix, edit out `-abc` in the tcl script (find it before you install it...)
+
+## Yosys
+
+Yosys fails to calculate computed parameter values correctly. For instance,
+
+    parameter CTRLVAL = 5;
+    localparam VALUE = CTRLVAL + 1;
+
+Yosys will *silently* fail to compile this, setting `VALUE` to be equal
+to 0. The solution is to use preprocessor defines:
+
+    parameter CTRLVAL = 5;
+    `define VALUE (CTRLVAL + 1)
+
+In Verilog, in order to replace a macro identifier with the value of the
+macro, you must put a backtick before the name: i.e.
+
+    `VALUE

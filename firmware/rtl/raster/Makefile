@@ -27,3 +27,7 @@ obj_dir/Vram_shim: obj_dir/Vram_shim.mk ram_shim_sim.cpp
 ram_shim_cmds.h: ram_shim_cmds.vh
 	echo '#pragma once' > ram_shim_cmds.h
 	sed 's/`define/#define/g; s/`//g' ram_shim_cmds.vh >> ram_shim_cmds.h
+
+clean:
+	rm -rf obj_dir
+	rm *.vcd ram_shim_cmds.h

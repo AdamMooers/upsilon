@@ -1,3 +1,10 @@
+/* Raster scanner. This module sweeps two DACs (the X and Y piezos)
+ * across a box, where the X and Y axes may be at an angle. After
+ * a single step, the ADCs connected to the raster scanner are
+ * activated, with each value read into system memory (see ram_shim).
+ * The kernel then reads these values and sends them to the controller
+ * over ethernet.
+ */
 module raster #(
 	parameter SAMPLEWID = 9,
 	parameter DAC_DATA_WID = 20,
@@ -280,10 +287,10 @@ always @ (posedge clk) begin
 			end else begin
 				/* rotation of (dx,dy) by 90° -> (dy, -dx) */
 				x_val <= x_val + dy;
-				x_to_dac <= {4'b0001, x_val + dx_vert};
+				x_to_dac <= {4'b0001, x_val + dy};
 				x_arm <= 1;
 				y_val <= y_val - dx;
-				y_to_dac <= {4'b0001, y_val + dy_vert};
+				y_to_dac <= {4'b0001, y_val - dx};
 				y_arm <= 1;
 				line <= line + 1;
 			end
