@@ -1,3 +1,7 @@
+/* Implements a synchronous(!) FIFO using inferred Block RAM. This
+ * must wrap "ram_fifo_dual_port" due to difficulties YOSYS has with
+ * inferring Block RAM: refer to that module for details.
+ */
 module ram_fifo #(
 	parameter DAT_WID = 24,
 	parameter FIFO_DEPTH_WID = 11,
