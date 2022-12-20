@@ -49,7 +49,9 @@ module raster #(
 	 * and they will automatically extend ADC value lengths to their highest
 	 * values. */
 	output reg [ADCNUM-1:0] adc_arm,
-	input [MAX_ADC_DATA_WID-1:0] adc_data [ADCNUM-1:0],
+
+	/* Yosys does not support input arrays. */
+	input [ADCNUM*MAX_ADC_DATA_WID-1:0] adc_data,
 	input [ADCNUM-1:0] adc_finished,
 
 	/* Bitmap for which ADCs are used. */
@@ -115,7 +117,6 @@ localparam SCAN_ADC_VALUES = 4;
 localparam SEND_VALUE = 5;
 localparam ADVANCE_DAC_WRITE = 6;
 localparam WAIT_ADVANCE = 7;
-localparam ON_ADC_FINISHED = 8;
 localparam NEXT_LINE  = 9;
 localparam WAIT_ON_ARM_DEASSERT = 10;
 localparam STATE_WID = 4;
@@ -139,6 +140,17 @@ reg [ADCNUM-1:0] adc_used_tmp = 0;
  */
 reg [MAX_ADC_DATA_WID-1:0] adc_data_tmp [ADCNUM-1:0];
 
+genvar ii;
+generate for (ii = 0; ii < ADCNUM - 1; ii = ii + 1) begin
+	always @ (posedge clk) begin
+		if (state == SCAN_ADC_VALUES) begin
+			adc_data_tmp[ii] <= adc_data_tmp[ii+1];
+		end else if (state == MEASURE && adc_finished == adc_arm) begin
+			adc_data_tmp[ii] <= adc_data[(ADCNUM-ii)*MAX_ADC_DATA_WID-1:(ADCNUM-ii-1)*MAX_ADC_DATA_WID];
+		end
+	end
+end endgenerate
+
 /********** Loop Parameters *************/
 reg [ADCNUM-1:0] adc_used = 0;
 reg is_reverse = 0;
@@ -149,20 +161,6 @@ reg [TIMER_WID-1:0] settle_time = 0;
 reg [SAMPLEWID-1:0] max_samples = 0;
 reg [SAMPLEWID-1:0] max_lines = 0;
 reg [STEPWID-1:0] steps_per_sample = 0;
-
-/* Reading ADC data.
- * If this doesn't work, a gigantic vector with large bit shifts
- * can also work.
- */
-
-genvar ii;
-generate for (ii = 0; ii < ADCNUM - 1; ii = ii + 1) begin
-	always @ (posedge clk) begin
-		if (state == SCAN_ADC_VALUES) begin
-			adc_data_tmp[ii] <= adc_data_tmp[ii+1];
-		end
-	end
-end endgenerate
 
 always @ (posedge clk) begin
 	case (state)
@@ -232,7 +230,6 @@ always @ (posedge clk) begin
 	end
 	SCAN_ADC_VALUES: begin
 		if (adc_used_tmp == 0) begin
-			state <= ON_ADC_FINISHED;
 			if (sample == max_samples) begin
 				dx <= ~dx + 1;
 				dy <= ~dy + 1;
