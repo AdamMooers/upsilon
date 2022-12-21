@@ -6,6 +6,7 @@
  * over ethernet.
  */
 `include "raster_cmds.vh"
+`timescale 10ns/10ns
 module raster #(
 	parameter SAMPLEWID = 9,
 	parameter DAC_DATA_WID = 20,
@@ -331,3 +332,4 @@ always @ (posedge clk) begin
 end
 
 endmodule
+`undefineall

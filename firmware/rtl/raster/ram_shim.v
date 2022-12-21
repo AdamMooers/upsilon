@@ -9,6 +9,7 @@
  * THIS MODULE ASSUMES that RAM_WORD < DAT_WID < RAM_WORD*2.
  */
 `include "ram_shim_cmds.vh"
+`timescale 10ns/10ns
 module ram_shim #(
 	parameter DAT_WID = 24,
 	parameter RAM_WORD = 16,

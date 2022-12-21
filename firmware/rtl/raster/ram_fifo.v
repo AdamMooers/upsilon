@@ -2,6 +2,7 @@
  * must wrap "ram_fifo_dual_port" due to difficulties YOSYS has with
  * inferring Block RAM: refer to that module for details.
  */
+`timescale 10ns/10ns
 module ram_fifo #(
 	parameter DAT_WID = 24,
 	parameter FIFO_DEPTH_WID = 11,

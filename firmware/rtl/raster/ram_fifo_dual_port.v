@@ -7,6 +7,7 @@
  * https://stackoverflow.com/questions/62703942/trouble-getting-yosys-to-infer-block-ram-array-rather-than-using-logic-cells-v
  * The answer by "TinLethax" infers a BRAM.
  */
+`timescale 10ns/10ns
 module ram_fifo_dual_port #(
 	parameter DAT_WID = 24,
 	parameter FIFO_DEPTH = 1500,

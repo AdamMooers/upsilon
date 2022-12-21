@@ -1,4 +1,6 @@
 `timescale 10ns/10ns
+`include "raster_cmds.vh"
+`include "ram_shim_cmds.vh"
 module raster_sim #(
 	parameter SAMPLEWID = 9,
 	parameter DAC_DATA_WID = 20,
@@ -9,8 +11,6 @@ module raster_sim #(
 	parameter ADCNUM = 9,
 	parameter MAX_ADC_DATA_WID = 24,
 
-	parameter BASE_ADDR = 32'h1000000,
-	parameter MAX_BYTE_WID = 13,
 	parameter DAT_WID = 24,
 	parameter RAM_WORD = 16,
 	parameter RAM_WID = 32,
@@ -19,52 +19,47 @@ module raster_sim #(
 	parameter ADC_SIM_WAIT_TIME = 54
 ) (
 	input clk,
-	input arm,
-	output reg finished,
-	output reg running,
 
-	/* Amount of samples in one line (forward) */
-	input [SAMPLEWID-1:0] max_samples_in,
-	/* Amount of lines in the output. */
-	input [SAMPLEWID-1:0] max_lines_in,
-	/* Wait time after each step. */
-	input [TIMER_WID-1:0] settle_time_in,
+	input [`RASTER_CMD_WID-1:0] kernel_cmd,
+	input [`RASTER_DATA_WID-1:0] kernel_data_in,
+	output [`RASTER_DATA_WID-1:0] kernel_data_out,
+	input kernel_ready,
+	output kernel_finished,
 
-	/* Each step goes (x,y) -> (x + dx, y + dy) forward for each line of
-	 * the output. */
-	input signed [DAC_DATA_WID-1:0] dx_in,
-	input signed [DAC_DATA_WID-1:0] dy_in,
+	output [DAC_DATA_WID-1:0] x_dac,
+	output [DAC_DATA_WID-1:0] y_dac,
 
-	/* Vertical steps to go to the next line. */
-	input signed [DAC_DATA_WID-1:0] dx_vert_in,
-	input signed [DAC_DATA_WID-1:0] dy_vert_in,
-
-	output reg [DAC_DATA_WID-1:0] coord_dac [1:0],
-
-	/* Connections to all possible ADCs. These are connected to SPI masters
-	 * and they will automatically extend ADC value lengths to their highest
-	 * values. */
 	output reg [ADCNUM-1:0] adc_arm,
 	input [MAX_ADC_DATA_WID-1:0] adc_data [ADCNUM-1:0],
 	input [ADCNUM-1:0] adc_finished,
-
-	/* Bitmap for which ADCs are used. */
-	input [ADCNUM-1:0] adc_used_in,
 
 	/* DMA interface */
 	output [RAM_WORD-1:0] word,
 	output [RAM_WID-1:0] addr,
 	output reg ram_write,
-	input ram_valid
+	input ram_valid,
+
+	/* RAM shim control interface */
+	input [RAM_WID-1:0] shim_cmd_data,
+	input [`RAM_SHIM_CMD_WID-1:0] shim_cmd,
+	input shim_cmd_active,
+	output shim_cmd_finished,
+	output [RAM_WID-1:0] shim_cmd_data_out
 );
 
-/**** DAC simulation ****/
+/**** DAC simulation.
+ * The code to handle each axis (X and Y) are similar.
+ ****/
 
 reg [DAC_WID-1:0] coord_write_buf [1:0];
 reg [DAC_WID-1:0] coord_to_dac [1:0];
 reg [DAC_WID-1:0] coord_from_dac [1:0];
 wire coord_arm [1:0];
 reg coord_finished [1:0];
+
+reg [DAC_DATA_WID-1:0] coord_dac [1:0];
+assign x_dac = coord_dac[0];
+assign y_dac = coord_dac[1];
 
 genvar ci;
 generate for (ci = 0; ci < 2; ci = ci + 1) begin
@@ -88,6 +83,7 @@ generate for (ci = 0; ci < 2; ci = ci + 1) begin
 				coord_write_buf[ci] <= 0;
 				coord_dac[ci] <= coord_from_dac[ci][DAC_WID-4-1:0];
 			end
+			default: ;
 			endcase
 
 		end else if (!coord_arm[ci]) begin
@@ -96,9 +92,13 @@ generate for (ci = 0; ci < 2; ci = ci + 1) begin
 	end
 end endgenerate
 
-/**** ADC Shim ****/
+/**** ADC Shim
+ * This shim and the shim below implement delays to simulate the actual
+ * acquisition process. The values are then floated up to the Verilator
+ * simulator so the C++ code doesn't have to implement timers manually.
+ ****/
 
-wire adc_arm_internal;
+wire [ADCNUM-1:0] adc_arm_internal;
 reg [31:0] adc_wait_cntr = 0;
 
 always @ (posedge clk) begin
@@ -115,50 +115,52 @@ end
 
 /**** RAM Shim ****/
 
-/* Check all addresses are valid. */
-property address_in_range;
-	@(posedge clk)
-	ram_commit |->
-	BASE_ADDR <= addr && addr < BASE_ADDR + (1 << MAX_BYTE_WID);
-endproperty
-address_in_range_assert: assert property (address_in_range);
-
-wire signed [DAT_WID-1:0] ram_data;
-wire ram_commit;
-wire ram_write_finished;
-
-wire ram_write_internal = 0;
-reg [31:0] ram_cntr = 0;
+wire ram_write_internal;
+reg [31:0] ram_wait_cntr = 0;
 
 always @ (posedge clk) begin
-	if (ram_commit) begin
-		if (ram_cntr < RAM_SIM_WAIT_TIME) begin
-			ram_cntr <= ram_cntr + 1;
-		end else begin
-			ram_write <= 1;
-		end
+	if (!ram_write_internal) begin
+		ram_wait_cntr <= 0;
+	end else if (ram_wait_cntr < RAM_SIM_WAIT_TIME) begin
+		ram_wait_cntr <= ram_wait_cntr + 1;
 	end else begin
-		ram_cntr <= 0;
-		ram_write <= 0;
+		ram_write <= 1;
 	end
 end
 
+wire [MAX_ADC_DATA_WID-1:0] ram_data;
+wire ram_commit;
+wire ram_finished;
+
 ram_shim #(
-	.BASE_ADDR(BASE_ADDR),
-	.MAX_BYTE_WID(MAX_BYTE_WID),
 	.DAT_WID(DAT_WID),
 	.RAM_WORD(RAM_WORD),
 	.RAM_WID(RAM_WID)
 ) ram (
 	.clk(clk),
+	.rst(0),
 	.data(ram_data),
-	.commit(ram_commit),
-	.finished(ram_write_finished),
+	.data_commit(ram_commit),
+	.finished(ram_finished),
 	.word(word),
 	.addr(addr),
 	.write(ram_write_internal),
-	.valid(ram_valid)
+	.valid(ram_valid),
+
+	.cmd_data(shim_cmd_data),
+	.cmd(shim_cmd),
+	.cmd_active(shim_cmd_active),
+	.cmd_finished(shim_cmd_finished),
+	.cmd_data_out(shim_cmd_data_out)
 );
+
+/* Converting array to vector, arrays are easier to handle in Verilator. */
+wire [ADCNUM*MAX_ADC_DATA_WID-1:0] adc_data_internal;
+genvar ii;
+generate for (ii = 0; ii < ADCNUM; ii = ii + 1) begin
+	assign adc_data_internal[(ii+1)*MAX_ADC_DATA_WID-1:ii*MAX_ADC_DATA_WID]
+	       = adc_data[ii];
+end endgenerate
 
 raster #(
 	.SAMPLEWID(SAMPLEWID),
@@ -170,37 +172,31 @@ raster #(
 	.MAX_ADC_DATA_WID(MAX_ADC_DATA_WID)
 ) raster (
 	.clk(clk),
-	.arm(arm),
-	.finished(finished),
-	.running(running),
-	.steps_per_sample_in(steps_per_sample_in),
-	.max_samples_in(max_samples_in),
-	.max_lines_in(max_lines_in),
-	.settle_time_in(settle_time_in),
-	.dx_in(dx_in),
-	.dy_in(dy_in),
-	.dx_vert_in(dx_vert_in),
-	.dy_vert_in(dy_vert_in),
 
-	.x_arm(x_arm),
-	.x_to_dac(x_to_dac),
-	.x_from_dac(x_from_dac),
-	.x_finished(x_finished),
+	.kernel_cmd(kernel_cmd),
+	.kernel_data_in(kernel_data_in),
+	.kernel_data_out(kernel_data_out),
+	.kernel_ready(kernel_ready),
+	.kernel_finished(kernel_finished),
 
-	.y_arm(y_arm),
-	.y_to_dac(y_to_dac),
-	.y_from_dac(y_from_dac),
-	.y_finished(y_finished),
+	.x_arm(coord_arm[0]),
+	.x_to_dac(coord_to_dac[0]),
+	.x_from_dac(coord_from_dac[0]),
+	.x_finished(coord_finished[0]),
+
+	.y_arm(coord_arm[1]),
+	.y_to_dac(coord_to_dac[1]),
+	.y_from_dac(coord_from_dac[1]),
+	.y_finished(coord_finished[1]),
 
 	.adc_arm(adc_arm_internal),
-	.adc_data(adc_data),
+	.adc_data(adc_data_internal),
 	.adc_finished(adc_finished),
-
-	.adc_used_in(adc_used_in),
 
 	.data(ram_data),
 	.mem_commit(ram_commit),
-	.mem_finished(ram_write_finished)
+	.mem_finished(ram_finished)
 );
 
 endmodule
+`undefineall
