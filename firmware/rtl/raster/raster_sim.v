@@ -2,23 +2,17 @@
 `include "raster_cmds.vh"
 `include "ram_shim_cmds.vh"
 module raster_sim #(
-	parameter SAMPLEWID = 9,
-	parameter DAC_DATA_WID = 20,
-	parameter DAC_WID = 24,
 	parameter DAC_WAIT_BETWEEN_CMD = 10,
-	parameter TIMER_WID = 4,
-	parameter STEPWID = 16,
-	parameter ADCNUM = 9,
-	parameter MAX_ADC_DATA_WID = 24,
 
 	parameter DAT_WID = 24,
 	parameter RAM_WORD = 16,
 	parameter RAM_WID = 32,
 
-	parameter RAM_SIM_WAIT_TIME = 54,
+	parameter RAM_SIM_WAIT_TIME = 72,
 	parameter ADC_SIM_WAIT_TIME = 54
 ) (
 	input clk,
+	output is_running,
 
 	input [`RASTER_CMD_WID-1:0] kernel_cmd,
 	input [`RASTER_DATA_WID-1:0] kernel_data_in,
@@ -26,12 +20,12 @@ module raster_sim #(
 	input kernel_ready,
 	output kernel_finished,
 
-	output [DAC_DATA_WID-1:0] x_dac,
-	output [DAC_DATA_WID-1:0] y_dac,
+	output [`DAC_DATA_WID-1:0] x_dac,
+	output [`DAC_DATA_WID-1:0] y_dac,
 
-	output reg [ADCNUM-1:0] adc_arm,
-	input [MAX_ADC_DATA_WID-1:0] adc_data [ADCNUM-1:0],
-	input [ADCNUM-1:0] adc_finished,
+	output reg [`ADCNUM-1:0] adc_arm,
+	input [`MAX_ADC_DATA_WID-1:0] adc_data [`ADCNUM-1:0],
+	input [`ADCNUM-1:0] adc_finished,
 
 	/* DMA interface */
 	output [RAM_WORD-1:0] word,
@@ -51,13 +45,15 @@ module raster_sim #(
  * The code to handle each axis (X and Y) are similar.
  ****/
 
-reg [DAC_WID-1:0] coord_write_buf [1:0];
-reg [DAC_WID-1:0] coord_to_dac [1:0];
-reg [DAC_WID-1:0] coord_from_dac [1:0];
+reg [`DAC_WID-1:0] coord_write_buf [1:0];
+/* verilator lint_off UNUSEDSIGNAL */
+reg [`DAC_WID-1:0] coord_to_dac [1:0];
+/* verilator lint_on UNUSEDSIGNAL */
+reg [`DAC_WID-1:0] coord_from_dac [1:0];
 wire coord_arm [1:0];
 reg coord_finished [1:0];
 
-reg [DAC_DATA_WID-1:0] coord_dac [1:0];
+reg [`DAC_DATA_WID-1:0] coord_dac [1:0];
 assign x_dac = coord_dac[0];
 assign y_dac = coord_dac[1];
 
@@ -75,13 +71,13 @@ generate for (ci = 0; ci < 2; ci = ci + 1) begin
 			coord_to_dac[ci] <= coord_write_buf[ci];
 			coord_finished[ci] <= 1;
 
-			case (coord_from_dac[ci][DAC_WID-1:DAC_WID-4])
+			case (coord_from_dac[ci][`DAC_WID-1:`DAC_DATA_WID])
 			4'b1001: begin
 				coord_write_buf[ci] <= {4'b1001, coord_dac[ci]};
 			end
 			4'b0001: begin
 				coord_write_buf[ci] <= 0;
-				coord_dac[ci] <= coord_from_dac[ci][DAC_WID-4-1:0];
+				coord_dac[ci] <= coord_from_dac[ci][`DAC_DATA_WID-1:0];
 			end
 			default: ;
 			endcase
@@ -98,7 +94,7 @@ end endgenerate
  * simulator so the C++ code doesn't have to implement timers manually.
  ****/
 
-wire [ADCNUM-1:0] adc_arm_internal;
+wire [`ADCNUM-1:0] adc_arm_internal;
 reg [31:0] adc_wait_cntr = 0;
 
 always @ (posedge clk) begin
@@ -110,6 +106,7 @@ always @ (posedge clk) begin
 		end
 	end else begin
 		adc_wait_cntr <= 0;
+		adc_arm <= 0;
 	end
 end
 
@@ -121,6 +118,7 @@ reg [31:0] ram_wait_cntr = 0;
 always @ (posedge clk) begin
 	if (!ram_write_internal) begin
 		ram_wait_cntr <= 0;
+		ram_write <= 0;
 	end else if (ram_wait_cntr < RAM_SIM_WAIT_TIME) begin
 		ram_wait_cntr <= ram_wait_cntr + 1;
 	end else begin
@@ -128,7 +126,7 @@ always @ (posedge clk) begin
 	end
 end
 
-wire [MAX_ADC_DATA_WID-1:0] ram_data;
+wire [`MAX_ADC_DATA_WID-1:0] ram_data;
 wire ram_commit;
 wire ram_finished;
 
@@ -155,23 +153,18 @@ ram_shim #(
 );
 
 /* Converting array to vector, arrays are easier to handle in Verilator. */
-wire [ADCNUM*MAX_ADC_DATA_WID-1:0] adc_data_internal;
+wire [`ADCNUM*`MAX_ADC_DATA_WID-1:0] adc_data_internal;
 genvar ii;
-generate for (ii = 0; ii < ADCNUM; ii = ii + 1) begin
-	assign adc_data_internal[(ii+1)*MAX_ADC_DATA_WID-1:ii*MAX_ADC_DATA_WID]
+generate for (ii = 0; ii < `ADCNUM; ii = ii + 1) begin
+	assign adc_data_internal[(ii+1)*`MAX_ADC_DATA_WID-1:ii*`MAX_ADC_DATA_WID]
 	       = adc_data[ii];
 end endgenerate
 
 raster #(
-	.SAMPLEWID(SAMPLEWID),
-	.DAC_DATA_WID(DAC_DATA_WID),
-	.DAC_WID(DAC_WID),
-	.DAC_WAIT_BETWEEN_CMD(DAC_WAIT_BETWEEN_CMD),
-	.TIMER_WID(TIMER_WID),
-	.STEPWID(STEPWID),
-	.MAX_ADC_DATA_WID(MAX_ADC_DATA_WID)
+	.DAC_WAIT_BETWEEN_CMD(DAC_WAIT_BETWEEN_CMD)
 ) raster (
 	.clk(clk),
+	.is_running(is_running),
 
 	.kernel_cmd(kernel_cmd),
 	.kernel_data_in(kernel_data_in),
@@ -197,6 +190,11 @@ raster #(
 	.mem_commit(ram_commit),
 	.mem_finished(ram_finished)
 );
+
+initial begin
+	$dumpfile("raster.fst");
+	$dumpvars;
+end
 
 endmodule
 `undefineall
