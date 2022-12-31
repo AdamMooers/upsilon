@@ -3,15 +3,6 @@
 #include <zephyr/net/socket.h>
 #include "buf.h"
 
-/* Read from the socket into the buffer.
- * This function is meant to be called multiple times on the
- * same struct. The controller loads bp->left with the amount
- * of bytes it wishes to read, and continues until bp->left == 0.
- *
- * This function returns false if there was an error reading
- * from the socket.
- * A read of 0 bytes returns true.
- */
 bool
 buf_read_sock(int sock, struct bufptr *bp)
 {
@@ -24,12 +15,6 @@ buf_read_sock(int sock, struct bufptr *bp)
 	return true;
 }
 
-/* Write from the bufptr into a socket.
- * This function is meant to be called once per prepared bufptr.
- *
- * This function returns false if there was an error on the
- * socket.
- */
 bool
 buf_write_sock(int sock, struct bufptr *bp)
 {
@@ -44,21 +29,6 @@ buf_write_sock(int sock, struct bufptr *bp)
 	return true;
 }
 
-/* Write a formatted string to bp.
- * This function uses printf(), which means that it deals with
- * writing _C-strings_, not unterminated buffers.
- * When using this function, the buffer must be _one more_ than
- * the maximum message length. For instance, a 1024-byte message
- * should be in a 1025-byte buffer. HOWEVER, bp->left must still
- * be set to the total length of the buffer (in the example, 1025).
- *
- * The final bufptr points to the NUL terminator, so that it
- * is overwritten on each call to the function.
- *
- * This function returns 0 for a successful write, -1 for an
- * encoding error (should never happen), and a positive value
- * for the amount of bytes that could not fit.
- */
 int
 buf_writevf(struct bufptr *bp, const char *fmt, va_list va)
 {
@@ -90,8 +60,10 @@ buf_writevf(struct bufptr *bp, const char *fmt, va_list va)
 int
 buf_writef(struct bufptr *bp, const char *fmt, ...)
 {
+	int r;
 	va_list va;
 	va_start(va, fmt);
-	buf_writevf(bp, fmt, va);
+	r = buf_writevf(bp, fmt, va);
 	va_end(va);
+	return r;
 }
