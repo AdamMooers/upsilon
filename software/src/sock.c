@@ -3,6 +3,8 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include "sock.h"
+#include "lsc.h"
 
 LOG_MODULE_REGISTER(sock);
 
@@ -58,36 +60,50 @@ server_accept_client(int server)
 	return client;
 }
 
-bool
-client_read_into_buf(int sock, struct clireadbuf *buf)
+int
+sock_vprintf(int sock, char *buf, int buflen, char *fmt, va_list va)
 {
-	if (buf->st == MSG_READY) {
-		LOG_WRN("%s called while MSG_READY: misuse", __func__);
-		return true;
+	int w = vsnprintk(buf, buflen, fmt, va);
+	if (w < 0)
+		return b;
+	else if (w <= buflen)
+		return w - buflen;
+
+	ssize_t left = w;
+	char *p = buf;
+	while (left > 0) {
+		ssize_t i = zsock_send(sock, p, left, 0);
+		if (i < 0)
+			return 0;
+		p += i;
+		left -= i;
 	}
 
-	if (!buf_read_sock(sock, &buf->b))
-		return false;
-
-	if (buf->b.left == 0) switch (buf->st) {
-	case WAIT_ON_HEADER: {
-		uint16_t len;
-		memcpy(&len, buf->buf, sizeof(len));
-		buf->b.left = ntohs(len);
-		buf->st = READING_CLIENT;
-		break;
-	} case READING_CLIENT:
-		buf->st = MSG_READY;
-		break;
-	}
-
-	return true;
+	return w;
 }
 
-void
-client_buf_reset(struct clireadbuf *buf)
+int
+sock_name_printf(int sock, struct lsc_line *l, char *buf, int buflen, char *fmt, ...)
 {
-	buf->st = WAIT_ON_HEADER;
-	buf->b.p = buf->buf;
-	buf->b.left = sizeof(uint16_t);
+	if (l->name) {
+		int r = sock_printf(sock, buf, buflen, "%s\t", l->buf[0]);
+		if (r < 0)
+			return r;
+	}
+
+	va_list va;
+	va_start(va, fmt);
+	int r = sock_vprintf(sock, buf, buflen, fmt, va);
+	va_end(va);
+	return r;
+}
+
+int
+sock_printf(int sock, char *buf, int buflen, char *fmt, ...)
+{
+	va_list va;
+	va_start(va, fmt);
+	int r = sock_vprintf(sock, buf, buflen, fmt, va);
+	va_end(va);
+	return r;
 }

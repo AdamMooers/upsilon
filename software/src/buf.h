@@ -2,6 +2,8 @@
 
 /* This is a pointer _into_ a buffer. It is incremented (and the variable
  * "left" decremented) after each operation.
+ *
+ * Space is always left for a NUL terminator.
  */
 struct bufptr {
 	char *p;

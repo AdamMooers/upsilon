@@ -6,12 +6,16 @@
 bool
 buf_read_sock(int sock, struct bufptr *bp)
 {
-	ssize_t l = zsock_recv(sock, bp->p, bp->left, 0);
+	if (bp->left < 2)
+		return false;
+
+	ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
 	if (l < 0)
 		return false;
 
 	bp->left -= l;
 	bp->p += l;
+	*bp->p = 0;
 	return true;
 }
 
