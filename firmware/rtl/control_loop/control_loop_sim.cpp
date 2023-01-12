@@ -77,21 +77,6 @@ int main(int argc, char **argv) {
 			mod->fulfilled = 0;
 		}
 
-		/* Test changing constants mid-loop. */
-		if (tick == 50000) {
-			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_P;
-			/* 0.60 */
-			mod->word_into_loop = 0b1001100110011001100110011001100110011001100;
-			mod->start_cmd = 1;
-			printf("adjust P\n");
-		}
-		if (tick == 100000) {
-			mod->cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_I;
-			/* 0.5 */
-			mod->word_into_loop = (V)1 << (CONSTS_FRAC - 1);
-			printf("adjust I\n");
-			mod->start_cmd = 1;
-		}
 		if (mod->finish_cmd) {
 			mod->start_cmd = 0;
 		}
