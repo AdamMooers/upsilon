@@ -86,9 +86,7 @@ static void test_aa_read_1() {
 	my_assert(ind == WORD_AMNT, "second read value %zu != %d\n", ind, WORD_AMNT);
 }
 
-int main(int argc, char **argv) {
-	init(argc, argv);
-
+static void refresh_data() {
 	for (size_t i = 0; i < RAM_WID; i++) {
 		ram_refresh_data[i] = mask_extend(rand(), 20);
 	}
@@ -105,6 +103,14 @@ int main(int argc, char **argv) {
 	mod->refresh_start = 0;
 	run_clock();
 
+}
+
+int main(int argc, char **argv) {
+	init(argc, argv);
+
+	refresh_data();
+	test_aa_read_1();
+	refresh_data();
 	test_aa_read_1();
 	printf("ok\n");
 
