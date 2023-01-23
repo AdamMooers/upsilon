@@ -7,12 +7,14 @@
 #include <random>
 #include <unistd.h>
 
+// Other classes implemented (Verilator)
 #include <verilated.h>
 #include "control_loop_math_implementation.h"
 #include "control_loop_cmds.h"
 #include "Vcontrol_loop_sim_top.h"
 using ModType = Vcontrol_loop_sim_top;
 
+// Clock
 uint32_t main_time = 0;
 double sc_time_stamp() {
 	return main_time;
@@ -52,10 +54,12 @@ int main(int argc, char **argv) {
 
 	mod->clk = 0;
 
+	// Replace CONTROL_LOOP_P with an int P and the number with char or string seed
 	set_value(0b11010111000010100011110101110000101000111, CONTROL_LOOP_P);
 	/* Constant values must be sized to 64 bits, or else the compiler
 	 * will think they are 32 bit and silently mess things up
 	 */
+	// Replace CONTROL_LOOP_I with int I
 	set_value((V)6 << CONSTS_FRAC, CONTROL_LOOP_I);
 	set_value(20, CONTROL_LOOP_DELAY);
 	set_value(10000, CONTROL_LOOP_SETPT);
