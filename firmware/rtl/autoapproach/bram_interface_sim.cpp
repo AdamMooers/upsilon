@@ -86,6 +86,24 @@ static void test_aa_read_1() {
 	my_assert(ind == WORD_AMNT, "second read value %zu != %d\n", ind, WORD_AMNT);
 }
 
+static void test_aa_read_interrupted() {
+	size_t ind = 0;
+
+	mod->word_next = 1;
+	run_clock();
+	for (int i = 0; i < 100; i++) {
+		handle_read_aa(ind);
+		run_clock();
+		my_assert(!mod->word_last, "too many reads");
+	}
+	mod->word_rst = 1;
+	run_clock();
+	mod->word_rst = 0;
+	run_clock();
+
+	test_aa_read_1();
+}
+
 static void refresh_data() {
 	for (size_t i = 0; i < RAM_WID; i++) {
 		ram_refresh_data[i] = mask_extend(rand(), 20);
@@ -108,10 +126,15 @@ static void refresh_data() {
 int main(int argc, char **argv) {
 	init(argc, argv);
 
+	printf("test basic read/write\n");
 	refresh_data();
 	test_aa_read_1();
 	refresh_data();
 	test_aa_read_1();
+
+	printf("test resetting\n");
+	test_aa_read_interrupted();
+
 	printf("ok\n");
 
 	return 0;

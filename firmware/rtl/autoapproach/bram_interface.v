@@ -86,6 +86,9 @@ reg [WORD_AMNT_WID-1:0] auto_cntr = 0;
 
 always @ (posedge clk) if (word_rst) begin
 	auto_cntr <= 0;
+	word_ok <= 0;
+	word_last <= 0;
+	word <= 0;
 end else if (word_next && !word_ok) begin
 	if (refresh_state == WAIT_ON_REFRESH) begin
 		word <= backing_buffer[auto_cntr];
