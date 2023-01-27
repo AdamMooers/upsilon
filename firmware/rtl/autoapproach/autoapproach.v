@@ -64,6 +64,7 @@ DO_WAIT: if (!arm) begin
 end else if (wait_timer == 0) begin
 	word_next <= 1;
 	state <= RECV_WORD;
+	wait_timer <= time_to_wait;
 end else begin
 	wait_timer <= wait_timer - 1;
 end
