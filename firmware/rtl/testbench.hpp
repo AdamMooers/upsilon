@@ -1,13 +1,19 @@
 #pragma once
 #include <cstdint>
+#include <verilated.h>
 
 /* https://zipcpu.com/blog/2017/06/21/looking-at-verilator.html */
 template <class TOP> class TB {
 	int tick_count;
 	int bailout;
 
-	public: TOP mod;
-	TB(int _bailout = 0) : mod(), bailout(_bailout) {
+	public:
+	TOP mod;
+	VerilatedContext vc;
+
+	TB(int argc, char *argv[], int _bailout = 0) : mod(), bailout(_bailout), vc() {
+		vc.commandArgs(argc, argv);
+		vc.traceEverOn(true);
 		mod.clk = 0;
 		tick_count = 0;
 	}
@@ -19,10 +25,10 @@ template <class TOP> class TB {
 	virtual void run_clock() {
 		mod.clk = !mod.clk;
 		mod.eval();
-		Verilated::timeInc(1);
+		vc.timeInc(1);
 		mod.clk = !mod.clk;
 		mod.eval();
-		Verilated::timeInc(1);
+		vc.timeInc(1);
 		tick_count++;
 
 		if (bailout > 0 && tick_count >= bailout)

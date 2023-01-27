@@ -1,10 +1,5 @@
-#include <memory>
-#include <cassert>
 #include <limits>
-#include <cstdint>
-#include <cstring>
 #include <cstdlib>
-#include <iostream>
 #include <random>
 #include <unistd.h>
 #include <verilated.h>
@@ -118,9 +113,8 @@ static void refresh_data() {
 }
 
 int main(int argc, char *argv[]) {
-	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
-	tb = new TB<Vbram_interface>();
+	tb = new TB<Vbram_interface>(argc, argv);
 
 	printf("test basic read/write\n");
 	refresh_data();
