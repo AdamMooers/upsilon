@@ -54,9 +54,9 @@ int main(int argc, char **argv) {
 	P = 3,					// Default P value
 	I = 0,					// Default I value
  	Delay = 20,				// Default Delay value
-	SetPt = 10000,
-	Status = 1,
-	Option_Picked;
+	SetPt = 10000,			// Default SetPt value
+	Status = 1,				// Default Status value
+	Option_Picked;			// Option user picked
 	
 	do
 	{
