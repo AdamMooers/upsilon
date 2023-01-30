@@ -4,42 +4,11 @@
 #include <unistd.h>
 #include <verilated.h>
 
-#include "Vbram_interface.h"
+#include "Vbram_interface_sim.h"
 #include "../testbench.hpp"
 
-TB<Vbram_interface> *tb;
-constexpr uint32_t start_addr = 0x12340;
 std::array<uint32_t, WORD_AMNT> ram_refresh_data;
-
-static void handle_ram() {
-	static int timer = 0;
-	constexpr auto TIMER_MAX = 10;
-	bool flip_flop = false;
-
-	if (tb->mod.ram_read) {
-		timer++;
-		if (timer == TIMER_MAX) {
-			tb->mod.ram_valid = 1;
-			if (tb->mod.ram_dma_addr < start_addr ||
-			    tb->mod.ram_dma_addr >= start_addr + WORD_AMNT*4) {
-				printf("bad address %x\n", tb->mod.ram_dma_addr);
-				exit(1);
-			}
-			my_assert(tb->mod.ram_dma_addr >= start_addr, "left oob access %x", tb->mod.ram_dma_addr);
-			my_assert(tb->mod.ram_dma_addr < start_addr + WORD_AMNT*4, "right oob access %x", tb->mod.ram_dma_addr);
-			my_assert(tb->mod.ram_dma_addr % 2 == 0, "unaligned access %x", tb->mod.ram_dma_addr);
-
-			if (tb->mod.ram_dma_addr % 4 == 0) {
-				tb->mod.ram_word = ram_refresh_data[(tb->mod.ram_dma_addr - start_addr)/4]& 0xFFFF;
-			} else {
-				tb->mod.ram_word = ram_refresh_data[(tb->mod.ram_dma_addr - start_addr)/4] >> 16;
-			}
-		}
-	} else {
-		tb->mod.ram_valid = 0;
-		timer = 0;
-	}
-}
+TB<Vbram_interface_sim> *tb;
 
 static void handle_read_aa(size_t &i) {
 	if (tb->mod.word_ok) {
@@ -95,17 +64,18 @@ static void test_aa_read_interrupted() {
 
 static void refresh_data() {
 	for (size_t i = 0; i < RAM_WID; i++) {
-		ram_refresh_data[i] = mask_extend(rand(), 20);
+		uint32_t val = mask_extend(rand(), 20);
+		ram_refresh_data[i] = val;
+		tb->mod.backing_store[i*2] = val & 0xFFFF;
+		tb->mod.backing_store[i*2+1] = val >> 16;
 	}
 
 	tb->mod.refresh_start = 1;
-	tb->mod.start_addr = start_addr;
+	tb->mod.start_addr = 0x12340;
 	tb->run_clock();
 
-	while (!tb->mod.refresh_finished) {
-		handle_ram();
+	while (!tb->mod.refresh_finished)
 		tb->run_clock();
-	}
 
 	tb->mod.refresh_start = 0;
 	tb->run_clock();
@@ -113,8 +83,11 @@ static void refresh_data() {
 }
 
 int main(int argc, char *argv[]) {
+	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
-	tb = new TB<Vbram_interface>(argc, argv);
+	Verilated::fatalOnError(false);
+
+	tb = new TB<Vbram_interface_sim>(argc, argv);
 
 	printf("test basic read/write\n");
 	refresh_data();

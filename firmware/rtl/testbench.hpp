@@ -9,12 +9,8 @@ template <class TOP> class TB {
 
 	public:
 	TOP mod;
-	VerilatedContext vc;
 
-	TB(int argc, char *argv[], int _bailout = 0) : mod(), bailout(_bailout), vc() {
-		vc.commandArgs(argc, argv);
-		vc.traceEverOn(true);
-
+	TB(int argc, char *argv[], int _bailout = 0) : mod(), bailout(_bailout) {
 		mod.clk = 0;
 		tick_count = 0;
 	}
@@ -26,14 +22,16 @@ template <class TOP> class TB {
 	void run_clock() {
 		mod.clk = !mod.clk;
 		mod.eval();
-		vc.timeInc(1);
+		Verilated::timeInc(1);
 
 		mod.clk = !mod.clk;
 		mod.eval();
-		vc.timeInc(1);
+		Verilated::timeInc(1);
 		tick_count++;
 
 		if (bailout > 0 && tick_count >= bailout)
+			exit(1);
+		if (Verilated::gotError())
 			exit(1);
 	}
 };

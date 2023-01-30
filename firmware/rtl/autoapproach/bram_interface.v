@@ -105,11 +105,4 @@ end else if (!word_next && word_ok) begin
 	word_ok <= 0;
 end
 
-`ifdef VERILATOR
-initial begin
-	$dumpfile("bram.fst");
-	$dumpvars;
-end
-`endif
-
 endmodule
