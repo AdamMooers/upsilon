@@ -7,7 +7,13 @@ module autoapproach #(
 	parameter DAC_WID = 24,
 	parameter DAC_DATA_WID = 20,
 	parameter ADC_WID = 24,
-	parameter TIMER_WID = 32
+	parameter TIMER_WID = 32,
+	parameter WORD_WID = 24,
+	parameter WORD_AMNT_WID = 11,
+	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
+	parameter RAM_WID = 32,
+	parameter RAM_WORD_WID = 16,
+	parameter RAM_WORD_INCR = 2
 ) (
 	input clk,
 	input arm,
@@ -18,20 +24,20 @@ module autoapproach #(
 	input [ADC_WID-1:0] setpoint,
 	input [TIMER_WID-1:0] time_to_wait,
 
-	/* BRAM memory interface. Each pulse returns the next value in
-	 * the sequence, and also informs the module if the sequence
-	 * is completed. The kernel interacts primarily with this interface.
-	 */
-	input [DAC_DATA_WID-1:0] word,
-	output word_next,
-	input  word_last,
-	input  word_ok,
-	output word_rst,
+	/* User interface */
+	input refresh_start,
+	input [RAM_WID-1:0] start_addr,
+	output reg refresh_finished,
+
+	/* RAM interface */
+	output reg [RAM_WID-1:0] ram_dma_addr,
+	input [RAM_WORD_WID-1:0] ram_word,
+	output reg ram_read,
+	input ram_valid,
 
 	/* DAC wires. */
 	input dac_finished,
 	output dac_arm,
-	input [DAC_WID-1:0] dac_in,
 	output [DAC_WID-1:0] dac_out,
 
 	input adc_finished,
@@ -39,6 +45,28 @@ module autoapproach #(
 	input [ADC_WID-1:0] measurement
 );
 
+bram_interface #(
+	.WORD_WID(WORD_WID),
+	.WORD_AMNT_WID(WORD_AMNT_WID),
+	.WORD_AMNT(WORD_AMNT),
+	.RAM_WID(RAM_WID),
+	.RAM_WORD_WID(RAM_WORD_WID),
+	.RAM_WORD_INCR(RAM_WORD_INCR)
+) bram (
+	.clk(clk),
+	.word(word),
+	.word_next(word_next),
+	.word_last(word_last),
+	.word_ok(word_ok),
+	.word_rst(word_rst),
+	.refresh_start(refresh_start),
+	.start_addr(start_addr),
+	.refresh_finished(refresh_finished),
+	.ram_dma_addr(ram_dma_addr),
+	.ram_word(ram_word),
+	.ram_read(ram_read),
+	.ram_valid(ram_valid)
+);
 
 localparam WAIT_ON_ARM = 0;
 localparam DO_WAIT = 1;

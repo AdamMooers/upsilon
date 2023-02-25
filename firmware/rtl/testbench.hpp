@@ -19,10 +19,13 @@ template <class TOP> class TB {
 		mod.final();
 	}
 
+	virtual void posedge() {}
+
 	void run_clock() {
 		mod.clk = !mod.clk;
 		mod.eval();
 		Verilated::timeInc(1);
+		posedge();
 
 		mod.clk = !mod.clk;
 		mod.eval();

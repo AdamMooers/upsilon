@@ -63,7 +63,7 @@ static void test_aa_read_interrupted() {
 }
 
 static void refresh_data() {
-	for (size_t i = 0; i < RAM_WID; i++) {
+	for (size_t i = 0; i < WORD_AMNT; i++) {
 		uint32_t val = mask_extend(rand(), 20);
 		ram_refresh_data[i] = val;
 		tb->mod.backing_store[i*2] = val & 0xFFFF;

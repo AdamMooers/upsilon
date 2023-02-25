@@ -183,3 +183,21 @@ In Verilog, in order to replace a macro identifier with the value of the
 macro, you must put a backtick before the name: i.e.
 
     `VALUE
+
+## Forth scripting
+
+The user controls the kernel through Forth scripts. The particular
+implementation used is zForth.
+
+Forth has the following memory access primitives:
+
+* `addr` `@`: get value at `addr`
+* `val` `addr` `!`: write `val` to `addr`
+* `val` `,`: allocate a cell in "data space" (think the heap) and store
+  the data there.
+* `addr` `#`: return the size of the value at addr (not standard Forth)
+
+Each of these are not primitives in zForth. zForth allows for peeks and
+pokes to get values of different lengths, and the standard operators are
+for addressing a variable length value.
+
