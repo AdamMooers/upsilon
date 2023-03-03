@@ -1,12 +1,13 @@
-/* Autoapproach module. This module applies a waveform located in memory
- * (and copied into Block RAM). This waveform is arbitrary but of fixed
- * length.
- * time in between sent sample, total period 10-50ms
- */
-module autoapproach #(
+/* Write a waveform to a DAC. */
+module waveform #(
 	parameter DAC_WID = 24,
-	parameter DAC_DATA_WID = 20,
-	parameter ADC_WID = 24,
+	parameter DAC_WID_SIZ = 5,
+	parameter DAC_POLARITY = 0,
+	parameter DAC_PHASE = 1,
+	parameter DAC_CYCLE_HALF_WAIT = 10,
+	parameter DAC_CYCLE_HALF_WAIT_SIZ = 4,
+	parameter DAC_SS_WAIT = 5,
+	parameter DAC_SS_WAIT_SIZ = 3,
 	parameter TIMER_WID = 32,
 	parameter WORD_WID = 24,
 	parameter WORD_AMNT_WID = 11,
@@ -17,11 +18,6 @@ module autoapproach #(
 ) (
 	input clk,
 	input arm,
-	output stopped,
-	output detected,
-
-	input polarity,
-	input [ADC_WID-1:0] setpoint,
 	input [TIMER_WID-1:0] time_to_wait,
 
 	/* User interface */
@@ -36,14 +32,17 @@ module autoapproach #(
 	input ram_valid,
 
 	/* DAC wires. */
-	input dac_finished,
-	output dac_arm,
-	output [DAC_WID-1:0] dac_out,
-
-	input adc_finished,
-	output adc_arm,
-	input [ADC_WID-1:0] measurement
+	input miso,
+	output mosi,
+	input sck,
+	output ss_L
 );
+
+wire [WORD_WID-1:0] word;
+reg word_next;
+wire word_ok;
+wire word_last;
+wire word_rst;
 
 bram_interface #(
 	.WORD_WID(WORD_WID),
@@ -59,22 +58,46 @@ bram_interface #(
 	.word_last(word_last),
 	.word_ok(word_ok),
 	.word_rst(word_rst),
+
 	.refresh_start(refresh_start),
 	.start_addr(start_addr),
 	.refresh_finished(refresh_finished),
+
 	.ram_dma_addr(ram_dma_addr),
 	.ram_word(ram_word),
 	.ram_read(ram_read),
 	.ram_valid(ram_valid)
 );
 
+wire dac_finished;
+reg dac_arm;
+reg [DAC_WID-1:0] dac_out;
+
+spi_master_ss_no_read #(
+	.WID(DAC_WID),
+	.WID_LEN(DAC_WID_SIZ),
+	.CYCLE_HALF_WAIT(DAC_CYCLE_HALF_WAIT),
+	.TIMER_LEN(DAC_CYCLE_HALF_WAIT_SIZ),
+	.POLARITY(DAC_POLARITY),
+	.PHASE(DAC_PHASE),
+	.SS_WAIT(DAC_SS_WAIT),
+	.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
+) dac_master (
+	.clk(clk),
+	.mosi(mosi),
+	.miso(miso),
+	.sck_wire(sck),
+	.ss_L(ss_L),
+	.finished(dac_finished),
+	.arm(dac_arm),
+	.to_slave(dac_out)
+);
+
 localparam WAIT_ON_ARM = 0;
 localparam DO_WAIT = 1;
 localparam RECV_WORD = 2;
 localparam WAIT_ON_DAC = 3;
-localparam WAIT_ON_DETECTION = 4;
-localparam DETECTED = 5;
-reg [2:0] state = WAIT_ON_ARM;
+reg [1:0] state = WAIT_ON_ARM;
 
 reg [TIMER_WID-1:0] wait_timer = 0;
 
@@ -107,23 +130,10 @@ WAIT_ON_DAC: if (dac_finished) begin
 	dac_arm <= 0;
 	/* Was the last word read *the* last word? */
 	if (word_last) begin
-		state <= WAIT_ON_DETECTION;
-		adc_arm <= 1;
-	end else begin
 		state <= WAIT_ON_ARM;
+	end else begin
+		state <= DO_WAIT;
 	end
-endcase
-WAIT_ON_DETECTION: if (adc_finished) begin
-	if ((polarity && measurement >= setpt) ||
-	    (!polarity && measurement <= setpt)) begin
-		state <= DETECTED;
-		detected <= 1;
-	end
-end
-DETECTED: if (!arm) begin
-	state <= WAIT_ON_ARM;
-	detected <= 0;
-end
 endcase
 
 endmodule

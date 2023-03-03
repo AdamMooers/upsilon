@@ -4,7 +4,7 @@
  * This crossbar is entirely controlled by the kernel.
  */
 module spi_crossbar #(
-	parameter PORTS = 2,
+	parameter PORTS = 8,
 (
 	input select[PORTS-1:0],
 
@@ -23,19 +23,27 @@ module spi_crossbar #(
    Do things the old, dumb way instead.
  */
 
-always @(*) begin
-	if (select[1]) begin
-		mosi = mosi_ports[1];
-		miso = miso_ports[1];
-		sck = sck_ports[1];
-		ss = ss_ports[1];
-	end else begin
-		/* Select zeroth slot by default. No latches. */
-		mosi = mosi_ports[0];
-		miso = miso_ports[0];
-		sck = sck_ports[0];
-		ss = ss_ports[0];
+`define do_select(n)           \
+	mosi = mosi_ports[n];  \
+	miso = miso_ports[n];  \
+	sck = sck_ports[n];    \
+	ss = ss_ports[n]
+
+`define check_select(n)        \
+	if (select[n]) begin   \
+		do_select(n);  \
 	end
+
+always @(*) begin
+	check_select(7)
+	else check_select(6)
+	else check_select(5)
+	else check_select(4)
+	else check_select(3)
+	else check_select(2)
+	else check_select(1)
+	else do_select(0)
 end
 
 endmodule
+`undefineall
