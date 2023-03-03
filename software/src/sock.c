@@ -4,7 +4,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "sock.h"
-#include "lsc.h"
 
 LOG_MODULE_REGISTER(sock);
 
@@ -80,22 +79,6 @@ sock_vprintf(int sock, char *buf, int buflen, char *fmt, va_list va)
 	}
 
 	return w;
-}
-
-int
-sock_name_printf(int sock, struct lsc_line *l, char *buf, int buflen, char *fmt, ...)
-{
-	if (l->name) {
-		int r = sock_printf(sock, buf, buflen, "%s\t", l->buf[0]);
-		if (r < 0)
-			return r;
-	}
-
-	va_list va;
-	va_start(va, fmt);
-	int r = sock_vprintf(sock, buf, buflen, fmt, va);
-	va_end(va);
-	return r;
 }
 
 int

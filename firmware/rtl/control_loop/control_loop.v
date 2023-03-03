@@ -38,6 +38,7 @@ module control_loop
 	parameter DAC_SS_WAIT_SIZ = 3
 ) (
 	input clk,
+	output in_loop,
 
 	output dac_mosi,
 	input dac_miso,
@@ -323,6 +324,8 @@ always @ (posedge clk) begin
 		finish_cmd <= 0;
 	end
 end
+
+assign in_loop = state != INIT_READ_FROM_DAC || running;
 
 always @ (posedge clk) begin
 	case (state)
