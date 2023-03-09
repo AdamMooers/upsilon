@@ -3,20 +3,20 @@
  *
  * This crossbar is entirely controlled by the kernel.
  */
-module spi_crossbar #(
-	parameter PORTS = 8,
+module spi_switch #(
+	parameter PORTS = 3,
 (
 	input select[PORTS-1:0],
 
 	output mosi,
 	input miso,
 	output sck,
-	output ss,
+	output ss_L,
 
-	input mosi_ports[PORTS-1:0],
-	output miso_ports[PORTS-1:0],
-	input sck_ports[PORTS-1:0],
-	input ss_ports[PORTS-1:0]
+	input  [PORTS-1:0] mosi_ports,
+	output  [PORTS-1:0] miso_ports,
+	input  [PORTS-1:0] sck_ports,
+	input  [PORTS-1:0] ss_L_ports
 );
 
 /* Avoid using for loops, they might not synthesize correctly.
@@ -27,23 +27,21 @@ module spi_crossbar #(
 	mosi = mosi_ports[n];  \
 	miso = miso_ports[n];  \
 	sck = sck_ports[n];    \
-	ss = ss_ports[n]
+	ss_L = ss_L_ports[n]
 
 `define check_select(n)        \
 	if (select[n]) begin   \
 		do_select(n);  \
 	end
 
-always @(*) begin
-	check_select(7)
-	else check_select(6)
-	else check_select(5)
-	else check_select(4)
-	else check_select(3)
-	else check_select(2)
+generate if (PORTS == 2) always @(*) begin
+	check_select(2)
 	else check_select(1)
 	else do_select(0)
-end
+end else always @(*) begin
+	check_select(1)
+	else do_select(0)
+end endgenerate
 
 endmodule
 `undefineall
