@@ -9,7 +9,7 @@ module waveform #(
 	parameter DAC_SS_WAIT = 5,
 	parameter DAC_SS_WAIT_SIZ = 3,
 	parameter TIMER_WID = 32,
-	parameter WORD_WID = 24,
+	parameter WORD_WID = 20,
 	parameter WORD_AMNT_WID = 11,
 	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
 	parameter RAM_WID = 32,
@@ -32,9 +32,8 @@ module waveform #(
 	input ram_valid,
 
 	/* DAC wires. */
-	input miso,
 	output mosi,
-	input sck,
+	output sck,
 	output ss_L
 );
 
@@ -42,7 +41,7 @@ wire [WORD_WID-1:0] word;
 reg word_next;
 wire word_ok;
 wire word_last;
-wire word_rst;
+reg word_rst;
 
 bram_interface #(
 	.WORD_WID(WORD_WID),
@@ -85,7 +84,6 @@ spi_master_ss_no_read #(
 ) dac_master (
 	.clk(clk),
 	.mosi(mosi),
-	.miso(miso),
 	.sck_wire(sck),
 	.ss_L(ss_L),
 	.finished(dac_finished),
@@ -104,10 +102,8 @@ reg [TIMER_WID-1:0] wait_timer = 0;
 always @ (posedge clk) case (state)
 WAIT_ON_ARM: if (arm) begin
 	state <= DO_WAIT;
-	stopped <= 0;
 	wait_timer <= time_to_wait;
 end else begin
-	stopped <= 1;
 	word_rst <= 1;
 end
 DO_WAIT: if (!arm) begin
@@ -134,6 +130,7 @@ WAIT_ON_DAC: if (dac_finished) begin
 	end else begin
 		state <= DO_WAIT;
 	end
+end
 endcase
 
 endmodule
