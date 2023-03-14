@@ -10,7 +10,7 @@ template <class TOP> class TB {
 	public:
 	TOP mod;
 
-	TB(int argc, char *argv[], int _bailout = 0) : mod(), bailout(_bailout) {
+	TB(int _bailout = 0) : mod(), bailout(_bailout) {
 		mod.clk = 0;
 		tick_count = 0;
 	}

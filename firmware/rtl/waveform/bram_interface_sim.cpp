@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
 	Verilated::traceEverOn(true);
 	Verilated::fatalOnError(false);
 
-	tb = new TB<Vbram_interface_sim>(argc, argv);
+	tb = new TB<Vbram_interface_sim>();
 
 	printf("test basic read/write\n");
 	refresh_data();

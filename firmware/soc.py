@@ -298,6 +298,8 @@ class CryoSNOM1SoC(SoCCore):
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="symbiflow")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True)
+        platform.add_source("rtl/spi/spi_switch.v")
+        platform.add_source("rtl/spi/spi_master.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/spi/spi_master_ss_no_write.v")
 	platform.add_source("rtl/control_loop/sign_extend.v")

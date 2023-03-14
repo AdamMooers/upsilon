@@ -1,4 +1,6 @@
 #pragma once
+#include <cstdarg>
+#include <cstdlib>
 #include <cstdio>
 
 static inline void _assert(const char *file, int line, const char *exp, bool ev, const char *fmt, ...) {

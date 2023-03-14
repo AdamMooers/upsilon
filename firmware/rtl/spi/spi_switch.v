@@ -6,7 +6,9 @@
 module spi_switch #(
 	parameter PORTS = 3
 ) (
+	/* verilator lint_off UNUSEDSIGNAL */
 	input [PORTS-1:0] select,
+	/* verilator lint_on UNUSEDSIGNAL */
 
 	output reg mosi,
 	input miso,
@@ -23,10 +25,10 @@ module spi_switch #(
    Do things the old, dumb way instead.
  */
 
-`define do_select(n)           \
-	mosi = mosi_ports[n];  \
-	miso_ports[n] = miso;  \
-	sck = sck_ports[n];    \
+`define do_select(n)            \
+	mosi = mosi_ports[n];   \
+	miso_ports = {{(PORTS-1){1'b0}},miso} << n; \
+	sck = sck_ports[n];     \
 	ss_L = ss_L_ports[n]
 
 `define check_select(n)        \
@@ -37,7 +39,9 @@ module spi_switch #(
 generate if (PORTS == 3) always @(*) begin
 	`check_select(2)
 	else `check_select(1)
-	else `do_select(0);
+	else begin
+		`do_select(0);
+	end
 end else always @(*) begin
 	`check_select(1)
 	else `do_select(0);
