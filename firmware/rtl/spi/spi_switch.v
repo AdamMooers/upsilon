@@ -44,7 +44,9 @@ generate if (PORTS == 3) always @(*) begin
 	end
 end else always @(*) begin
 	`check_select(1)
-	else `do_select(0);
+	else begin
+		`do_select(0);
+	end
 end endgenerate
 
 endmodule
