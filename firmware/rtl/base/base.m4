@@ -11,13 +11,13 @@ m4_define(m4_dac_wires, ⟨
 	input [DAC_WID-1:0] to_dac_$2,
 
 	input wf_arm_$2,
-	input [TIMER_WID-1:0] wf_time_to_wait_$2,
+	input [WF_TIMER_WID-1:0] wf_time_to_wait_$2,
 	input wf_refresh_start_$2,
-	input [RAM_WID-1:0] wf_start_addr_$2,
+	input [WF_RAM_WID-1:0] wf_start_addr_$2,
 	output wf_refresh_finished_$2,
 
-	output [RAM_WID-1:0] wf_ram_dma_addr_$2,
-	input [RAM_WORD_WID-1:0] wf_ram_word_$2,
+	output [WF_RAM_WID-1:0] wf_ram_dma_addr_$2,
+	input [WF_RAM_WORD_WID-1:0] wf_ram_word_$2,
 	output wf_ram_read_$2,
 	input wf_ram_valid_$2
 ⟩)
@@ -35,18 +35,18 @@ m4_define(m4_dac_switch, ⟨
 	wire [$1-1:0] ss_L_port_$2;
 
 	spi_switch #(
-		.PORTS(`DAC_PORTS_CONTROL_LOOP)
+		.PORTS($1)
 	) switch_$2 (
 		.select(dac_sel_$2),
-		.mosi(dac_mosi[0]),
-		.miso(dac_miso[0]),
-		.sck(dac_sck[0]),
-		.ss(dac_ss_L[0]),
+		.mosi(dac_mosi[$2]),
+		.miso(dac_miso[$2]),
+		.sck(dac_sck[$2]),
+		.ss_L(dac_ss_L[$2]),
 
 		.mosi_ports(mosi_port_$2),
 		.miso_ports(miso_port_$2),
 		.sck_ports(sck_port_$2),
-		.ss_ports(ss_L_port_$2)
+		.ss_L_ports(ss_L_port_$2)
 	);
 
 	spi_master_ss #(
@@ -63,7 +63,7 @@ m4_define(m4_dac_switch, ⟨
 		.mosi(mosi_port_$2[0]),
 		.miso(miso_port_$2[0]),
 		.sck_wire(sck_port_$2[0]),
-		.ss_L(ss_port_$2[0]),
+		.ss_L(ss_L_port_$2[0]),
 		.finished(dac_finished_$2),
 		.arm(dac_arm_$2),
 		.from_slave(from_dac_$2),
@@ -73,8 +73,6 @@ m4_define(m4_dac_switch, ⟨
 	waveform #(
 		.DAC_WID(DAC_WID),
 		.DAC_WID_SIZ(DAC_WID_SIZ),
-		.DAC_POLARITY(DAC_POLARITY),
-		.DAC_PHASE(DAC_PHASE),
 		.DAC_POLARITY(DAC_POLARITY),
 		.DAC_PHASE(DAC_PHASE),
 		.DAC_CYCLE_HALF_WAIT(DAC_CYCLE_HALF_WAIT),
@@ -95,23 +93,22 @@ m4_define(m4_dac_switch, ⟨
 		.refresh_start(wf_refresh_start_$2),
 		.start_addr(wf_start_addr_$2),
 		.refresh_finished(wf_refresh_finished_$2),
-		.ram_dma_adr(wf_ram_dma_addr_$2),
+		.ram_dma_addr(wf_ram_dma_addr_$2),
 		.ram_word(wf_ram_word_$2),
 		.ram_read(wf_ram_read_$2),
 		.ram_valid(wf_ram_valid_$2),
 		.mosi(mosi_port_$2[1]),
-		.miso(miso_port_$2[1]),
 		.sck(sck_port_$2[1]),
-		.ss_L(ss_port_$2[1])
+		.ss_L(ss_L_port_$2[1])
 	)
 ⟩)
 
 m4_define(m4_adc_switch, ⟨
-	spi_master_no_write #(
+	spi_master_ss_no_write #(
 		.WID($1),
 		.WID_LEN(ADC_WID_SIZ),
 		.CYCLE_HALF_WAIT(ADC_CYCLE_HALF_WAIT),
-		.TIMER_LEN(ADC_CYCLE_HALF_WAIT_LEN),
+		.TIMER_LEN(ADC_CYCLE_HALF_WAIT_SIZ),
 		.SS_WAIT(ADC_CONV_WAIT),
 		.SS_WAIT_TIMER_LEN(ADC_CONV_WAIT_SIZ),
 		.POLARITY(ADC_POLARITY),
@@ -138,7 +135,8 @@ module base #(
 
 	parameter DAC_NUM = 8,
 	parameter DAC_WID = 24,
-	parameter DAC_WID_LEN = 5,
+	parameter DAC_DATA_WID = 20,
+	parameter DAC_WID_SIZ = 5,
 	parameter DAC_POLARITY = 0,
 	parameter DAC_PHASE = 1,
 	parameter DAC_CYCLE_HALF_WAIT = 10,
@@ -146,9 +144,9 @@ module base #(
 	parameter DAC_SS_WAIT = 5,
 	parameter DAC_SS_WAIT_SIZ = 3,
 	parameter WF_TIMER_WID = 32,
-	parameter WF_WORD_WID = 24,
+	parameter WF_WORD_WID = 20,
 	parameter WF_WORD_AMNT_WID = 11,
-	parameter [WORD_AMNT_WID-1:0] WF_WORD_AMNT = 2047,
+	parameter [WF_WORD_AMNT_WID-1:0] WF_WORD_AMNT = 2047,
 	parameter WF_RAM_WID = 32,
 	parameter WF_RAM_WORD_WID = 16,
 	parameter WF_RAM_WORD_INCR = 2,
@@ -222,7 +220,7 @@ module base #(
 );
 
 wire [ADC_NUM-1:0] adc_conv_L;
-assign adc_conv = !adc_conv_L;
+assign adc_conv = ~adc_conv_L;
 
 m4_dac_switch(`DAC_PORTS_CONTROL_LOOP, 0);
 m4_dac_switch(DAC_PORTS, 1);
@@ -248,19 +246,19 @@ spi_switch #(
 	.mosi(adc_mosi_unassigned),
 	.miso(adc_sdo[0]),
 	.sck(adc_sck[0]),
-	.ss(adc_conv_L[0]),
+	.ss_L(adc_conv_L[0]),
 
 	.mosi_ports(adc_mosi_port_0_unassigned),
 	.miso_ports(adc_sdo_port_0),
 	.sck_ports(adc_sck_port_0),
-	.ss_ports(adc_conv_port_0)
+	.ss_L_ports(adc_conv_L_port_0)
 );
 
-spi_master_no_write #(
+spi_master_ss_no_write #(
 	.WID(ADC_TYPE1_WID),
 	.WID_LEN(ADC_WID_SIZ),
 	.CYCLE_HALF_WAIT(ADC_CYCLE_HALF_WAIT),
-	.TIMER_LEN(ADC_CYCLE_HALF_WAIT_LEN),
+	.TIMER_LEN(ADC_CYCLE_HALF_WAIT_SIZ),
 	.SS_WAIT(ADC_CONV_WAIT),
 	.SS_WAIT_TIMER_LEN(ADC_CONV_WAIT_SIZ),
 	.POLARITY(ADC_POLARITY),

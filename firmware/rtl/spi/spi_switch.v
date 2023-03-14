@@ -4,17 +4,17 @@
  * This crossbar is entirely controlled by the kernel.
  */
 module spi_switch #(
-	parameter PORTS = 3,
-(
-	input select[PORTS-1:0],
+	parameter PORTS = 3
+) (
+	input [PORTS-1:0] select,
 
-	output mosi,
+	output reg mosi,
 	input miso,
-	output sck,
-	output ss_L,
+	output reg sck,
+	output reg ss_L,
 
 	input  [PORTS-1:0] mosi_ports,
-	output  [PORTS-1:0] miso_ports,
+	output reg [PORTS-1:0] miso_ports,
 	input  [PORTS-1:0] sck_ports,
 	input  [PORTS-1:0] ss_L_ports
 );
@@ -25,22 +25,22 @@ module spi_switch #(
 
 `define do_select(n)           \
 	mosi = mosi_ports[n];  \
-	miso = miso_ports[n];  \
+	miso_ports[n] = miso;  \
 	sck = sck_ports[n];    \
 	ss_L = ss_L_ports[n]
 
 `define check_select(n)        \
 	if (select[n]) begin   \
-		do_select(n);  \
+		`do_select(n); \
 	end
 
-generate if (PORTS == 2) always @(*) begin
-	check_select(2)
-	else check_select(1)
-	else do_select(0)
+generate if (PORTS == 3) always @(*) begin
+	`check_select(2)
+	else `check_select(1)
+	else `do_select(0);
 end else always @(*) begin
-	check_select(1)
-	else do_select(0)
+	`check_select(1)
+	else `do_select(0);
 end endgenerate
 
 endmodule
