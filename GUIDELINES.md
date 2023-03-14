@@ -10,6 +10,12 @@ See also [Dan Gisselquist][1]'s rules for FPGA development.
   synthesizes it incorrectly.
 * Do not use parameters that are calculated from other parameters (yosys
   will not parse them correctly). Use macros instead.
+* Only use Verlog macros for basic expression replacement (replacing calculated
+  parameters). For more advanced code generation, use m4 (see `base.m4` as an
+  example).
+* Add `undefineall` at the end of *every single module*. If you do not,
+  you will get many confusing errors.
+* Do all code and test generation in Makefiles.
 * Simulate *every* module, even the trivial ones using Verilator.
   Simulation must be simulatable with open-source software (Verilator is
   preferred, but Icarus Verilog and similar are fine). Put test code in the same
