@@ -1,3 +1,5 @@
+m4_changequote(`⟨', `⟩')
+m4_changecom(⟨/*⟩, ⟨*/⟩)
 /* Booth Multiplication v1.0
  * Written by Peter McGoron, 2022.
  *
@@ -28,11 +30,12 @@ module boothmul
 	input arm,
 	input [A1_LEN-1:0] a1,
 	input [A2_LEN-1:0] a2,
-	output [A1_LEN+A2_LEN-1:0] outn,
+m4_define(M4_OUT_LEN, (A1_LEN + A2_LEN))
+	output [M4_OUT_LEN-1:0] outn,
 `ifdef DEBUG
-	output [A1_LEN+A2_LEN+1:0] debug_a,
-	output [A1_LEN+A2_LEN+1:0] debug_s,
-	output [A1_LEN+A2_LEN+1:0] debug_p,
+	output [M4_OUT_LEN+1:0] debug_a,
+	output [M4_OUT_LEN+1:0] debug_s,
+	output [M4_OUT_LEN+1:0] debug_p,
 	output [A2LEN_SIZ-1:0] debug_state,
 `endif
 	output reg fin
@@ -42,8 +45,7 @@ module boothmul
  * Booth Parameters
  **********************/
 
-`define OUT_LEN (A1_LEN + A2_LEN)
-`define REG_LEN (`OUT_LEN + 2)
+m4_define(M4_REG_LEN, (M4_OUT_LEN + 2))
 
 /* The Booth multiplication algorithm is a sequential algorithm for
  * twos-compliment integers.
@@ -71,24 +73,24 @@ module boothmul
 
 reg [A1_LEN-1:0] a1_reg;
 
-wire [`REG_LEN-1:0] a;
+wire [M4_REG_LEN-1:0] a;
 assign a[A2_LEN:0] = 0;
-assign a[`REG_LEN-2:A2_LEN+1] = a1_reg;
-assign a[`REG_LEN-1] = a1_reg[A1_LEN-1];
-wire signed [`REG_LEN-1:0] a_signed;
+assign a[M4_REG_LEN-2:A2_LEN+1] = a1_reg;
+assign a[M4_REG_LEN-1] = a1_reg[A1_LEN-1];
+wire signed [M4_REG_LEN-1:0] a_signed;
 assign a_signed = a;
 
-wire [`REG_LEN-1:0] s;
+wire [M4_REG_LEN-1:0] s;
 assign s[A2_LEN:0] = 0;
-assign s[`REG_LEN-1:A2_LEN+1] = ~{a1_reg[A1_LEN-1],a1_reg} + 1;
-wire signed [`REG_LEN-1:0] s_signed;
+assign s[M4_REG_LEN-1:A2_LEN+1] = ~{a1_reg[A1_LEN-1],a1_reg} + 1;
+wire signed [M4_REG_LEN-1:0] s_signed;
 assign s_signed = s;
 
-reg [`REG_LEN-1:0] p;
-wire signed [`REG_LEN-1:0] p_signed;
+reg [M4_REG_LEN-1:0] p;
+wire signed [M4_REG_LEN-1:0] p_signed;
 assign p_signed = p;
 
-assign outn = p[`REG_LEN-2:1];
+assign outn = p[M4_REG_LEN-2:1];
 
 /**********************
  * Loop Implementation
@@ -110,7 +112,7 @@ always @ (posedge clk) begin
 	end else if (loop_accul == 0) begin
 		p[0] <= 0;
 		p[A2_LEN:1] <= a2;
-		p[`REG_LEN-1:A2_LEN+1] <= 0;
+		p[M4_REG_LEN-1:A2_LEN+1] <= 0;
 
 		a1_reg <= a1;
 
@@ -142,4 +144,3 @@ end
 `endif
 
 endmodule
-`undefineall

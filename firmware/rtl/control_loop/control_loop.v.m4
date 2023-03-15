@@ -1,4 +1,7 @@
-`include "control_loop_cmds.vh"
+m4_changequote(`⟨', `⟩')
+m4_changecom(⟨/*⟩, ⟨*/⟩)
+m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
+m4_include(control_loop_cmds.m4)
 
 module control_loop
 #(
@@ -17,9 +20,9 @@ module control_loop
 	parameter CONSTS_WHOLE = 21,
 	parameter CONSTS_FRAC = 43,
 	parameter CONSTS_SIZ = 7,
-`define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
+m4_define(M4_CONSTS_WID, (CONSTS_WHOLE + CONSTS_FRAC))
 	parameter DELAY_WID = 16,
-`define DATA_WID `CONSTS_WID
+m4_define(M4_DATA_WID, M4_CONSTS_WID)
 	parameter READ_DAC_DELAY = 5,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 24,
@@ -29,7 +32,7 @@ module control_loop
 	 */
 	parameter DAC_WID_SIZ = 5,
 	parameter DAC_DATA_WID = 20,
-`define E_WID (DAC_DATA_WID + 1)
+m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 	parameter DAC_POLARITY = 0,
 	parameter DAC_PHASE = 1,
 	parameter DAC_CYCLE_HALF_WAIT = 10,
@@ -50,9 +53,9 @@ module control_loop
 	output adc_sck,
 
 	/* Hacky ad-hoc read-write interface. */
-	input [`CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
-	input [`DATA_WID-1:0] word_in,
-	output reg [`DATA_WID-1:0] word_out,
+	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
+	input [M4_DATA_WID-1:0] word_in,
+	output reg [M4_DATA_WID-1:0] word_out,
 	input start_cmd,
 	output reg finish_cmd
 );
@@ -125,12 +128,12 @@ reg signed [ADC_WID-1:0] setpt = 0;
 reg signed [ADC_WID-1:0] setpt_buffer = 0;
 
 /* Integral parameter */
-reg signed [`CONSTS_WID-1:0] cl_I_reg = 0;
-reg signed [`CONSTS_WID-1:0] cl_I_reg_buffer = 0;
+reg signed [M4_CONSTS_WID-1:0] cl_I_reg = 0;
+reg signed [M4_CONSTS_WID-1:0] cl_I_reg_buffer = 0;
 
 /* Proportional parameter */
-reg signed [`CONSTS_WID-1:0] cl_p_reg = 0;
-reg signed [`CONSTS_WID-1:0] cl_p_reg_buffer = 0;
+reg signed [M4_CONSTS_WID-1:0] cl_p_reg = 0;
+reg signed [M4_CONSTS_WID-1:0] cl_p_reg_buffer = 0;
 
 /* Delay parameter (to make the loop run slower) */
 reg [DELAY_WID-1:0] dely = 0;
@@ -143,11 +146,11 @@ reg running = 0;
 reg signed [DAC_DATA_WID-1:0] stored_dac_val = 0;
 reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
 reg [CYCLE_COUNT_WID-1:0] counting_timer = 0;
-reg [`CONSTS_WID-1:0] adjval_prev = 0;
+reg [M4_CONSTS_WID-1:0] adjval_prev = 0;
 
-reg signed [`E_WID-1:0] err_prev = 0;
-wire signed [`E_WID-1:0] e_cur;
-wire signed [`CONSTS_WID-1:0] adj_val;
+reg signed [M4_E_WID-1:0] err_prev = 0;
+wire signed [M4_E_WID-1:0] e_cur;
+wire signed [M4_CONSTS_WID-1:0] adj_val;
 wire signed [DAC_DATA_WID-1:0] new_dac_val;
 
 reg arm_math = 0;
@@ -244,78 +247,78 @@ reg dirty_bit = 0;
 always @ (posedge clk) begin
 	if (start_cmd && !finish_cmd) begin
 		case (cmd)
-		`CONTROL_LOOP_NOOP:
+		M4_CONTROL_LOOP_NOOP:
 			finish_cmd <= 1;
-		`CONTROL_LOOP_NOOP | `CONTROL_LOOP_WRITE_BIT:
+		M4_CONTROL_LOOP_NOOP | M4_CONTROL_LOOP_WRITE_BIT:
 			finish_cmd <= 1;
-		`CONTROL_LOOP_STATUS: begin
-			word_out[`DATA_WID-1:1] <= 0;
+		M4_CONTROL_LOOP_STATUS: begin
+			word_out[M4_DATA_WID-1:1] <= 0;
 			word_out[0] <= running;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_STATUS | `CONTROL_LOOP_WRITE_BIT:
+		M4_CONTROL_LOOP_STATUS | M4_CONTROL_LOOP_WRITE_BIT:
 			if (write_control) begin
 				running <= word_in[0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
-		`CONTROL_LOOP_SETPT: begin
-			word_out[`DATA_WID-1:ADC_WID] <= 0;
+		M4_CONTROL_LOOP_SETPT: begin
+			word_out[M4_DATA_WID-1:ADC_WID] <= 0;
 			word_out[ADC_WID-1:0] <= setpt;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_SETPT | `CONTROL_LOOP_WRITE_BIT:
+		M4_CONTROL_LOOP_SETPT | M4_CONTROL_LOOP_WRITE_BIT:
 			if (write_control) begin
 				setpt_buffer <= word_in[ADC_WID-1:0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
-		`CONTROL_LOOP_P: begin
+		M4_CONTROL_LOOP_P: begin
 			word_out <= cl_p_reg;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_P | `CONTROL_LOOP_WRITE_BIT: begin
+		M4_CONTROL_LOOP_P | M4_CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				cl_p_reg_buffer <= word_in;
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		`CONTROL_LOOP_I: begin
+		M4_CONTROL_LOOP_I: begin
 			word_out <= cl_I_reg;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_I | `CONTROL_LOOP_WRITE_BIT: begin
+		M4_CONTROL_LOOP_I | M4_CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				cl_I_reg_buffer <= word_in;
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		`CONTROL_LOOP_DELAY: begin
-			word_out[`DATA_WID-1:DELAY_WID] <= 0;
+		M4_CONTROL_LOOP_DELAY: begin
+			word_out[M4_DATA_WID-1:DELAY_WID] <= 0;
 			word_out[DELAY_WID-1:0] <= dely;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_DELAY | `CONTROL_LOOP_WRITE_BIT: begin
+		M4_CONTROL_LOOP_DELAY | M4_CONTROL_LOOP_WRITE_BIT: begin
 			if (write_control) begin
 				dely_buffer <= word_in[DELAY_WID-1:0];
 				finish_cmd <= 1;
 				dirty_bit <= 1;
 			end
 		end
-		`CONTROL_LOOP_ERR: begin
-			word_out[`DATA_WID-1:`E_WID] <= 0;
-			word_out[`E_WID-1:0] <= err_prev;
+		M4_CONTROL_LOOP_ERR: begin
+			word_out[M4_DATA_WID-1:M4_E_WID] <= 0;
+			word_out[M4_E_WID-1:0] <= err_prev;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_Z: begin
-			word_out[`DATA_WID-1:DAC_DATA_WID] <= 0;
+		M4_CONTROL_LOOP_Z: begin
+			word_out[M4_DATA_WID-1:DAC_DATA_WID] <= 0;
 			word_out[DAC_DATA_WID-1:0] <= stored_dac_val;
 			finish_cmd <= 1;
 		end
-		`CONTROL_LOOP_CYCLES: begin
-			word_out[`DATA_WID-1:CYCLE_COUNT_WID] <= 0;
+		M4_CONTROL_LOOP_CYCLES: begin
+			word_out[M4_DATA_WID-1:CYCLE_COUNT_WID] <= 0;
 			word_out[CYCLE_COUNT_WID-1:0] <= last_timer;
 			finish_cmd <= 0;
 		end
@@ -403,4 +406,3 @@ always @ (posedge clk) begin
 end
 
 endmodule
-`undefineall

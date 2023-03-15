@@ -135,7 +135,7 @@ m4_define(m4_adc_switch, ⟨
 `include "control_loop_cmds.vh"
 module base #(
 	parameter DAC_PORTS = 2,
-`define DAC_PORTS_CONTROL_LOOP (DAC_PORTS + 1)
+m4_define(DAC_PORTS_CONTROL_LOOP, (DAC_PORTS + 1))
 
 	parameter DAC_NUM = 8,
 	parameter DAC_WID = 24,
@@ -156,7 +156,7 @@ module base #(
 	parameter WF_RAM_WORD_INCR = 2,
 
 	parameter ADC_PORTS = 1,
-`define ADC_PORTS_CONTROL_LOOP (ADC_PORTS + 1)
+m4_define(ADC_PORTS_CONTROL_LOOP, (ADC_PORTS + 1))
 	parameter ADC_NUM = 8,
 	/* Three types of ADC. For now assume that their electronics
 	 * are similar enough, just need different numbers for the width.
@@ -179,8 +179,8 @@ module base #(
 	parameter CL_CONSTS_FRAC = 43,
 	parameter CL_CONSTS_SIZ = 7,
 	parameter CL_DELAY_WID = 16,
-`define CL_CONSTS_WID (CL_CONSTS_WHOLE + CL_CONSTS_FRAC)
-`define CL_DATA_WID `CL_CONSTS_WID
+m4_define(CL_CONSTS_WID, (CL_CONSTS_WHOLE + CL_CONSTS_FRAC))
+m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	parameter CL_READ_DAC_DELAY = 5,
 	parameter CL_CYCLE_COUNT_WID = 18
 ) (
@@ -195,7 +195,7 @@ module base #(
 	input [ADC_NUM-1:0] adc_sdo,
 	output [ADC_NUM-1:0] adc_sck,
 
-	m4_dac_wires(`DAC_PORTS_CONTROL_LOOP, 0),
+	m4_dac_wires(DAC_PORTS_CONTROL_LOOP, 0),
 	m4_dac_wires(DAC_PORTS, 1),
 	m4_dac_wires(DAC_PORTS, 2),
 	m4_dac_wires(DAC_PORTS, 3),
@@ -204,7 +204,7 @@ module base #(
 	m4_dac_wires(DAC_PORTS, 6),
 	m4_dac_wires(DAC_PORTS, 7),
 
-	input [`ADC_PORTS_CONTROL_LOOP-1:0] adc_sel_0,
+	input [ADC_PORTS_CONTROL_LOOP-1:0] adc_sel_0,
 
 	m4_adc_wires(ADC_TYPE1_WID, 0),
 	m4_adc_wires(ADC_TYPE1_WID, 1),
@@ -217,8 +217,8 @@ module base #(
 
 	output cl_in_loop,
 	input [`CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
-	input [`CL_DATA_WID-1:0] cl_word_in,
-	output reg [`CL_DATA_WID-1:0] cl_word_out,
+	input [CL_DATA_WID-1:0] cl_word_in,
+	output reg [CL_DATA_WID-1:0] cl_word_out,
 	input cl_start_cmd,
 	output reg cl_finish_cmd
 );
@@ -226,7 +226,7 @@ module base #(
 wire [ADC_NUM-1:0] adc_conv_L;
 assign adc_conv = ~adc_conv_L;
 
-m4_dac_switch(`DAC_PORTS_CONTROL_LOOP, 0);
+m4_dac_switch(DAC_PORTS_CONTROL_LOOP, 0);
 m4_dac_switch(DAC_PORTS, 1);
 m4_dac_switch(DAC_PORTS, 2);
 m4_dac_switch(DAC_PORTS, 3);
@@ -237,14 +237,14 @@ m4_dac_switch(DAC_PORTS, 7);
 
 /* 1st adc is Type 1 (18 bit) */
 
-wire [`ADC_PORTS_CONTROL_LOOP-1:0] adc_conv_L_port_0;
-wire [`ADC_PORTS_CONTROL_LOOP-1:0] adc_sdo_port_0;
-wire [`ADC_PORTS_CONTROL_LOOP-1:0] adc_sck_port_0;
-wire [`ADC_PORTS_CONTROL_LOOP-1:0] adc_mosi_port_0_unassigned;
+wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_conv_L_port_0;
+wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_sdo_port_0;
+wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_sck_port_0;
+wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_mosi_port_0_unassigned;
 wire adc_mosi_unassigned;
 
 spi_switch #(
-	.PORTS(`ADC_PORTS_CONTROL_LOOP)
+	.PORTS(ADC_PORTS_CONTROL_LOOP)
 ) switch_adc_0 (
 	.select(adc_sel_0),
 	.mosi(adc_mosi_unassigned),
@@ -327,4 +327,3 @@ m4_adc_switch(ADC_TYPE1_WID, 6);
 m4_adc_switch(ADC_TYPE1_WID, 7);
 
 endmodule
-`undefineall

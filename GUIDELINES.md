@@ -9,12 +9,8 @@ See also [Dan Gisselquist][1]'s rules for FPGA development.
 * Stick to Verilog 2005. F4PGA will accept SystemVerilog but yosys sometimes
   synthesizes it incorrectly.
 * Do not use parameters that are calculated from other parameters (yosys
-  will not parse them correctly). Use macros instead.
-* Only use Verlog macros for basic expression replacement (replacing calculated
-  parameters). For more advanced code generation, use m4 (see `base.m4` as an
-  example).
-* Add `undefineall` at the end of *every single module*. If you do not,
-  you will get many confusing errors.
+  will not parse them correctly). Use m4 macros instead.
+* Do not use Verilog macros. Use m4.
 * Do all code and test generation in Makefiles.
 * Simulate *every* module, even the trivial ones using Verilator.
   Simulation must be simulatable with open-source software (Verilator is

@@ -19,6 +19,7 @@ module control_loop_sim_top #(
 	parameter DELAY_WID = 16
 )(
 	input clk,
+	output in_loop,
 
 	output [DAC_DATA_WID-1:0] curset,
 	output dac_err,
@@ -104,6 +105,7 @@ control_loop #(
 	.DAC_PHASE(DAC_PHASE)
 ) cloop (
 	.clk(clk),
+	.in_loop(in_loop),
 	.dac_mosi(dac_mosi),
 	.dac_miso(dac_miso),
 	.dac_ss_L(dac_ss_L),

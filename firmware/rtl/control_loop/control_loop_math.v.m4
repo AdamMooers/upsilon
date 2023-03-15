@@ -1,3 +1,5 @@
+m4_changequote(`⟨', `⟩')
+m4_changecom(⟨/*⟩, ⟨*/⟩)
 /*************** Precision **************
  * The control loop is designed around these values, but generally
  * does not hardcode them.
@@ -25,18 +27,18 @@
 module control_loop_math #(
 	parameter CONSTS_WHOLE = 21,
 	parameter CONSTS_FRAC = 43,
-`define CONSTS_WID (CONSTS_WHOLE + CONSTS_FRAC)
+m4_define(M4_CONSTS_WID, (CONSTS_WHOLE + CONSTS_FRAC))
 	parameter CONSTS_SIZ=7,
 
 	parameter ADC_WID = 18,
-	parameter [`CONSTS_WID-1:0] SEC_PER_CYCLE = 'b10101011110011000,
+	parameter [M4_CONSTS_WID-1:0] SEC_PER_CYCLE = 'b10101011110011000,
 	/* The conversion between the ADC bit (20/2**18) and DAC bit (20.48/2**20)
 	 * is 0.256.
 	 */
-	parameter [`CONSTS_WID-1:0] ADC_TO_DAC = 64'b0100000110001001001101110100101111000110101,
+	parameter [M4_CONSTS_WID-1:0] ADC_TO_DAC = 64'b0100000110001001001101110100101111000110101,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 20
-`define E_WID (DAC_WID + 1)
+m4_define(M4_E_WID, (DAC_WID + 1))
 ) (
 	input clk,
 	input arm,
@@ -44,23 +46,23 @@ module control_loop_math #(
 
 	input signed [ADC_WID-1:0] setpt,
 	input signed [ADC_WID-1:0] measured,
-	input signed [`CONSTS_WID-1:0] cl_P,
-	input signed [`CONSTS_WID-1:0] cl_I,
+	input signed [M4_CONSTS_WID-1:0] cl_P,
+	input signed [M4_CONSTS_WID-1:0] cl_I,
 	input signed [CYCLE_COUNT_WID-1:0] cycles,
-	input signed [`E_WID-1:0] e_prev,
-	input signed [`CONSTS_WID-1:0] adjval_prev,
+	input signed [M4_E_WID-1:0] e_prev,
+	input signed [M4_CONSTS_WID-1:0] adjval_prev,
 	input signed [DAC_WID-1:0] stored_dac_val,
 
 `ifdef DEBUG_CONTROL_LOOP_MATH
-	output reg [`CONSTS_WID-1:0] dt_reg,
-	output reg [`CONSTS_WID-1:0] idt_reg,
-	output reg [`CONSTS_WID-1:0] epidt_reg,
-	output reg [`CONSTS_WID-1:0] ep_reg,
+	output reg [M4_CONSTS_WID-1:0] dt_reg,
+	output reg [M4_CONSTS_WID-1:0] idt_reg,
+	output reg [M4_CONSTS_WID-1:0] epidt_reg,
+	output reg [M4_CONSTS_WID-1:0] ep_reg,
 `endif
 
-	output reg signed [`E_WID-1:0] e_cur,
+	output reg signed [M4_E_WID-1:0] e_cur,
 	output signed [DAC_WID-1:0] new_dac_val,
-	output signed [`CONSTS_WID-1:0] adj_val
+	output signed [M4_CONSTS_WID-1:0] adj_val
 );
 
 /*******
@@ -69,16 +71,16 @@ module control_loop_math #(
  * to be a 64 bit output, according to fixed-point rules.
  */
 
-reg signed [`CONSTS_WID-1:0] a1;
-reg signed [`CONSTS_WID-1:0] a2;
+reg signed [M4_CONSTS_WID-1:0] a1;
+reg signed [M4_CONSTS_WID-1:0] a2;
 /* verilator lint_off UNUSED */
-wire signed [`CONSTS_WID+`CONSTS_WID-1:0] out_untrunc;
+wire signed [M4_CONSTS_WID+M4_CONSTS_WID-1:0] out_untrunc;
 wire mul_fin;
 reg mul_arm = 0;
 
 boothmul #(
-	.A1_LEN(`CONSTS_WID),
-	.A2_LEN(`CONSTS_WID),
+	.A1_LEN(M4_CONSTS_WID),
+	.A2_LEN(M4_CONSTS_WID),
 	.A2LEN_SIZ(CONSTS_SIZ)
 ) multiplier (
 	.a1(a1),
@@ -95,11 +97,11 @@ boothmul #(
  * Q(2X).Y
  */
 
-`define OUT_RTRUNC_WID (`CONSTS_WID+`CONSTS_WID-CONSTS_FRAC)
-wire signed [`OUT_RTRUNC_WID-1:0] out_rtrunc
-	= out_untrunc[`CONSTS_WID+`CONSTS_WID-1:CONSTS_FRAC];
+m4_define(M4_OUT_RTRUNC_WID, (M4_CONSTS_WID+M4_CONSTS_WID-CONSTS_FRAC))
+wire signed [M4_OUT_RTRUNC_WID-1:0] out_rtrunc
+	= out_untrunc[M4_CONSTS_WID+M4_CONSTS_WID-1:CONSTS_FRAC];
 
-wire signed [`CONSTS_WID-1:0] mul_out;
+wire signed [M4_CONSTS_WID-1:0] mul_out;
 
 /***************************
  * Saturate higher X bits away.
@@ -107,7 +109,7 @@ wire signed [`CONSTS_WID-1:0] mul_out;
  */
 
 intsat #(
-	.IN_LEN(`OUT_RTRUNC_WID),
+	.IN_LEN(M4_OUT_RTRUNC_WID),
 	.LTRUNC(CONSTS_WHOLE)
 ) multiplier_saturate (
 	.inp(out_rtrunc),
@@ -118,11 +120,11 @@ intsat #(
  * Safely get rid of high bit in addition.
  ************************/
 
-reg signed [`CONSTS_WID+1-1:0] add_sat;
-wire signed [`CONSTS_WID-1:0] saturated_add;
+reg signed [M4_CONSTS_WID+1-1:0] add_sat;
+wire signed [M4_CONSTS_WID-1:0] saturated_add;
 
 intsat #(
-	.IN_LEN(`CONSTS_WID + 1),
+	.IN_LEN(M4_CONSTS_WID + 1),
 	.LTRUNC(1)
 ) addition_saturate (
 	.inp(add_sat),
@@ -168,8 +170,8 @@ localparam CALCULATE_NEW_DAC_VALUE_PART_2 = 11;
 localparam WAIT_ON_DISARM = 8;
 
 reg [4:0] state = WAIT_ON_ARM;
-reg signed [`CONSTS_WID+1-1:0] tmpstore = 0;
-wire signed [`CONSTS_WID-1:0] tmpstore_view = tmpstore[`CONSTS_WID-1:0];
+reg signed [M4_CONSTS_WID+1-1:0] tmpstore = 0;
+wire signed [M4_CONSTS_WID-1:0] tmpstore_view = tmpstore[M4_CONSTS_WID-1:0];
 
 
 always @ (posedge clk) begin
@@ -185,8 +187,8 @@ always @ (posedge clk) begin
 		end
 	CALCULATE_ERR: begin
 		/* Sign-extend */
-		a1[`CONSTS_WID-1:CONSTS_FRAC + ADC_WID + 1] <=
-			{(`CONSTS_WID-(CONSTS_FRAC + ADC_WID + 1)){a1[ADC_WID+1-1+CONSTS_FRAC]}};
+		a1[M4_CONSTS_WID-1:CONSTS_FRAC + ADC_WID + 1] <=
+			{(M4_CONSTS_WID-(CONSTS_FRAC + ADC_WID + 1)){a1[ADC_WID+1-1+CONSTS_FRAC]}};
 		a2 <= ADC_TO_DAC;
 		mul_arm <= 1;
 		state <= CALCULATE_DAC_E;
@@ -195,7 +197,7 @@ always @ (posedge clk) begin
 		if (mul_fin) begin
 			/* Discard other bits. This works without saturation because
 			 * CONSTS_WHOLE = E_WID. */
-			e_cur <= mul_out[`CONSTS_WID-1:CONSTS_FRAC];
+			e_cur <= mul_out[M4_CONSTS_WID-1:CONSTS_FRAC];
 
 			a1 <= SEC_PER_CYCLE;
 			/* No sign extension, cycles is positive */
@@ -228,7 +230,7 @@ always @ (posedge clk) begin
 				idt_reg <= mul_out;
 			`endif
 
-			a2 <= {{(CONSTS_WHOLE-`E_WID){e_cur[`E_WID-1]}},e_cur, {(CONSTS_FRAC){1'b0}}};
+			a2 <= {{(CONSTS_WHOLE-M4_E_WID){e_cur[M4_E_WID-1]}},e_cur, {(CONSTS_FRAC){1'b0}}};
 			state <= CALCULATE_EPIDT;
 		end
 	CALCULATE_EPIDT:
@@ -237,14 +239,14 @@ always @ (posedge clk) begin
 			mul_arm <= 1;
 		end else if (mul_fin) begin
 			mul_arm <= 0;
-			tmpstore <= {mul_out[`CONSTS_WID-1],mul_out};
+			tmpstore <= {mul_out[M4_CONSTS_WID-1],mul_out};
 
 			`ifdef DEBUG_CONTROL_LOOP_MATH
 				epidt_reg <= mul_out;
 			`endif
 
 			a1 <= cl_P;
-			a2 <= {{(CONSTS_WHOLE-`E_WID){e_prev[`E_WID-1]}},e_prev, {(CONSTS_FRAC){1'b0}}};
+			a2 <= {{(CONSTS_WHOLE-M4_E_WID){e_prev[M4_E_WID-1]}},e_prev, {(CONSTS_FRAC){1'b0}}};
 			state <= CALCULATE_EP;
 		end
 	CALCULATE_EP:
@@ -268,7 +270,7 @@ always @ (posedge clk) begin
 		state <= CALCULATE_NEW_DAC_VALUE_PART_1;
 	end
 	CALCULATE_NEW_DAC_VALUE_PART_1: begin
-		adj_sat <= saturated_add[`CONSTS_WID-1:CONSTS_FRAC];
+		adj_sat <= saturated_add[M4_CONSTS_WID-1:CONSTS_FRAC];
 		adj_val <= saturated_add;
 		state <= CALCULATE_NEW_DAC_VALUE_PART_2;
 	end
@@ -296,4 +298,3 @@ end
 `endif
 
 endmodule
-`undefineall
