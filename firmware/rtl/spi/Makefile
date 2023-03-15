@@ -6,7 +6,7 @@ all: test codegen
 test: obj_dir/Vspi_switch
 
 codegen: spi_master_ss_preprocessed.v spi_master_preprocessed.v \
-         spi_master_ss_no_write_preprocessed.v
+         spi_master_ss_no_write_preprocessed.v spi_switch_preprocessed.v
 
 %_preprocessed.v: %.v
 	verilator -E $< > $@

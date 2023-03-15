@@ -332,7 +332,7 @@ class CryoSNOM1SoC(SoCCore):
 				csr_address_width=14,
 				csr_paging=0x800,
 				csr_ordering="big",
-				timer_uptime = True)e
+				timer_uptime = True)
 		# This initializes the connection to the physical DRAM interface.
 		self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
 			memtype		= "DDR3",
