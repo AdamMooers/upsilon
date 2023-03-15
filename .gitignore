@@ -14,3 +14,4 @@ obj_dir
 firmware/rtl/control_loop/control_loop_cmds.h
 firmware/rtl/raster/ram_shim_cmds.h
 firmware/rtl/raster/raster_cmds.h
+firmware/rtl/base/base.v

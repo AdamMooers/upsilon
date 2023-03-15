@@ -11,6 +11,8 @@ m4_define(m4_dac_wires, ⟨
 	input [DAC_WID-1:0] to_dac_$2,
 
 	input wf_arm_$2,
+	input wf_halt_on_finish_$2,
+	output wf_finished_$2,
 	input [WF_TIMER_WID-1:0] wf_time_to_wait_$2,
 	input wf_refresh_start_$2,
 	input [WF_RAM_WID-1:0] wf_start_addr_$2,
@@ -89,6 +91,8 @@ m4_define(m4_dac_switch, ⟨
 	) waveform_$2 (
 		.clk(clk),
 		.arm(wf_arm_$2),
+		.halt_on_finish(wf_halt_on_finish_$2),
+		.finished(wf_finished_$2),
 		.time_to_wait(wf_time_to_wait_$2),
 		.refresh_start(wf_refresh_start_$2),
 		.start_addr(wf_start_addr_$2),
