@@ -106,3 +106,4 @@ end else if (!word_next && word_ok) begin
 end
 
 endmodule
+`undefineall

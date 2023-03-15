@@ -32,9 +32,10 @@ template <class TOP> class TB {
 		Verilated::timeInc(1);
 		tick_count++;
 
-		if (bailout > 0 && tick_count >= bailout)
+		if (bailout > 0 && tick_count >= bailout) {
 			exit(1);
-		if (Verilated::gotError())
+		} if (Verilated::gotError()) {
 			exit(1);
+		}
 	}
 };

@@ -1,5 +1,5 @@
 module bram_interface_sim #(
-	parameter WORD_WID = 24,
+	parameter WORD_WID = 20,
 	parameter WORD_AMNT_WID = 11,
 	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
 	parameter RAM_WID = 32,

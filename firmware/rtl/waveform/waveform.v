@@ -1,4 +1,5 @@
 /* Write a waveform to a DAC. */
+/* TODO: Add reset pin. */
 module waveform #(
 	parameter DAC_WID = 24,
 	parameter DAC_WID_SIZ = 5,
@@ -18,6 +19,8 @@ module waveform #(
 ) (
 	input clk,
 	input arm,
+	input halt_on_finish,
+	output reg finished,
 	input [TIMER_WID-1:0] time_to_wait,
 
 	/* User interface */
@@ -100,11 +103,14 @@ reg [1:0] state = WAIT_ON_ARM;
 reg [TIMER_WID-1:0] wait_timer = 0;
 
 always @ (posedge clk) case (state)
-WAIT_ON_ARM: if (arm) begin
-	state <= DO_WAIT;
-	wait_timer <= time_to_wait;
-end else begin
-	word_rst <= 1;
+WAIT_ON_ARM: begin
+	finished <= 0;
+	if (arm) begin
+		state <= DO_WAIT;
+		wait_timer <= time_to_wait;
+	end else begin
+		word_rst <= 1;
+	end
 end
 DO_WAIT: if (!arm) begin
 	state <= WAIT_ON_ARM;
@@ -126,11 +132,26 @@ WAIT_ON_DAC: if (dac_finished) begin
 	dac_arm <= 0;
 	/* Was the last word read *the* last word? */
 	if (word_last) begin
-		state <= WAIT_ON_ARM;
+		if (!halt_on_finish) begin
+			state <= WAIT_ON_ARM;
+			finished <= 0;
+		end else begin
+			finished <= 1;
+		end
 	end else begin
 		state <= DO_WAIT;
 	end
 end
 endcase
 
+/* Warning! This will crash verilator with a segmentation fault!
+`ifdef VERILATOR
+initial begin
+	$dumpfile("waveform.fst");
+	$dumpvars();
+end
+`endif
+*/
+
 endmodule
+`undefineall
