@@ -9,3 +9,8 @@ misc/
 software/build/
 *.fst
 obj_dir
+*.fst.hier
+*.swp
+firmware/rtl/control_loop/control_loop_cmds.h
+firmware/rtl/raster/ram_shim_cmds.h
+firmware/rtl/raster/raster_cmds.h
