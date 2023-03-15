@@ -1,5 +1,7 @@
 m4_changequote(`⟨', `⟩')
 m4_changecom(⟨/*⟩, ⟨*/⟩)
+m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
+m4_include(../control_loop/control_loop_cmds.m4)
 /*********************************************************/
 /********************** M4 macros ************************/
 /*********************************************************/
@@ -132,7 +134,6 @@ m4_define(m4_adc_switch, ⟨
 /*********************** Verilog *************************/
 /*********************************************************/
 
-`include "control_loop_cmds.vh"
 module base #(
 	parameter DAC_PORTS = 2,
 m4_define(DAC_PORTS_CONTROL_LOOP, (DAC_PORTS + 1))
@@ -216,7 +217,7 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	m4_adc_wires(ADC_TYPE1_WID, 7),
 
 	output cl_in_loop,
-	input [`CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
+	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
 	input [CL_DATA_WID-1:0] cl_word_in,
 	output reg [CL_DATA_WID-1:0] cl_word_out,
 	input cl_start_cmd,

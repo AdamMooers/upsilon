@@ -4,10 +4,11 @@
 
 all: test codegen
 test: obj_dir/Vbram_interface_sim obj_dir/Vwaveform_sim
+CODEGEN_FILES=bram_interface_preprocessed.v waveform_preprocessed.v
 
-codegen: bram_interface_preprocessed.v waveform_preprocessed.v
+codegen: ${CODEGEN_FILES}
 %_preprocessed.v: %.v
-	verilator -E $< > $@
+	verilator -P -E $< > $@
 
 bram_SRC= bram_interface_sim.v dma_sim.v bram_interface.v bram_interface_sim.cpp
 
@@ -31,4 +32,4 @@ obj_dir/Vwaveform_sim: obj_dir/Vwaveform_sim.mk $(waveform_src)
 	./obj_dir/Vwaveform_sim
 
 clean:
-	rm -rf obj_dir/
+	rm -rf obj_dir/ ${CODEGEN_FILES}

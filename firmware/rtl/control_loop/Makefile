@@ -15,8 +15,6 @@ E_WID=21
 
 test: obj_dir/Vcontrol_loop_sim_top obj_dir/Vcontrol_loop_math
 	# obj_dir/Vcontrol_loop_math
-clean:
-	rm -rf obj_dir *.fst
 
 obj_dir/Vcontrol_loop_math.mk: control_loop_math_sim.cpp ${COMMON} \
                                ${control_loop_math_verilog}
@@ -51,9 +49,13 @@ obj_dir/Vcontrol_loop_sim_top: obj_dir/Vcontrol_loop_sim_top.mk control_loop_cmd
 ####### Codegen ########
 
 include ../common.makefile
-codegen: control_loop_cmds.h boothmul.v control_loop_math.v control_loop.v control_loop_cmds.vh
+CODEGEN_FILES=control_loop_cmds.h boothmul.v control_loop_math.v control_loop.v control_loop_cmds.vh
+codegen: ${CODEGEN_FILES}
 control_loop_cmds.vh: control_loop_cmds.m4
 	m4 -P control_loop_cmds.vh.m4  > control_loop_cmds.vh
 control_loop_cmds.h: control_loop_cmds.m4
 	echo '#pragma once' > control_loop_cmds.h
 	m4 -P control_loop_cmds.h.m4 >> control_loop_cmds.h
+
+clean:
+	rm -rf obj_dir *.fst ${CODEGEN_FILES}
