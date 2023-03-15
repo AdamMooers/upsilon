@@ -38,6 +38,8 @@ class Base(Module, AutoCSR):
 			setattr(self, f"from_dac_{i}", CSRStatus(24))
 			setattr(self, f"to_dac_{i}", CSRStorage(24))
 			setattr(self, f"wf_arm_{i}", CSRStorage(1))
+			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1)),
+			setattr(self, f"wf_finished_{i}", CSRStatus(1)),
 			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16))
 			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1))
 			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1))
