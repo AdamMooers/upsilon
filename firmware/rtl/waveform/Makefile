@@ -1,8 +1,13 @@
 # Makefile for tests and hardware verification.
 
-.PHONY: test clean
+.PHONY: test clean codegen
 
+all: test codegen
 test: obj_dir/Vbram_interface_sim obj_dir/Vwaveform_sim
+
+codegen: bram_interface_preprocessed.v waveform_preprocessed.v
+%_preprocessed.v: %.v
+	verilator -E $< > $@
 
 bram_SRC= bram_interface_sim.v dma_sim.v bram_interface.v bram_interface_sim.cpp
 

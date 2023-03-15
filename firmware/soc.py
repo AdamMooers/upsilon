@@ -302,17 +302,17 @@ class CryoSNOM1SoC(SoCCore):
 		sys_clk_freq = int(100e6)
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
 		self.submodules.crg = _CRG(platform, sys_clk_freq, True)
-		platform.add_source("rtl/spi/spi_switch.v")
-		platform.add_source("rtl/spi/spi_master.v")
-		platform.add_source("rtl/spi/spi_master_ss.v")
-		platform.add_source("rtl/spi/spi_master_ss_no_write.v")
+		platform.add_source("rtl/spi/spi_switch_preprocessed.v")
+		platform.add_source("rtl/spi/spi_master_preprocessed.v")
+		platform.add_source("rtl/spi/spi_master_ss_preprocessed.v")
+		platform.add_source("rtl/spi/spi_master_ss_no_write_preprocessed.v")
 		platform.add_source("rtl/control_loop/sign_extend.v")
 		platform.add_source("rtl/control_loop/intsat.v")
 		platform.add_source("rtl/control_loop/boothmul.v")
 		platform.add_source("rtl/control_loop/control_loop_math.v")
 		platform.add_source("rtl/control_loop/control_loop.v")
-		platform.add_source("rtl/waveform/bram_interface.v")
-		platform.add_source("rtl/waveform/waveform.v")
+		platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
+		platform.add_source("rtl/waveform/waveform_preprocessed.v")
 		platform.add_source("rtl/base/base.v")
 
 		# SoCCore does not have sane defaults (no integrated rom)
@@ -332,8 +332,7 @@ class CryoSNOM1SoC(SoCCore):
 				csr_address_width=14,
 				csr_paging=0x800,
 				csr_ordering="big",
-				timer_uptime = True)
-
+				timer_uptime = True)e
 		# This initializes the connection to the physical DRAM interface.
 		self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
 			memtype		= "DDR3",
