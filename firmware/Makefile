@@ -2,8 +2,11 @@
 
 DEVICETREE_GEN_DIR=.
 
-all: build/digilent_arty/digilent_arty.bit overlay.dts overlay.config pin_io.h
-build/digilent_arty/digilent_arty.bit: soc.py
+all: rtl/base/base.v build/digilent_arty/digilent_arty.bit overlay.dts overlay.config pin_io.h
+
+rtl/base/base.v:
+	cd rtl/base && make
+build/digilent_arty/digilent_arty.bit: rtl/base/base.v soc.py
 	python3 soc.py
 clean:
 	rm -rf build csr.json overlay.config overlay.dts pin_io.h
