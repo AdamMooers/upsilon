@@ -115,7 +115,7 @@ When you write or modify a verilog module, the first thing you should do
 is write/run a simulation of that module. A simulation of that module
 should at the minimum compare the execution of the module with known
 results (called "Ground truth testing"). A simulation should also consider
-borderline cases that you might overlook when writing Verilog.
+edge cases that you might overlook when writing Verilog.
 
 For example, a module that multiplies two signed integers together should
 have a simulation that sends the module many pairs of integers, taking
@@ -133,11 +133,25 @@ Otherwise there is no way for you to check that
 If you find a bug that isn't covered by your simulation, make sure you
 add that case to the simulation.
 
+The file `firmware/rtl/testbench.hpp` contains a class that you should
+use to organize individual tests. Make a derived class of `TB` and
+use the `posedge()` function to encode what default actions your test
+should take at every positive edge of the clock. Remember, in C++ each
+action is blocking: there is no equivalent to the non-blocking `<=`.
+
+If you have to do a lot of non-blocking code for your test, you
+should write a Verilog wrapper for your test that implements
+the non-blocking code. **Verilator only supports a subset of
+non-synthesizable Verilog.  Unless you really need to, use synthesizable
+Verilog only.** See `firmware/rtl/waveform/waveform_sim.v` and
+`firmware/rtl/waveform/dma_sim.v` for an example of Verilog files only
+used for tests.
+
 ## Test Synthesis
 
-**Yosys only accepts a subset of the Verilog that Verilator supports. You
-might write a bunch of code that Verilator will happily simulate but that
-will fail to go through Yosys.**
+**Yosys only accepts a subset of Verilog. You might write a bunch of
+code that Verilator will happily simulate but that will fail to go
+through Yosys.**
 
 Once you have simulated your design, you should use yosys to synthesize it.
 This will allow you to understand how much and what resources the module
@@ -152,9 +166,16 @@ is taking up. To do this, you can put the follwing in a script file:
 
 and run `yosys -s scriptfile`. The options to `synth_xilinx` reflect
 the current limitations that F4PGA has. The file `xc7.f4pga.tcl` that
-F4PGA downloads is the complete synthesis script.
+F4PGA downloads is the complete synthesis script, read it to understand
+the internals of what F4PGA does to compile your verilog.
 
 ## Test Compilation
+
+I haven't been able to do this for most of this project. The basic idea
+is to use `firmware/rtl/soc.py` to load only the module to test, and
+to use LiteScope to write and read values from the module. For more
+information, you can look at
+[the boothmul test](https://software.mcgoron.com/peter/boothmul/src/branch/master/arty_test).
 
 # Hacks and Pitfalls
 
@@ -162,9 +183,9 @@ The open source toolchain that Upsilon uses is novel and unstable.
 
 ## F4PGA
 
-This is really a Yosys (and really, really, an abc bug). F4PGA defaults
-to using the ABC flow, which can break, especially for block RAM. To
-fix, edit out `-abc` in the tcl script (find it before you install it...)
+This is really a Yosys (and really, an abc bug). F4PGA defaults to using
+the ABC flow, which can break, especially for block RAM. To fix, edit out
+`-abc` in the tcl script (find it before you install it...)
 
 ## Yosys
 
@@ -174,30 +195,19 @@ Yosys fails to calculate computed parameter values correctly. For instance,
     localparam VALUE = CTRLVAL + 1;
 
 Yosys will *silently* fail to compile this, setting `VALUE` to be equal
-to 0. The solution is to use preprocessor defines:
+to 0. The solution is to use macros.
 
-    parameter CTRLVAL = 5;
-    `define VALUE (CTRLVAL + 1)
+## Macros
 
-In Verilog, in order to replace a macro identifier with the value of the
-macro, you must put a backtick before the name: i.e.
+Verilog's preprocessor is awful. F4PGA (through yosys) barely supports it.
 
-    `VALUE
+You should only use Verilog macros as a replacement for `localparam`.
+When you need to do so, you must preprocess the file with
+Verilator. For example, if you have a file called `mod.v` in the folder
+`firmware/rtl/mod/`, then in the file `firmware/rtl/mod/Makefile` add
 
-## Forth scripting
+    codegen: [...] mod_preprocessed.v
 
-The user controls the kernel through Forth scripts. The particular
-implementation used is zForth.
-
-Forth has the following memory access primitives:
-
-* `addr` `@`: get value at `addr`
-* `val` `addr` `!`: write `val` to `addr`
-* `val` `,`: allocate a cell in "data space" (think the heap) and store
-  the data there.
-* `addr` `#`: return the size of the value at addr (not standard Forth)
-
-Each of these are not primitives in zForth. zForth allows for peeks and
-pokes to get values of different lengths, and the standard operators are
-for addressing a variable length value.
-
+(putting it after all other generated files). The file
+`firmware/rtl/common.makefile` should automatically generate the
+preprocessed file for you.
