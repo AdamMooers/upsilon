@@ -12,8 +12,6 @@ CODEGEN_FILES= spi_master_ss_preprocessed.v spi_master_preprocessed.v \
                spi_master_ss_no_write_preprocessed.v spi_switch_preprocessed.v
 
 codegen: ${CODEGEN_FILES}
-%_preprocessed.v: %.v
-	verilator -P -E $< > $@
 
 SRC= spi_switch.v spi_switch_sim.cpp
 obj_dir/Vspi_switch.mk: $(SRC)
