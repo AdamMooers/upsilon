@@ -1,0 +1,1 @@
+yosys -p "plugin -i systemverilog" -p "read_systemverilog control_loop.v control_loop_math.v ../spi/spi_master_ss_no_write.v ../spi/spi_master_ss.v boothmul.v intsat.v ../spi/spi_master.v ../spi/spi_master_no_write.v" -p "synth_xilinx"
