@@ -3,9 +3,9 @@ import json
 import sys
 
 class CSRGenerator:
-	def __init__(self, json, registers, file):
+	def __init__(self, json_file, registers, f):
 		self.registers = registers
-		self.j = json.load(open("csr.json"))
+		self.j = json.load(open(json_file))
 		self.file = f
 
 	def get_reg(self, name, num):
@@ -15,27 +15,26 @@ class CSRGenerator:
 			regname = f"base_{name}_{num}"
 		return self.j["csr_registers"][regname]["addr"]
 	def print(self, *args):
-		print(*args, end='', file=f)
+		print(*args, end='', file=self.file)
 
 	def print_array(self, name, num):
 		if num == 1:
 			self.print(f'csr_t {name} = {self.get_reg(name, None)};\n')
 		else:
-			self.print(f'csr_t {name} = {{', self.get_reg(name, 0))
-			for i in range(i,num):
+			self.print(f'csr_t {name}[{num}] = {{', self.get_reg(name, 0))
+			for i in range(0,num):
 				self.print(',', self.get_reg(name, i))
-			self.print('}\n\n')
+			self.print('};\n\n')
 
 	def print_registers(self):
 		for name,num in self.registers:
 			self.print_array(name, num)
 	def print_file(self):
-		self.print(f'''
-		#pragma once
-		typedef volatile uint32_t *csr_t;
-		#define ADC_MAX {adc_num}
-		#define DAC_MAX {dac_num}
-		''')
+		self.print(f'''#pragma once
+typedef volatile uint32_t *csr_t;
+#define ADC_MAX {adc_num}
+#define DAC_MAX {dac_num}
+''')
 		self.print_registers()
 
 if __name__ == "__main__":
@@ -69,5 +68,5 @@ if __name__ == "__main__":
 		("cl_finish_cmd", 1),
 	]
 
-	CSRGenerator(self, "csr.json", registers, sys.stdout)
+	CSRGenerator("csr.json", registers, sys.stdout).print_file()
 
