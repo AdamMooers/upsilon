@@ -20,3 +20,14 @@ firmware/rtl/control_loop/control_loop.v
 firmware/rtl/control_loop/control_loop_cmds.vh
 firmware/rtl/control_loop/control_loop_math.v
 *_preprocessed.v
+firmware/csr.repl
+firmware/csr.resc
+firmware/rtl/control_loop/slpp_all/
+firmware/rtl/raster/.f4cache
+firmware/rtl/raster/build/
+firmware/rtl/raster/pack.log
+firmware/rtl/raster/place.log
+firmware/rtl/raster/route.log
+firmware/rtl/raster/synth.log
+firmware/rtl/raster/synth_test_yosys.v
+firmware/rtl/raster/yosys_output
