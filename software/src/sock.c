@@ -4,6 +4,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "sock.h"
+#include "buf.h"
 
 LOG_MODULE_REGISTER(sock);
 
@@ -47,6 +48,9 @@ server_accept_client(int server)
 	struct sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 
+	/* Accept clients in a loop. This is halting so other threads will
+	 * be able to process clients.
+	 */
 	do {
 		client = zsock_accept(server, (struct sockaddr *)&addr, &len);
 		if (client < 0)
@@ -59,34 +63,71 @@ server_accept_client(int server)
 	return client;
 }
 
-int
-sock_vprintf(int sock, char *buf, int buflen, char *fmt, va_list va)
+bool
+sock_read_buf(int sock, struct bufptr *bp)
 {
-	int w = vsnprintk(buf, buflen, fmt, va);
-	if (w < 0)
-		return b;
-	else if (w <= buflen)
-		return w - buflen;
+	if (bp->left < 2)
+		return false;
 
-	ssize_t left = w;
-	char *p = buf;
-	while (left > 0) {
-		ssize_t i = zsock_send(sock, p, left, 0);
-		if (i < 0)
-			return 0;
-		p += i;
-		left -= i;
+	ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
+	if (l < 0)
+		return false;
+
+	bp->left -= l;
+	bp->p += l;
+	if (bp->left == 0) {
+		LOG_ERR("internal out of bounds error in %s", __func__);
+		k_fatal_halt(K_ERR_KERNEL_PANIC);
 	}
 
-	return w;
+	*bp->p = 0;
+	return true;
+}
+
+bool
+sock_write_buf(int sock, struct bufptr *bp)
+{
+	/* Since send may not send all data in the buffer at once,
+	 * loop until it sends all data (or fails).
+	 */
+	while (bp->left) {
+		ssize_t l = zsock_send(sock, bp->p, bp->left, 0);
+		if (l < 0)
+			return false;
+		bp->p += l;
+		bp->left -= l;
+	}
+
+	return true;
 }
 
 int
-sock_printf(int sock, char *buf, int buflen, char *fmt, ...)
+sock_vprintf(int sock, struct bufptr *bp, const char *fmt, va_list va)
+{
+	int r = buf_writevf(bp, fmt, va);
+	struct bufptr store_bp = *bp;
+	if (r != BUF_OK)
+		return r;
+
+	/* The difference between the initial and final values of
+	 * `left` is the amount of bytes written to the buffer.
+	 * Set left to this difference so that the only thing sent
+	 * is the bytes written by buf_writevf.
+	 */
+	store_bp.left -= bp->left;
+	if (!sock_write_buf(sock, &store_bp)) {
+		return BUF_SOCK_ERR;
+	} else {
+		return BUF_OK;
+	}
+}
+
+int
+sock_printf(int sock, struct bufptr *bp, const char *fmt, ...)
 {
 	va_list va;
 	va_start(va, fmt);
-	int r = sock_vprintf(sock, buf, buflen, fmt, va);
+	bool b = sock_vprintf(sock, bp, fmt, va);
 	va_end(va);
-	return r;
+	return b;
 }

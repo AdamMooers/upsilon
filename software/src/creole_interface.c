@@ -1,8 +1,10 @@
 #include <sys_clock.h>
+#include <sys/util.h>
 #include "control_loop_cmds.h"
 #include "creole.h"
 #include "creole_upsilon.h"
 #include "pin_io.h"
+#include "creole.h"
 
 static inline uint32_t
 sign_extend(uint32_t in, unsigned len)
@@ -67,7 +69,7 @@ creole_word
 upsilon_usec(creole_word usec)
 {
 	k_sleep(K_USEC(usec));
-	return 0;
+	return 1;
 }
 
 creole_word
@@ -82,7 +84,7 @@ upsilon_control_loop_read(creole_word *high_reg,
 	*low_reg = cl_word_out[1];
 	*cl_start_cmd = 0;
 
-	return 0;
+	return 1;
 }
 
 creole_word
@@ -97,32 +99,85 @@ upsilon_control_loop_write(creole_word high_val,
 	while (!*cl_finish_cmd);
 	*cl_start_cmd = 0;
 
-	return 0;
+	return 1;
 }
 
+static size_t
+load_into_array(const struct creole_reader *start, creole_word *buf, size_t buflen)
+{
+	size_t i = 0;
+	struct creole_word w;
+	struct creole_reader r = start;
+
+	while (creole_decode(&r, &w) && i < buflen) {
+		buf[i++] = w.word;
+	}
+
+	return i;
+}
+
+#define MAX_WL_SIZE 4096
 creole_word
 upsilon_load_waveform(struct creole_env *env, creole_word slot,
                       creole_word db)
 {
-	/* TODO */
-	return 0;
+	creole_word buf[MAX_WL_SIZE];
+	size_t len = load_into_array(env->dats[db], buf, ARRAY_SIZE(buf));
+
+	if (len != MAX_WL_SIZE)
+		return 0;
+
+	*wf_start_addr[slot] = &buf;
+	*wf_refresh_start[slot] = 1;
+	while (!*wf_refresh_finished[slot]);
+	*wf_refresh_start[slot] = 0;
+
+	return 1;
 }
 creole_word
-upsilon_exec_waveform(creole_word slot, creole_word dac)
+upsilon_arm_waveform(creole_word slot, creole_word hof, creole_word wait)
 {
-	/* TODO */
-	return 0;
+	*wf_halt_on_finished[slot] = hof;
+	*wf_time_to_wait[slot] = wait;
+	*wf_arm[slot] = 1;
+
+	if (wait) {
+		while (!*wf_finished[slot]);
+		*wf_arm[slot] = 0;
+	}
+
+	return 1;
 }
+
 creole_word
-upsilon_sendval(creole_word num)
+upsilon_disarm_waveform(creole_word slot)
 {
-	/* TODO */
-	return 0;
+	*wf_arm[slot] = 0;
+	return 1;
+}
+
+creole_word
+upsilon_sendval(struct creole_env *env, creole_word num)
+{
+	char buf[32];
+	struct bufptr bp = {buf, sizeof(buf)};
+
+	return sock_printf(env->fd, &bp, "%u", num) == BUF_OK;
 }
 
 creole_word
 upsilon_senddat(struct creole_env *env, creole_word db)
 {
-	/* TODO */
-	return 0;
+	char buf[128];
+	struct bufptr bp = {buf, 0};
+	struct creole_word w;
+	struct creole_reader r = start;
+
+	while (creole_decode(&r, &w) && bp.left < buflen) {
+		if (w.word > 0xFF)
+			return 0;
+		buf[bp.left++] = w.word;
+	}
+
+	return sock_write_buf(env->fd, &bp);
 }
