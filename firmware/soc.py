@@ -32,238 +32,87 @@ io = [
 
 class Base(Module, AutoCSR):
 	def __init__(self, clk, sdram, platform):
+		kwargs = {}
+
 		for i in range(0,8):
 			setattr(self, f"dac_sel_{i}", CSRStorage(3, name=f"dac_sel_{i}"))
+			kwargs[f"dac_sel_{i}"] = getattr(self, f"dac_sel_{i}")
+
 			setattr(self, f"dac_finished_{i}", CSRStatus(1, name=f"dac_finished_{i}"))
+			kwargs[f"dac_finished_{i}"] = getattr(finishedf, f"dac_finished_{i}")
+
 			setattr(self, f"dac_arm_{i}", CSRStorage(1, name=f"dac_arm_{i}"))
+			kwargs[f"dac_arm_{i}"] = getattr(armf, f"dac_arm_{i}")
+
 			setattr(self, f"from_dac_{i}", CSRStatus(24, name=f"from_dac_{i}"))
+			kwargs[f"from_dac_{i}"] = getattr(armf, f"from_dac_{i}")
+
 			setattr(self, f"to_dac_{i}", CSRStorage(24, name=f"to_dac_{i}"))
+			kwargs[f"to_dac_{i}"] = getattr(armf, f"to_dac_{i}")
+
 			setattr(self, f"wf_arm_{i}", CSRStorage(1, name=f"wf_arm_{i}"))
+			kwargs[f"wf_arm_{i}"] = getattr(armf, f"wf_arm_{i}")
+
 			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1, name=f"wf_halt_on_finish_{i}")),
+			kwargs[f"wf_halt_on_finish_{i}"] = getattr(armf, f"wf_halt_on_finish_{i}")
+
 			setattr(self, f"wf_finished_{i}", CSRStatus(1, name=f"wf_finished_{i}")),
+			kwargs[f"wf_finished_{i}"] = getattr(armf, f"wf_finished_{i}")
+
+			setattr(self, f"wf_running_{i}", CSRStatus(1, name=f"wf_running_{i}")),
+			kwargs[f"wf_running_{i}"] = getattr(armf, f"wf_running_{i}")
+
 			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16, name=f"wf_time_to_wait_{i}"))
+			kwargs[f"wf_time_to_wait_{i}"] = getattr(armf, f"wf_time_to_wait_{i}")
+
 			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1, name=f"wf_refresh_start_{i}"))
+			kwargs[f"wf_refresh_start_{i}"] = getattr(armf, f"wf_refresh_start_{i}")
+
 			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1, name=f"wf_refresh_finished_{i}"))
+			kwargs[f"wf_refresh_finished_{i}"] = getattr(armf, f"wf_refresh_finished_{i}")
+
 			setattr(self, f"wf_start_addr_{i}", CSRStorage(32, name=f"wf_start_addr_{i}"))
+			kwargs[f"wf_start_addr_{i}"] = getattr(armf, f"wf_start_addr_{i}")
+
 			port = sdram.crossbar.get_port()
 
 			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
+			kwargs[f"wf_sdram_{i}"] = getattr(armf, f"wf_sdram_{i}")
 
 			setattr(self, f"adc_finished_{i}", CSRStatus(1, name=f"adc_finished_{i}"))
+			kwargs[f"adc_finished_{i}"] = getattr(armf, f"adc_finished_{i}")
+
 			setattr(self, f"adc_arm_{i}", CSRStorage(1, name=f"adc_arm_{i}"))
+			kwargs[f"adc_arm_{i}"] = getattr(armf, f"adc_arm_{i}")
+
 			setattr(self, f"from_adc_{i}", CSRStatus(32, name=f"from_adc_{i}"))
+			kwargs[f"from_adc_{i}"] = getattr(armf, f"from_adc_{i}")
 
 		self.adc_sel_0 = CSRStorage(2)
+		kwargs["adc_sel_0"] = self.adc_sel_0
 		self.cl_in_loop = CSRStatus(1)
+		kwargs["o_cl_in_loop"] = self.cl_in_loop.status
 		self.cl_cmd = CSRStorage(64)
+		kwargs["i_cl_cmd"] = self.cl_cmd.storage
 		self.cl_word_in = CSRStorage(32)
+		kwargs["i_cl_word_in"] = self.cl_word_in.storage
 		self.cl_word_out = CSRStatus(32)
+		kwargs["o_cl_word_out"] = self.cl_word_out.status
 		self.cl_start_cmd = CSRStorage(1)
+		kwargs["i_cl_start_cmd"] = self.cl_start_cmd.storage
 		self.cl_finish_cmd = CSRStatus(1)
+		kwargs["o_cl_finish_cmd"] = self.cl_finish_cmd.status
 
-		self.specials += Instance("base",
-			i_clk = clk,
-			i_dac_miso = platform.request("dac_miso"),
-			o_dac_mosi = platform.request("dac_mosi"),
-			o_dac_sck = platform.request("dac_sck"),
-			o_dac_ss_L = platform.request("dac_ss_L"),
-			o_adc_conv = platform.request("adc_conv"),
-			i_adc_sdo = platform.request("adc_sdo"),
-			o_adc_sck = platform.request("adc_sck"),
+		kwargs["i_clk"] = clk
+		kwargs["i_dac_miso"] = platform.request("dac_miso")
+		kwargs["o_dac_mosi"] = platform.request("dac_mosi")
+		kwargs["o_dac_sck"] = platform.request("dac_sck")
+		kwargs["o_dac_ss_L"] = platform.request("dac_ss_L")
+		kwargs["o_adc_conv"] = platform.request("adc_conv")
+		kwargs["i_adc_sdo"] = platform.request("adc_sdo")
+		kwargs["o_adc_sck"] = platform.request("adc_sck")
 
-			# dac_0
-			i_dac_sel_0 = self.dac_sel_0.storage,
-			o_dac_finished_0 = self.dac_finished_0.status,
-			i_dac_arm_0 = self.dac_arm_0.storage,
-			o_from_dac_0 = self.from_dac_0.status,
-			i_to_dac_0 = self.to_dac_0.storage,
-
-			i_wf_arm_0 = self.wf_arm_0.storage,
-			i_wf_time_to_wait_0 = self.wf_time_to_wait_0.storage,
-			i_wf_refresh_start_0 = self.wf_refresh_start_0.storage,
-			o_wf_refresh_finished_0 = self.wf_refresh_finished_0.status,
-			o_wf_start_addr_0 = self.wf_start_addr_0.storage,
-
-			o_wf_ram_dma_addr_0 = self.wf_sdram_0.sink.address,
-			i_wf_ram_word_0 = self.wf_sdram_0.source.data,
-			o_wf_ram_read_0 = self.wf_sdram_0.sink.valid,
-			i_wf_ram_valid_0 = self.wf_sdram_0.source.valid,
-
-			# dac_1
-			i_dac_sel_1 = self.dac_sel_1.storage,
-			o_dac_finished_1 = self.dac_finished_1.status,
-			i_dac_arm_1 = self.dac_arm_1.storage,
-			o_from_dac_1 = self.from_dac_1.status,
-			i_to_dac_1 = self.to_dac_1.storage,
-
-			i_wf_arm_1 = self.wf_arm_1.storage,
-			i_wf_time_to_wait_1 = self.wf_time_to_wait_1.storage,
-			i_wf_refresh_start_1 = self.wf_refresh_start_1.storage,
-			o_wf_refresh_finished_1 = self.wf_refresh_finished_1.status,
-			o_wf_start_addr_1 = self.wf_start_addr_1.storage,
-
-			o_wf_ram_dma_addr_1 = self.wf_sdram_1.sink.address,
-			i_wf_ram_word_1 = self.wf_sdram_1.source.data,
-			o_wf_ram_read_1 = self.wf_sdram_1.sink.valid,
-			i_wf_ram_valid_1 = self.wf_sdram_1.source.valid,
-
-			# dac_2
-			i_dac_sel_2 = self.dac_sel_2.storage,
-			o_dac_finished_2 = self.dac_finished_2.status,
-			i_dac_arm_2 = self.dac_arm_2.storage,
-			o_from_dac_2 = self.from_dac_2.status,
-			i_to_dac_2 = self.to_dac_2.storage,
-
-			i_wf_arm_2 = self.wf_arm_2.storage,
-			i_wf_time_to_wait_2 = self.wf_time_to_wait_2.storage,
-			i_wf_refresh_start_2 = self.wf_refresh_start_2.storage,
-			o_wf_refresh_finished_2 = self.wf_refresh_finished_2.status,
-			o_wf_start_addr_2 = self.wf_start_addr_2.storage,
-
-			o_wf_ram_dma_addr_2 = self.wf_sdram_2.sink.address,
-			i_wf_ram_word_2 = self.wf_sdram_2.source.data,
-			o_wf_ram_read_2 = self.wf_sdram_2.sink.valid,
-			i_wf_ram_valid_2 = self.wf_sdram_2.source.valid,
-
-			# dac_3
-			i_dac_sel_3 = self.dac_sel_3.storage,
-			o_dac_finished_3 = self.dac_finished_3.status,
-			i_dac_arm_3 = self.dac_arm_3.storage,
-			o_from_dac_3 = self.from_dac_3.status,
-			i_to_dac_3 = self.to_dac_3.storage,
-
-			i_wf_arm_3 = self.wf_arm_3.storage,
-			i_wf_time_to_wait_3 = self.wf_time_to_wait_3.storage,
-			i_wf_refresh_start_3 = self.wf_refresh_start_3.storage,
-			o_wf_refresh_finished_3 = self.wf_refresh_finished_3.status,
-			o_wf_start_addr_3 = self.wf_start_addr_3.storage,
-
-			o_wf_ram_dma_addr_3 = self.wf_sdram_3.sink.address,
-			i_wf_ram_word_3 = self.wf_sdram_3.source.data,
-			o_wf_ram_read_3 = self.wf_sdram_3.sink.valid,
-			i_wf_ram_valid_3 = self.wf_sdram_3.source.valid,
-
-			# dac_4
-			i_dac_sel_4 = self.dac_sel_4.storage,
-			o_dac_finished_4 = self.dac_finished_4.status,
-			i_dac_arm_4 = self.dac_arm_4.storage,
-			o_from_dac_4 = self.from_dac_4.status,
-			i_to_dac_4 = self.to_dac_4.storage,
-
-			i_wf_arm_4 = self.wf_arm_4.storage,
-			i_wf_time_to_wait_4 = self.wf_time_to_wait_4.storage,
-			i_wf_refresh_start_4 = self.wf_refresh_start_4.storage,
-			o_wf_refresh_finished_4 = self.wf_refresh_finished_4.status,
-			o_wf_start_addr_4 = self.wf_start_addr_4.storage,
-
-			o_wf_ram_dma_addr_4 = self.wf_sdram_4.sink.address,
-			i_wf_ram_word_4 = self.wf_sdram_4.source.data,
-			o_wf_ram_read_4 = self.wf_sdram_4.sink.valid,
-			i_wf_ram_valid_4 = self.wf_sdram_4.source.valid,
-
-			# dac_5
-			i_dac_sel_5 = self.dac_sel_5.storage,
-			o_dac_finished_5 = self.dac_finished_5.status,
-			i_dac_arm_5 = self.dac_arm_5.storage,
-			o_from_dac_5 = self.from_dac_5.status,
-			i_to_dac_5 = self.to_dac_5.storage,
-
-			i_wf_arm_5 = self.wf_arm_5.storage,
-			i_wf_time_to_wait_5 = self.wf_time_to_wait_5.storage,
-			i_wf_refresh_start_5 = self.wf_refresh_start_5.storage,
-			o_wf_refresh_finished_5 = self.wf_refresh_finished_5.status,
-			o_wf_start_addr_5 = self.wf_start_addr_5.storage,
-
-			o_wf_ram_dma_addr_5 = self.wf_sdram_5.sink.address,
-			i_wf_ram_word_5 = self.wf_sdram_5.source.data,
-			o_wf_ram_read_5 = self.wf_sdram_5.sink.valid,
-			i_wf_ram_valid_5 = self.wf_sdram_5.source.valid,
-
-			# dac_6
-			i_dac_sel_6 = self.dac_sel_6.storage,
-			o_dac_finished_6 = self.dac_finished_6.status,
-			i_dac_arm_6 = self.dac_arm_6.storage,
-			o_from_dac_6 = self.from_dac_6.status,
-			i_to_dac_6 = self.to_dac_6.storage,
-
-			i_wf_arm_6 = self.wf_arm_6.storage,
-			i_wf_time_to_wait_6 = self.wf_time_to_wait_6.storage,
-			i_wf_refresh_start_6 = self.wf_refresh_start_6.storage,
-			o_wf_refresh_finished_6 = self.wf_refresh_finished_6.status,
-			o_wf_start_addr_6 = self.wf_start_addr_6.storage,
-
-			o_wf_ram_dma_addr_6 = self.wf_sdram_6.sink.address,
-			i_wf_ram_word_6 = self.wf_sdram_6.source.data,
-			o_wf_ram_read_6 = self.wf_sdram_6.sink.valid,
-			i_wf_ram_valid_6 = self.wf_sdram_6.source.valid,
-
-			# dac_7
-			i_dac_sel_7 = self.dac_sel_7.storage,
-			o_dac_finished_7 = self.dac_finished_7.status,
-			i_dac_arm_7 = self.dac_arm_7.storage,
-			o_from_dac_7 = self.from_dac_7.status,
-			i_to_dac_7 = self.to_dac_7.storage,
-
-			i_wf_arm_7 = self.wf_arm_7.storage,
-			i_wf_time_to_wait_7 = self.wf_time_to_wait_7.storage,
-			i_wf_refresh_start_7 = self.wf_refresh_start_7.storage,
-			o_wf_refresh_finished_7 = self.wf_refresh_finished_7.status,
-			o_wf_start_addr_7 = self.wf_start_addr_7.storage,
-
-			o_wf_ram_dma_addr_7 = self.wf_sdram_7.sink.address,
-			i_wf_ram_word_7 = self.wf_sdram_7.source.data,
-			o_wf_ram_read_7 = self.wf_sdram_7.sink.valid,
-			i_wf_ram_valid_7 = self.wf_sdram_7.source.valid,
-
-			i_adc_sel_0 = self.adc_sel_0.storage,
-
-			# adc_0
-			o_adc_finished_0 = self.adc_finished_0.status,
-			i_adc_arm_0 = self.adc_arm_0.storage,
-			o_from_adc_0 = self.from_adc_0.status,
-
-			# adc_1
-			o_adc_finished_1 = self.adc_finished_1.status,
-			i_adc_arm_1 = self.adc_arm_1.storage,
-			o_from_adc_1 = self.from_adc_1.status,
-
-			# adc_2
-			o_adc_finished_2 = self.adc_finished_2.status,
-			i_adc_arm_2 = self.adc_arm_2.storage,
-			o_from_adc_2 = self.from_adc_2.status,
-
-			# adc_3
-			o_adc_finished_3 = self.adc_finished_3.status,
-			i_adc_arm_3 = self.adc_arm_3.storage,
-			o_from_adc_3 = self.from_adc_3.status,
-
-			# adc_4
-			o_adc_finished_4 = self.adc_finished_4.status,
-			i_adc_arm_4 = self.adc_arm_4.storage,
-			o_from_adc_4 = self.from_adc_4.status,
-
-			# adc_5
-			o_adc_finished_5 = self.adc_finished_5.status,
-			i_adc_arm_5 = self.adc_arm_5.storage,
-			o_from_adc_5 = self.from_adc_5.status,
-
-			# adc_6
-			o_adc_finished_6 = self.adc_finished_6.status,
-			i_adc_arm_6 = self.adc_arm_6.storage,
-			o_from_adc_6 = self.from_adc_6.status,
-
-			# adc_7
-			o_adc_finished_7 = self.adc_finished_7.status,
-			i_adc_arm_7 = self.adc_arm_7.storage,
-			o_from_adc_7 = self.from_adc_7.status,
-
-			o_cl_in_loop = self.cl_in_loop.status,
-			i_cl_cmd = self.cl_cmd.storage,
-			i_cl_word_in = self.cl_word_in.storage,
-			o_cl_word_out = self.cl_word_out.status,
-			i_cl_start_cmd = self.cl_start_cmd.storage,
-			o_cl_finish_cmd = self.cl_finish_cmd.status
-		)
+		self.specials += Instance("base", **kwargs)
 
 # Clock and Reset Generator
 class _CRG(Module):
