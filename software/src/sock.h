@@ -13,7 +13,7 @@ int server_accept_client(int server);
 /* Read data into buffer. Returns false if error occurs. This is
  * raw binary (no NUL termination).
  */
-bool sock_read_buf(int sock, struct bufptr *bp);
+bool sock_read_buf(int sock, struct bufptr *bp, bool entire);
 
 /* Write raw buffer data into socket. This data is raw binary and
  * does not have to be NUL terminated.

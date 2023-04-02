@@ -48,8 +48,8 @@ server_accept_client(int server)
 	struct sockaddr_in addr;
 	socklen_t len = sizeof(addr);
 
-	/* Accept clients in a loop. This is halting so other threads will
-	 * be able to process clients.
+	/* Accept clients in a loop. This should block when there are no clients
+	 * so other threads can run.
 	 */
 	do {
 		client = zsock_accept(server, (struct sockaddr *)&addr, &len);
@@ -64,23 +64,20 @@ server_accept_client(int server)
 }
 
 bool
-sock_read_buf(int sock, struct bufptr *bp)
+sock_read_buf(int sock, struct bufptr *bp, bool entire)
 {
 	if (bp->left < 2)
 		return false;
 
-	ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
-	if (l < 0)
-		return false;
+	do {
+		ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
+		if (l < 0)
+			return false;
 
-	bp->left -= l;
-	bp->p += l;
-	if (bp->left == 0) {
-		LOG_ERR("internal out of bounds error in %s", __func__);
-		k_fatal_halt(K_ERR_KERNEL_PANIC);
-	}
+		bp->left -= l;
+		bp->p += l;
+	} while (entire && bp->left > 0);
 
-	*bp->p = 0;
 	return true;
 }
 
