@@ -67,20 +67,41 @@ int main(int argc, char *argv[]) {
 	tb->mod.rdy = 1;
 	tb->refresh_data();
 	tb->mod.time_to_wait = 10;
+	tb->mod.halt_on_finish = 1;
 	tb->mod.arm = 1;
 
 	do {
 		tb->run_clock();
 	} while (!tb->mod.refresh_finished);
 
+	printf("first run\n");
+	do {
+		tb->run_clock();
+	} while (!tb->mod.waveform_finished);
+	printf("waveform finished\n");
+
+	tb->mod.halt_on_finish = 0;
+	tb->mod.arm = 0;
+	tb->run_clock();
+	tb->mod.arm = 1;
 	tb->mod.halt_on_finish = 1;
+
+	printf("second run\n");
 	do {
 		tb->run_clock();
 	} while (!tb->mod.waveform_finished);
 
+	tb->mod.rdy = 0;
 	tb->mod.halt_on_finish = 0;
-	tb->run_clock();
+	tb->mod.refresh_start = 1;
+	do {
+		tb->run_clock();
+	} while (!tb->mod.refresh_finished);
+
+	tb->mod.rdy = 1;
 	tb->mod.halt_on_finish = 1;
+
+	printf("third run\n");
 	do {
 		tb->run_clock();
 	} while (!tb->mod.waveform_finished);

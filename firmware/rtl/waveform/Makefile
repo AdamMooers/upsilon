@@ -1,5 +1,7 @@
 # Makefile for tests and hardware verification.
 
+include ../common.makefile
+
 .PHONY: test clean codegen
 
 all: test codegen

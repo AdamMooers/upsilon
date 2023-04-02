@@ -24,6 +24,7 @@ module waveform_sim #(
 	input arm,
 	input halt_on_finish,
 	output waveform_finished,
+	output running,
 	input [TIMER_WID-1:0] time_to_wait,
 
 	/* User interface */
@@ -101,6 +102,7 @@ waveform #(
 	.clk(clk),
 	.arm(arm),
 	.halt_on_finish(halt_on_finish),
+	.running(running),
 	.finished(waveform_finished),
 	.time_to_wait(time_to_wait),
 
