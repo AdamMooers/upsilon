@@ -21,6 +21,7 @@ module waveform #(
 	input arm,
 	input halt_on_finish,
 	output reg finished,
+	output running,
 	input [TIMER_WID-1:0] time_to_wait,
 
 	/* User interface */
@@ -98,9 +99,12 @@ localparam WAIT_ON_ARM = 0;
 localparam DO_WAIT = 1;
 localparam RECV_WORD = 2;
 localparam WAIT_ON_DAC = 3;
-reg [1:0] state = WAIT_ON_ARM;
+localparam WAIT_ON_DISARM = 4;
+reg [2:0] state = WAIT_ON_ARM;
 
 reg [TIMER_WID-1:0] wait_timer = 0;
+
+assign running = state != WAIT_ON_ARM;
 
 always @ (posedge clk) case (state)
 WAIT_ON_ARM: begin
@@ -121,26 +125,42 @@ end else if (wait_timer == 0) begin
 end else begin
 	wait_timer <= wait_timer - 1;
 end
-RECV_WORD: if (word_ok) begin
-	dac_out <= {4'b0001, word};
-	dac_arm <= 1;
-
-	word_next <= 0;
-	state <= WAIT_ON_DAC;
-end
-WAIT_ON_DAC: if (dac_finished) begin
-	dac_arm <= 0;
-	/* Was the last word read *the* last word? */
-	if (word_last) begin
-		if (!halt_on_finish) begin
-			state <= WAIT_ON_ARM;
-			finished <= 0;
-		end else begin
-			finished <= 1;
-		end
-	end else begin
-		state <= DO_WAIT;
+RECV_WORD: begin
+`ifdef VERILATOR
+	if (!word_next) begin
+		$error("RECV_WORD: word_next not asserted means hang");
 	end
+`endif
+
+	if (word_ok) begin
+		dac_out <= {4'b0001, word};
+		dac_arm <= 1;
+
+		word_next <= 0;
+		state <= WAIT_ON_DAC;
+	end
+end
+WAIT_ON_DAC: begin
+`ifdef VERILATOR
+	if (!dac_arm) begin
+		$error("WAIT_ON_DAC: dac_arm not asserted means hang");
+	end
+`endif
+
+	if (dac_finished) begin
+		dac_arm <= 0;
+		/* Was the last word read *the* last word? */
+		if (word_last && halt_on_finish) begin
+			state <= WAIT_ON_DISARM;
+			finished <= 1;
+		end else begin
+			state <= DO_WAIT;
+			wait_timer <= time_to_wait;
+		end
+	end
+end
+WAIT_ON_DISARM: if (!arm) begin
+	state <= WAIT_ON_ARM;
 end
 endcase
 
