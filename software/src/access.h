@@ -27,10 +27,5 @@ int waveform_disarm(int slot);
  */
 void access_release_thread(void);
 
-/* Initialize thread local data, which might be non-zero due
- * to reusing threads.
- */
-void access_thread_init(void);
-
 /* Called once on initializion. */
 int access_init(void);

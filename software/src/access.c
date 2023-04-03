@@ -10,8 +10,11 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include "converters.h"
 #include "pin_io.h"
+
+LOG_MODULE_REGISTER(access);
 
 static inline uint32_t
 sign_extend(uint32_t in, unsigned len)
@@ -325,30 +328,39 @@ waveform_disarm(int slot)
 void
 access_release_thread(void)
 {
-	while (cloop_release() == 0);
+	while (cloop_release() == 0)
+		cloop_locked--;
+	if (cloop_locked != 0) {
+		LOG_WRN("cloop mutex counter mismatch");
+		cloop_locked = 0;
+	}
 
-	for (int i = 0; i < DAC_NUM; i++) {
+	for (int i = 0; i < DAC_MAX; i++) {
 		while (dac_release(i) == 0);
-		while (waveform_release(i) == 0);
+			dac_locked[i]--;
+		if (dac_locked[i] != 0) {
+			LOG_WRN("dac mutex %d counter mismatch", i);
+			dac_locked[i] = 0;
+		}
+
+		while (waveform_release(i) == 0)
+			waveform_locked[i]--;
+		if (waveform_locked[i] != 0) {
+			LOG_WRN("waveform mutex %d counter mismatch", i);
+			waveform_locked[i] = 0;
+		}
 	}
 
-	for (int i = 0; i < ADC_NUM; i++) {
-		while (adc_release(i) == 0);
-	}
-}
-
-void
-access_thread_init(void)
-{
-	cloop_locked = 0;
-
-	for (int i = 0; i < DAC_NUM; i++) {
-		dac_locked[i] = 0;
-		waveform_locked[i] = 0;
+	for (int i = 0; i < DAC_MAX; i++) {
 	}
 
-	for (int i = 0; i < ADC_NUM; i++) {
-		adc_locked[i] = 0;
+	for (int i = 0; i < ADC_MAX; i++) {
+		while (adc_release(i) == 0)
+			adc_locked[i]--;
+		if (adc_locked[i] != 0) {
+			LOG_WRN("adc mutex %d counter mismatch", i);
+			adc_locked[i] = 0;
+		}
 	}
 }
 
