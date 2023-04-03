@@ -50,6 +50,7 @@ if __name__ == "__main__":
 		("wf_arm", dac_num),
 		("wf_halt_on_finish", dac_num),
 		("wf_finished", dac_num),
+		("wf_running", dac_num),
 		("wf_time_to_wait", dac_num),
 		("wf_refresh_start", dac_num),
 		("wf_refresh_finished", dac_num),
