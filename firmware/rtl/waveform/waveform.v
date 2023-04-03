@@ -139,7 +139,7 @@ end else begin
 	wait_timer <= wait_timer - 1;
 end
 RECV_WORD: begin
-`ifdef VERILATOR
+`ifdef VERILATOR_SIMULATION
 	if (!word_next) begin
 		$error("RECV_WORD: word_next not asserted means hang");
 	end
@@ -154,7 +154,7 @@ RECV_WORD: begin
 	end
 end
 WAIT_ON_DAC: begin
-`ifdef VERILATOR
+`ifdef VERILATOR_SIMULATION
 	if (!dac_arm) begin
 		$error("WAIT_ON_DAC: dac_arm not asserted means hang");
 	end

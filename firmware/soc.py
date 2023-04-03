@@ -36,60 +36,64 @@ class Base(Module, AutoCSR):
 
 		for i in range(0,8):
 			setattr(self, f"dac_sel_{i}", CSRStorage(3, name=f"dac_sel_{i}"))
-			kwargs[f"dac_sel_{i}"] = getattr(self, f"dac_sel_{i}")
+			kwargs[f"i_dac_sel_{i}"] = getattr(self, f"dac_sel_{i}").storage
 
 			setattr(self, f"dac_finished_{i}", CSRStatus(1, name=f"dac_finished_{i}"))
-			kwargs[f"dac_finished_{i}"] = getattr(finishedf, f"dac_finished_{i}")
+			kwargs[f"o_dac_finished_{i}"] = getattr(self, f"dac_finished_{i}").status
 
 			setattr(self, f"dac_arm_{i}", CSRStorage(1, name=f"dac_arm_{i}"))
-			kwargs[f"dac_arm_{i}"] = getattr(armf, f"dac_arm_{i}")
+			kwargs[f"i_dac_arm_{i}"] = getattr(self, f"dac_arm_{i}").storage
 
 			setattr(self, f"from_dac_{i}", CSRStatus(24, name=f"from_dac_{i}"))
-			kwargs[f"from_dac_{i}"] = getattr(armf, f"from_dac_{i}")
+			kwargs[f"o_from_dac_{i}"] = getattr(self, f"from_dac_{i}").status
 
 			setattr(self, f"to_dac_{i}", CSRStorage(24, name=f"to_dac_{i}"))
-			kwargs[f"to_dac_{i}"] = getattr(armf, f"to_dac_{i}")
+			kwargs[f"i_to_dac_{i}"] = getattr(self, f"to_dac_{i}").storage
 
 			setattr(self, f"wf_arm_{i}", CSRStorage(1, name=f"wf_arm_{i}"))
-			kwargs[f"wf_arm_{i}"] = getattr(armf, f"wf_arm_{i}")
+			kwargs[f"i_wf_arm_{i}"] = getattr(self, f"wf_arm_{i}").storage
 
 			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1, name=f"wf_halt_on_finish_{i}")),
-			kwargs[f"wf_halt_on_finish_{i}"] = getattr(armf, f"wf_halt_on_finish_{i}")
+			kwargs[f"i_wf_halt_on_finish_{i}"] = getattr(self, f"wf_halt_on_finish_{i}").storage
 
 			setattr(self, f"wf_finished_{i}", CSRStatus(1, name=f"wf_finished_{i}")),
-			kwargs[f"wf_finished_{i}"] = getattr(armf, f"wf_finished_{i}")
+			kwargs[f"o_wf_finished_{i}"] = getattr(self, f"wf_finished_{i}").status
 
 			setattr(self, f"wf_running_{i}", CSRStatus(1, name=f"wf_running_{i}")),
-			kwargs[f"wf_running_{i}"] = getattr(armf, f"wf_running_{i}")
+			kwargs[f"o_wf_running_{i}"] = getattr(self, f"wf_running_{i}").status
 
 			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16, name=f"wf_time_to_wait_{i}"))
-			kwargs[f"wf_time_to_wait_{i}"] = getattr(armf, f"wf_time_to_wait_{i}")
+			kwargs[f"i_wf_time_to_wait_{i}"] = getattr(self, f"wf_time_to_wait_{i}").storage
 
 			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1, name=f"wf_refresh_start_{i}"))
-			kwargs[f"wf_refresh_start_{i}"] = getattr(armf, f"wf_refresh_start_{i}")
+			kwargs[f"i_wf_refresh_start_{i}"] = getattr(self, f"wf_refresh_start_{i}").storage
 
 			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1, name=f"wf_refresh_finished_{i}"))
-			kwargs[f"wf_refresh_finished_{i}"] = getattr(armf, f"wf_refresh_finished_{i}")
+			kwargs[f"o_wf_refresh_finished_{i}"] = getattr(self, f"wf_refresh_finished_{i}").status
 
 			setattr(self, f"wf_start_addr_{i}", CSRStorage(32, name=f"wf_start_addr_{i}"))
-			kwargs[f"wf_start_addr_{i}"] = getattr(armf, f"wf_start_addr_{i}")
+			kwargs[f"i_wf_start_addr_{i}"] = getattr(self, f"wf_start_addr_{i}").storage
 
 			port = sdram.crossbar.get_port()
 
 			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
-			kwargs[f"wf_sdram_{i}"] = getattr(armf, f"wf_sdram_{i}")
+			cur_sdram = getattr(self, f"wf_sdram_{i}")
+			kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
+			kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
+			kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
+			kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
 
 			setattr(self, f"adc_finished_{i}", CSRStatus(1, name=f"adc_finished_{i}"))
-			kwargs[f"adc_finished_{i}"] = getattr(armf, f"adc_finished_{i}")
+			kwargs[f"o_adc_finished_{i}"] = getattr(self, f"adc_finished_{i}").status
 
 			setattr(self, f"adc_arm_{i}", CSRStorage(1, name=f"adc_arm_{i}"))
-			kwargs[f"adc_arm_{i}"] = getattr(armf, f"adc_arm_{i}")
+			kwargs[f"i_adc_arm_{i}"] = getattr(self, f"adc_arm_{i}").storage
 
 			setattr(self, f"from_adc_{i}", CSRStatus(32, name=f"from_adc_{i}"))
-			kwargs[f"from_adc_{i}"] = getattr(armf, f"from_adc_{i}")
+			kwargs[f"o_from_adc_{i}"] = getattr(self, f"from_adc_{i}").status
 
 		self.adc_sel_0 = CSRStorage(2)
-		kwargs["adc_sel_0"] = self.adc_sel_0
+		kwargs["i_adc_sel_0"] = self.adc_sel_0.storage
 		self.cl_in_loop = CSRStatus(1)
 		kwargs["o_cl_in_loop"] = self.cl_in_loop.status
 		self.cl_cmd = CSRStorage(64)
