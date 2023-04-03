@@ -10,15 +10,16 @@ int server_init_sock(int port);
  */
 int server_accept_client(int server);
 
-/* Read data into buffer. Returns false if error occurs. This is
+/* Read data into buffer. Returns 0 if buffer is filled. This is
  * raw binary (no NUL termination).
  */
-bool sock_read_buf(int sock, struct bufptr *bp, bool entire);
+int sock_read_buf(int sock, struct bufptr *bp, bool entire);
 
 /* Write raw buffer data into socket. This data is raw binary and
- * does not have to be NUL terminated.
+ * does not have to be NUL terminated. Returns 0 when all data has
+ * been written.
  */
-bool sock_write_buf(int sock, struct bufptr *bp);
+int sock_write_buf(int sock, struct bufptr *bp);
 
 /* Write formatted string into socket. The user must provide a
  * buffer into which the formatted string is written. These return

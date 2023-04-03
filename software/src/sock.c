@@ -63,25 +63,22 @@ server_accept_client(int server)
 	return client;
 }
 
-bool
+int
 sock_read_buf(int sock, struct bufptr *bp, bool entire)
 {
-	if (bp->left < 2)
-		return false;
-
 	do {
 		ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
 		if (l < 0)
-			return false;
+			return -errno;
 
 		bp->left -= l;
 		bp->p += l;
 	} while (entire && bp->left > 0);
 
-	return true;
+	return 0;
 }
 
-bool
+int
 sock_write_buf(int sock, struct bufptr *bp)
 {
 	/* Since send may not send all data in the buffer at once,
@@ -90,12 +87,12 @@ sock_write_buf(int sock, struct bufptr *bp)
 	while (bp->left) {
 		ssize_t l = zsock_send(sock, bp->p, bp->left, 0);
 		if (l < 0)
-			return false;
+			return -errno;
 		bp->p += l;
 		bp->left -= l;
 	}
 
-	return true;
+	return 0;
 }
 
 int
