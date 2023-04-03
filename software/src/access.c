@@ -11,7 +11,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include "converters.h"
+#include "access.h"
 #include "pin_io.h"
 
 LOG_MODULE_REGISTER(access);
@@ -244,6 +244,16 @@ waveform_take(int waveform, k_timeout_t timeout)
 	return e;
 }
 
+static void
+waveform_disarm_wait(int wf)
+{
+	*wf_arm[wf] = 0;
+	if (*wf_running[wf]) {
+		k_sleep(K_NSEC(10* *wf_time_to_wait[wf]);
+		while (*wf_running[wf]);
+	}
+}
+
 int
 waveform_release(int waveform)
 {
@@ -251,8 +261,7 @@ waveform_release(int waveform)
 		return -EFAULT;
 
 	if (waveform_locked[waveform] == 1) {
-		*wf_arm[waveform] = 0;
-		while (*wf_running[waveform]);
+		waveform_disarm_wait(waveform);
 	}
 
 	int e k_mutex_unlock(waveform_mutex + waveform);
@@ -295,6 +304,12 @@ waveform_load(uint32_t buf[MAX_WL_SIZE], int slot, k_timeout_t timeout)
 }
 
 int
+waveform_halt_until_finished(int slot)
+{
+	// stub
+}
+
+int
 waveform_arm(int slot, bool halt_on_finish, uint32_t wait, k_timeout_t timeout)
 {
 	if (waveform_take(slot, timeout) != 0)
@@ -314,8 +329,7 @@ waveform_arm(int slot, bool halt_on_finish, uint32_t wait, k_timeout_t timeout)
 int
 waveform_disarm(int slot)
 {
-	*wf_arm[slot] = 0;
-	while (*wf_running[slot]);
+	waveform_disarm_wait(slot);
 	waveform_release(slot);
 	dac_release(slot);
 	return 1;
@@ -331,7 +345,7 @@ access_release_thread(void)
 	while (cloop_release() == 0)
 		cloop_locked--;
 	if (cloop_locked != 0) {
-		LOG_WRN("cloop mutex counter mismatch");
+		LOG_WRN("%s: cloop mutex counter mismatch", get_thread_name());
 		cloop_locked = 0;
 	}
 
@@ -339,14 +353,14 @@ access_release_thread(void)
 		while (dac_release(i) == 0);
 			dac_locked[i]--;
 		if (dac_locked[i] != 0) {
-			LOG_WRN("dac mutex %d counter mismatch", i);
+			LOG_WRN("%s: dac mutex %d counter mismatch", get_thread_name(), i);
 			dac_locked[i] = 0;
 		}
 
 		while (waveform_release(i) == 0)
 			waveform_locked[i]--;
 		if (waveform_locked[i] != 0) {
-			LOG_WRN("waveform mutex %d counter mismatch", i);
+			LOG_WRN("%s: waveform mutex %d counter mismatch", get_thread_name(), i);
 			waveform_locked[i] = 0;
 		}
 	}
@@ -358,7 +372,7 @@ access_release_thread(void)
 		while (adc_release(i) == 0)
 			adc_locked[i]--;
 		if (adc_locked[i] != 0) {
-			LOG_WRN("adc mutex %d counter mismatch", i);
+			LOG_WRN("%s: adc mutex %d counter mismatch", get_thread_name(), i);
 			adc_locked[i] = 0;
 		}
 	}

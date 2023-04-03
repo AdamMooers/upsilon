@@ -1,5 +1,6 @@
 /* Write a waveform to a DAC. */
-/* TODO: Add reset pin. */
+/* TODO: Add reset pin.
+ *       Add "how many values to go" counter. */
 module waveform #(
 	parameter DAC_WID = 24,
 	parameter DAC_WID_SIZ = 5,
@@ -20,6 +21,18 @@ module waveform #(
 	input clk,
 	input arm,
 	input halt_on_finish,
+	/* NOTE:
+	 * finished is used when a module wants to wait for a
+	 * waveform with the halt_on_finish flag finishes
+	 * one waveform.
+	 *
+	 * running is used when a module wants to know when
+	 * the waveform module has finished running after
+	 * deasserting arm.
+	 *
+	 * When in doubt, deassert arm and wait for running
+	 * to be deasserted.
+	 */
 	output reg finished,
 	output running,
 	input [TIMER_WID-1:0] time_to_wait,
