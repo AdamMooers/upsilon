@@ -58,6 +58,18 @@ static const char *const run_ret_str[CREOLE_RUN_RET_LEN] = {
 	[CREOLE_JUMP_OVERFLOW] = "jump overflow"
 };
 
+static int
+hup(int sock)
+{
+	struct zsock_pollfd fd = {
+		.fd = sock,
+		.events = POLLHUP,
+		.revents = 0
+	};
+
+	return zsock_pollfd(&fd, 1, 0);
+}
+
 static void
 exec_creole(unsigned char *buf, int size, int sock)
 {#define DATLEN 64
@@ -104,6 +116,11 @@ exec_creole(unsigned char *buf, int size, int sock)
 			        creole_run_ret[e]);
 			return;
 		}
+
+		if (hup(sock) != 0) {
+			LOG_WRN("%s: hangup", get_thread_name());
+			return;
+		}
 	}
 }
 
@@ -115,8 +132,8 @@ exec_entry(void *client_p, void *threadnum_p,
 	intptr_t threadnum = threadnum_p;
 	int size = read_size(client);
 
-	const char thread_name[32];
-	vsnprintk(thread_name, sizeof(thread_name), "%d", client);
+	const char thread_name[64];
+	vsnprintk(thread_name, sizeof(thread_name), "%d:%d", client, threadnum);
 	k_thread_name_set(k_current_get(), thread_name);
 
 	LOG_INF("%s: Connection initiated", thread_name);
