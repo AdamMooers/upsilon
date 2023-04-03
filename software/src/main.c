@@ -31,10 +31,36 @@ read_size(int s)
 	return (unsigned char)buf[0] | (unsigned char) buf[1] << 8;
 }
 
+static const char *const compiler_ret_str[CREOLE_COMPILER_RET_LEN] = {
+	[CREOLE_COMPILE_OK] = "compile ok",
+	[CREOLE_OPCODE_READ_ERROR] = "opcode read error",
+	[CREOLE_OPCODE_MALFORMED] = "opcode malformed",
+	[CREOLE_ARG_READ_ERROR] = "arg read error",
+	[CREOLE_ARG_MALFORMED] = "arg malformed",
+	[CREOLE_LAST_READ_ERROR] = "last read error",
+	[CREOLE_LAST_MALFORMED] = "last malformed",
+	[CREOLE_DATA_OVERFLOW] = "data overflow",
+	[CREOLE_TYPE_ERROR] = "type error",
+	[CREOLE_PROGRAM_OVERFLOW] = "program overflow"
+}
+
+static const char *const run_ret_str[CREOLE_RUN_RET_LEN] = {
+	[CREOLE_STEP_CONTINUE] = "continue",
+	[CREOLE_STEP_SYSCALL] = "syscall",
+	[CREOLE_STEP_STOP] = "stop",
+	[CREOLE_STACK_OVERFLOW] = "overflow",
+	[CREOLE_STACK_UNDERFLOW] = "underflow",
+	[CREOLE_RUN_DECODE_ERROR] = "decode error",
+	[CREOLE_REGISTER_OVERFLOW] = "register overflow",
+	[CREOLE_STEP_UNKNOWN_OPCODE] = "unknown opcode",
+	[CREOLE_DIV_BY_ZERO] = "div by zero",
+	[CREOLE_STEP_HIGH_BIT_MALFORMED] = "high bit malformed",
+	[CREOLE_JUMP_OVERFLOW] = "jump overflow"
+};
+
 static void
 exec_creole(unsigned char *buf, int size, int sock)
-{
-#define DATLEN 64
+{#define DATLEN 64
 	struct creole_reader dats[DATSLEN];
 #define REGLEN 32
 	creole_word reg[REGLEN];
@@ -54,6 +80,31 @@ exec_creole(unsigned char *buf, int size, int sock)
 		.sock = sock
 	};
 
+	int e = creole_compile(&env);
+	if (e != CREOLE_COMPILE_OK) {
+		LOG_WRN("%s: compile: %s at %zu", get_thread_name(),
+		        compiler_ret_str[e],
+		        (env.r_start.left - env.r_current.left));
+		return;
+	}
+
+	for (;;) {
+		creole_word sc;
+		e = creole_step(&env, &sc);
+		switch (e) {
+		case CREOLE_STEP_CONTINUE:
+			continue;
+		case CREOLE_STEP_SYSCALL:
+			LOG_WRN("%s: syscall unsupported", get_thread_name());
+			continue;
+		case CREOLE_STEP_STOP:
+			return;
+		default:
+			LOG_WRN("%s: run: %s", get_thread_name(),
+			        creole_run_ret[e]);
+			return;
+		}
+	}
 }
 
 static void
