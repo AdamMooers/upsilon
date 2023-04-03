@@ -203,6 +203,102 @@ to use LiteScope to write and read values from the module. For more
 information, you can look at
 [the boothmul test](https://software.mcgoron.com/peter/boothmul/src/branch/master/arty_test).
 
+# Software Programming
+
+The "software" is the code written in C that runs on the FPGA. This
+handles access to hardware components, running scripts sent by the
+controlling computer, and sending information between the hardware and
+the controlling computer.
+
+## Crash Course in Multithreaded Programming
+
+Each script (up to 32 by default, change by redefining a macro) runs in
+a separate thread. This allows for multiple scripts to execute without
+having to explicitly hand control from one component to another, but
+since there is no defined execution path (one thread may execute before
+or after another thread), the program must handle scripts attempting to
+access the same component.
+
+Upsilon handles multiple threads using
+
+1. Mutexes
+2. Thread Local Storage
+
+Mutexes ("mutual exclusion") are objects that only allow for one thread
+to access them at a time. When one thread locks a mutex, other threads
+attempting to lock the mutex sleep until the thread unlocks the mutex.
+After the thread that locked the mutex unlocks it, some other thread gets
+the mutex.
+
+Mutex management is important because if multiple threads attempt to
+read or write to a converter at the same time, the scripts could deadlock,
+requiring a hard reset of the system. (You could add manual deadlock
+aborting by adding new commands that call `k_thread_abort`, as long as
+all threads are not deadlocked. This is a hack but may be necessary.)
+
+Each thread can lock the mutex as many times as it wants, but it must
+unlock the mutex the same number of times. Thread local storage (the
+`__thread` modifier) is used to count the number of times that each mutex
+is locked by a thread. Since (as the name implies) TLS is thread-local,
+there is no need to control access to it by mutexes: each thread gets
+its own local version of the thread local variables.
+
+The software has to count the number of recursive locks because when
+the thread finally releases control of the mutex, another thread must
+be able to access the hardware in a well defined state: it should not
+attempt to write to hardware while the hardware is running (certain
+specific exceptions apply). When the unlock routines (see for example
+`waveform_release()`) reach the final unlock
+(e.g. `waveform_locked[i] == 1`), the software waits for the hardware
+to finish what its doing before unlocking.
+
+## Crash Course in Network Programming
+
+The kernel communicates with the controlling computer using a TCP/IP
+connection. You should connect the controller and the computer to a
+router and assign the kernel a static IP.
+
+Each script that runs on the kernel is a separate connection. Each
+connection runs on a separate thread, because each thread runs a Creole
+interpreter.
+
+## Logging
+
+Logging is done via UART. Connect the micro-USB slot to the controlling
+computer to get debug output.
+
+# Controlling Computer
+
+## Creole
+
+Creole is the bytecode that the kernel runs. It is written using a
+python library. It looks very similar to assembly, but is custom built
+to make it easier to write direct assembly code.
+
+Creole programs are the scripts run by the kernel to communicate with
+hardware and send messages over Ethernet to the controlling computer.
+Each creole program should do one thing: i.e. monitor an ADC, run
+the raster scan, output waveforms, etc.
+
+Creole programs should reserve the hardware modules (DAC, ADC, CLOOP,
+waveforms) that they use explicitly. This makes your program faster
+and less error prone.
+
+Since the Creole assembler is a python library, you can use things
+like Python format strings to automate production of Creole code. You
+can also add virtual instructions (by directly modifying the library)
+easily.
+
+Creole has a concept of data blocks, assigned using the `DB` command.
+These blocks are used for waveforms and for printing sets of data out
+to the datastream.
+
+Creole uses a [self-synchronizing code][ssc] to detect encoding and
+transmission errors. This makes programs bigger, but you should not
+write big Creole programs.
+
+[ssc]: https://en.wikipedia.org/wiki/Self-synchronizing_code
+
 # Hacks and Pitfalls
 
 The open source toolchain that Upsilon uses is novel and unstable.
