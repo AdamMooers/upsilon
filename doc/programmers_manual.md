@@ -11,6 +11,32 @@ You do not need to read and digest the entire manual in sequence. Many
 things will seem confusing and counterintuitive, and will require some time
 to properly understand.
 
+# Required Knowledge
+
+Verilog is critical for writing hardware. You should hopefully not have
+to write much of it.
+
+The kernel is written in C. This C is different than C you have written
+before because it is running "freestanding."
+
+The kernel uses Zephyr as the real-time operating system running the
+code. Zephyr has very good documentation and a very readable code base,
+go read it.
+
+Tests are written in C++ and verilog. You will not have to write C++
+unless you modify the Verilog files.
+
+The macro processing language GNU m4 is used occasionally. You will
+need to know how to use m4 if you modify the main `base.v.m4` file
+(e.g. adding more software-accessable ports).
+
+Python is used for the bytecode assembler, the bytecode itself, and
+the SoC generator. The SoC generator uses a library called LiteX,
+which in turn uses migen.
+You do not need to know a lot about migen, but LiteX's documentation
+is poor so you will need to know some migen in order to read the
+code and understand how some modules work.
+
 # FPGA Concepts
 
 Upsilon runs on a Field Programmable Gate Array (FPGA). FPGAs are sets
