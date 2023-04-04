@@ -1,16 +1,21 @@
 #pragma once
 #include <zephyr/kernel.h>
+#include "creole.h"
 
-
+int dac_take(int dac, k_timeout_t timeout);
 int dac_release(int dac);
 int dac_read_write(int dac, creole_word send, k_timeout_t timeout,
                    creole_word *recv);
 
-int adc_take(int adc, int timeout);
+int adc_take(int adc, k_timeout_t timeout);
 int adc_release(int adc);
-int adc_read(int adc, int timeout, creole_word *wrd);
+int adc_read(int adc, k_timeout_t timeout, creole_word *wrd);
 
 int cloop_take(k_timeout_t timeout);
+int cloop_read(int code, uint32_t *high_reg, uint32_t *low_reg,
+               k_timeout_t timeout);
+int cloop_write(int code, uint32_t high_val, uint32_t low_val,
+                k_timeout_t timeout);
 int cloop_release(void);
 
 int waveform_take(int waveform, k_timeout_t timeout);
@@ -28,4 +33,4 @@ int waveform_disarm(int slot);
 void access_release_thread(void);
 
 /* Called once on initializion. */
-int access_init(void);
+void access_init(void);

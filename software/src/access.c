@@ -11,8 +11,10 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include "upsilon.h"
 #include "access.h"
 #include "pin_io.h"
+#include "control_loop_cmds.h"
 
 LOG_MODULE_REGISTER(access);
 
@@ -31,7 +33,7 @@ sign_extend(uint32_t in, unsigned len)
  * DAC
  *********************/
 
-static struct k_mutex_t dac_mutex[DAC_MAX];
+static struct k_mutex dac_mutex[DAC_MAX];
 static __thread int dac_locked[DAC_MAX];
 
 int
@@ -74,7 +76,7 @@ dac_read_write(int dac, creole_word send, k_timeout_t timeout,
 		return e;
 
 	*to_dac[dac] = send;
-	*dac_arm[adc] = 1;
+	*dac_arm[dac] = 1;
 
 	/* Recursive locks should busy wait. */
 	/* 10ns * (2 * 10 cycles per half DAC cycle)
@@ -96,11 +98,11 @@ dac_read_write(int dac, creole_word send, k_timeout_t timeout,
  * adc read
  *********************/
 
-static struct k_mutex_t adc_mutex[ADC_MAX];
+static struct k_mutex adc_mutex[ADC_MAX];
 static __thread int adc_locked[ADC_MAX];
 
 int
-adc_take(int adc, int timeout)
+adc_take(int adc, k_timeout_t timeout)
 {
 	if (adc < 0 || adc >= ADC_MAX)
 		return -EFAULT;
@@ -131,7 +133,7 @@ adc_release(int adc)
 }
 
 int
-adc_read(int adc, int timeout, creole_word *wrd)
+adc_read(int adc, k_timeout_t timeout, creole_word *wrd)
 {
 	int e;
 	if ((e = adc_take(adc, timeout)) != 0)
@@ -144,7 +146,7 @@ adc_read(int adc, int timeout, creole_word *wrd)
 		k_sleep(K_NSEC(550 + 24*2*10*10));
 	while (!*adc_finished[adc]);
 
-	*wrd = sign_extend(*from_adc[adc]);
+	*wrd = sign_extend(*from_adc[adc], 20);
 	*adc_arm[adc] = 0;
 
 	adc_release(adc);
@@ -155,8 +157,8 @@ adc_read(int adc, int timeout, creole_word *wrd)
  * Control loop
  *******/
 
-static struct k_mutex_t cloop_mutex;
-static __thread cloop_locked;
+static struct k_mutex cloop_mutex;
+static __thread int cloop_locked;
 
 int
 cloop_take(k_timeout_t timeout)
@@ -206,7 +208,7 @@ cloop_read(int code, uint32_t *high_reg, uint32_t *low_reg,
 }
 
 int
-cloop_write(int code, uint32_t high_reg, uint32_t low_reg,
+cloop_write(int code, uint32_t high_val, uint32_t low_val,
             k_timeout_t timeout)
 {
 	if (cloop_take(timeout) != 0)
@@ -228,7 +230,7 @@ cloop_write(int code, uint32_t high_reg, uint32_t low_reg,
  * Waveforms
  ***********/
 
-static struct k_mutex_t waveform_mutex[DAC_MAX];
+static struct k_mutex waveform_mutex[DAC_MAX];
 static __thread int waveform_locked[DAC_MAX];
 
 int
@@ -249,7 +251,7 @@ waveform_disarm_wait(int wf)
 {
 	*wf_arm[wf] = 0;
 	if (*wf_running[wf]) {
-		k_sleep(K_NSEC(10* *wf_time_to_wait[wf]);
+		k_sleep(K_NSEC(10* *wf_time_to_wait[wf]));
 		while (*wf_running[wf]);
 	}
 }
@@ -264,10 +266,11 @@ waveform_release(int waveform)
 		waveform_disarm_wait(waveform);
 	}
 
-	int e k_mutex_unlock(waveform_mutex + waveform);
+	int e = k_mutex_unlock(waveform_mutex + waveform);
 	if (e == 0) {
 		waveform_locked[e]--;
 	}
+	return e;
 }
 
 size_t
@@ -275,7 +278,7 @@ creole_to_array(const struct creole_reader *start, creole_word *buf, size_t bufl
 {
 	size_t i = 0;
 	struct creole_word w;
-	struct creole_reader r = start;
+	struct creole_reader r = *start;
 
 	while (creole_decode(&r, &w) && i < buflen) {
 		buf[i++] = w.word;
@@ -290,11 +293,7 @@ waveform_load(uint32_t buf[MAX_WL_SIZE], int slot, k_timeout_t timeout)
 	if (waveform_take(slot, timeout) != 0)
 		return 0;
 
-	if (load_into_array(env->dats[db], buf, ARRAY_SIZE(buf))
-	    != MAX_WL_SIZE)
-		goto ret;
-
-	*wf_start_addr[slot] = &buf;
+	*wf_start_addr[slot] = (uint32_t) buf;
 	*wf_refresh_start[slot] = 1;
 	while (!*wf_refresh_finished[slot]);
 	*wf_refresh_start[slot] = 0;
@@ -306,7 +305,9 @@ waveform_load(uint32_t buf[MAX_WL_SIZE], int slot, k_timeout_t timeout)
 int
 waveform_halt_until_finished(int slot)
 {
-	// stub
+	*wf_halt_on_finish[slot] = 1;
+	while (!*wf_finished[slot]);
+	return 1;
 }
 
 int
@@ -319,7 +320,7 @@ waveform_arm(int slot, bool halt_on_finish, uint32_t wait, k_timeout_t timeout)
 		return 0;
 	}
 
-	*wf_halt_on_finished[slot] = halt_on_finish;
+	*wf_halt_on_finish[slot] = halt_on_finish;
 	*wf_time_to_wait[slot] = wait;
 	*wf_arm[slot] = 1;
 
@@ -350,7 +351,7 @@ access_release_thread(void)
 	}
 
 	for (int i = 0; i < DAC_MAX; i++) {
-		while (dac_release(i) == 0);
+		while (dac_release(i) == 0)
 			dac_locked[i]--;
 		if (dac_locked[i] != 0) {
 			LOG_WRN("%s: dac mutex %d counter mismatch", get_thread_name(), i);
@@ -378,17 +379,17 @@ access_release_thread(void)
 	}
 }
 
-int
+void
 access_init(void)
 {
-	k_mutex_init(cloop_mutex);
+	k_mutex_init(&cloop_mutex);
 
-	for (int i = 0; i < DAC_NUM; i++) {
+	for (int i = 0; i < DAC_MAX; i++) {
 		k_mutex_init(dac_mutex + i);
 		k_mutex_init(waveform_mutex + i);
 	}
 
-	for (int i = 0; i < ADC_NUM; i++) {
+	for (int i = 0; i < ADC_MAX; i++) {
 		k_mutex_init(adc_mutex + i);
 	}
 }

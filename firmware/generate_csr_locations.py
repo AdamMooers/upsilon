@@ -13,7 +13,7 @@ class CSRGenerator:
 			regname = f"base_{name}"
 		else:
 			regname = f"base_{name}_{num}"
-		return self.j["csr_registers"][regname]["addr"]
+		return f'(csr_t) {self.j["csr_registers"][regname]["addr"]}'
 	def print(self, *args):
 		print(*args, end='', file=self.file)
 
@@ -22,7 +22,7 @@ class CSRGenerator:
 			self.print(f'csr_t {name} = {self.get_reg(name, None)};\n')
 		else:
 			self.print(f'csr_t {name}[{num}] = {{', self.get_reg(name, 0))
-			for i in range(0,num):
+			for i in range(1,num):
 				self.print(',', self.get_reg(name, i))
 			self.print('};\n\n')
 

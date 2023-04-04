@@ -17,7 +17,7 @@ static K_KERNEL_STACK_ARRAY_DEFINE(stacks, THREADNUM, THREAD_STACK_SIZ);
 
 #define READBUF_SIZ 0xFFFF
 static unsigned char readbuf[THREADNUM][READBUF_SIZ];
-static struct kthread_t threads[THREADNUM];
+static struct k_thread threads[THREADNUM];
 static bool thread_ever_used[THREADNUM];
 
 static int
@@ -31,7 +31,7 @@ read_size(int s)
 	return (unsigned char)buf[0] | (unsigned char) buf[1] << 8;
 }
 
-static const char *const compiler_ret_str[CREOLE_COMPILER_RET_LEN] = {
+static const char *const compiler_ret_str[CREOLE_COMPILE_RET_LEN] = {
 	[CREOLE_COMPILE_OK] = "compile ok",
 	[CREOLE_OPCODE_READ_ERROR] = "opcode read error",
 	[CREOLE_OPCODE_MALFORMED] = "opcode malformed",
@@ -42,7 +42,7 @@ static const char *const compiler_ret_str[CREOLE_COMPILER_RET_LEN] = {
 	[CREOLE_DATA_OVERFLOW] = "data overflow",
 	[CREOLE_TYPE_ERROR] = "type error",
 	[CREOLE_PROGRAM_OVERFLOW] = "program overflow"
-}
+};
 
 static const char *const run_ret_str[CREOLE_RUN_RET_LEN] = {
 	[CREOLE_STEP_CONTINUE] = "continue",
@@ -67,12 +67,13 @@ hup(int sock)
 		.revents = 0
 	};
 
-	return zsock_pollfd(&fd, 1, 0);
+	return zsock_poll(&fd, 1, 0);
 }
 
 static void
 exec_creole(unsigned char *buf, int size, int sock)
-{#define DATLEN 64
+{
+#define DATSLEN 64
 	struct creole_reader dats[DATSLEN];
 #define REGLEN 32
 	creole_word reg[REGLEN];
@@ -81,7 +82,7 @@ exec_creole(unsigned char *buf, int size, int sock)
 
 	struct creole_env env = {
 		.dats = dats,
-		.datlen = DATLEN,
+		.datlen = DATSLEN,
 		.reg = reg,
 		.reglen = REGLEN,
 		.stk = stk,
@@ -89,7 +90,7 @@ exec_creole(unsigned char *buf, int size, int sock)
 
 		.r_current = {buf, size},
 		.r_start = {buf, size},
-		.sock = sock
+		.fd = sock
 	};
 
 	int e = creole_compile(&env);
@@ -113,7 +114,7 @@ exec_creole(unsigned char *buf, int size, int sock)
 			return;
 		default:
 			LOG_WRN("%s: run: %s", get_thread_name(),
-			        creole_run_ret[e]);
+			        run_ret_str[e]);
 			return;
 		}
 
@@ -128,12 +129,12 @@ static void
 exec_entry(void *client_p, void *threadnum_p,
            void *unused __attribute__((unused)))
 {
-	intptr_t client = client_p;
-	intptr_t threadnum = threadnum_p;
+	intptr_t client = (intptr_t)client_p;
+	intptr_t threadnum = (intptr_t)threadnum_p;
 	int size = read_size(client);
 
-	const char thread_name[64];
-	vsnprintk(thread_name, sizeof(thread_name), "%d:%d", client, threadnum);
+	char thread_name[64];
+	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, client, threadnum);
 	k_thread_name_set(k_current_get(), thread_name);
 
 	LOG_INF("%s: Connection initiated", thread_name);
@@ -152,7 +153,7 @@ exec_entry(void *client_p, void *threadnum_p,
 		return;
 	}
 
-	exec_creole(size);
+	exec_creole(readbuf[threadnum], size, (int)client);
 	zsock_close(client);
 }
 
@@ -167,12 +168,12 @@ main_loop(int srvsock)
 
 		for (i = 0; i < THREADNUM; i++) {
 			if (!thread_ever_used[i]
-			    || k_thread_join(threads[i], 0) == 0) {
+			    || k_thread_join(&threads[i], K_NO_WAIT) == 0) {
 				connection_counter++;
-				k_thread_create(threads[i], stacks[i],
+				k_thread_create(&threads[i], stacks[i],
 				THREAD_STACK_SIZ, exec_entry,
-				(uintptr_t) client, (uintptr_t) i,
-				(uintptr_t) connection_counter,
+				(void*) client, (void*) i,
+				(void*) connection_counter,
 				1, 0, K_NO_WAIT);
 			}
 		}
@@ -189,7 +190,7 @@ void
 main(void)
 {
 	access_init();
-	k_thread_name_get(k_current_get(), "main thread");
+	k_thread_name_set(k_current_get(), "main thread");
 	for (;;) {
 		int sock = server_init_sock(6626);
 		main_loop(sock);
