@@ -18,6 +18,10 @@
 
 LOG_MODULE_REGISTER(access);
 
+/* The values from converters are not aligned to an 8-bit byte.
+ * These values are still in twos compliment and have to be
+ * manually sign-extended.
+ */
 static inline uint32_t
 sign_extend(uint32_t in, unsigned len)
 {
@@ -74,6 +78,7 @@ dac_read_write(int dac, creole_word send, k_timeout_t timeout,
 	int e = dac_take(dac, timeout);
 	if (e != 0)
 		return e;
+	dac_switch(dac, DAC_SPI_PORT, K_NO_WAIT);
 
 	*to_dac[dac] = send;
 	*dac_arm[dac] = 1;
@@ -89,6 +94,19 @@ dac_read_write(int dac, creole_word send, k_timeout_t timeout,
 	if (recv)
 		*recv = sign_extend(*from_dac[dac], 20);
 	*dac_arm[dac] = 0;
+
+	dac_release(dac);
+	return 0;
+}
+
+int
+dac_switch(int dac, int setting, k_timeout_t timeout)
+{
+	int e = dac_take(dac, timeout);
+	if (e != 0)
+		return e;
+
+	*dac_sel[dac] = setting;
 
 	dac_release(dac);
 	return 0;
@@ -133,12 +151,32 @@ adc_release(int adc)
 }
 
 int
+adc_switch(int adc, int setting, k_timeout_t timeout)
+{
+	/* As of now, only one ADC (the CLOOP adc) is used
+	 * by two modules at the same time.
+	 */
+	if (adc != 0)
+		return -ENOENT;
+
+	int e = adc_take(adc, timeout);
+	if (e != 0)
+		return e;
+
+	*adc_sel_0 = setting;
+
+	adc_release(adc);
+	return 0;
+}
+
+int
 adc_read(int adc, k_timeout_t timeout, creole_word *wrd)
 {
 	int e;
 	if ((e = adc_take(adc, timeout)) != 0)
 		return e;
 
+	adc_switch(adc, ADC_SPI_PORT, K_NO_WAIT);
 	*adc_arm[adc] = 1;
 
 	/* Recursive locks should busy wait. */
@@ -173,15 +211,10 @@ cloop_take(k_timeout_t timeout)
 int
 cloop_release(void)
 {
-	/* If being unlocked for the last time. */
-	if (cloop_locked == 1) {
-		*cl_cmd = CONTROL_LOOP_WRITE_BIT | CONTROL_LOOP_STATUS;
-		cl_word_out[0] = 0;
-		cl_word_out[1] = 0;
-		*cl_start_cmd = 1;
-		while (!*cl_finish_cmd);
-		*cl_start_cmd = 0;
-	}
+	/* Do not attempt to reset the CLOOP interface.
+	 * Other scripts will fight to modify the CLOOP constants
+	 * while the loop is still running.
+	 */
 	int e = k_mutex_unlock(&cloop_mutex);
 	if (e == 0) {
 		cloop_locked--;
@@ -319,6 +352,8 @@ waveform_arm(int slot, bool halt_on_finish, uint32_t wait, k_timeout_t timeout)
 		waveform_release(slot);
 		return 0;
 	}
+
+	dac_switch(slot, DAC_WF_PORT, K_NO_WAIT);
 
 	*wf_halt_on_finish[slot] = halt_on_finish;
 	*wf_time_to_wait[slot] = wait;

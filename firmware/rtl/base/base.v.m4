@@ -2,9 +2,22 @@ m4_changequote(`⟨', `⟩')
 m4_changecom(⟨/*⟩, ⟨*/⟩)
 m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
 m4_include(../control_loop/control_loop_cmds.m4)
+
+/* Since yosys only allows for standard Verilog (no system verilog),
+ * arrays (which would make everything much cleaner) cannot be used.
+ * A preprocessor is used instead, and M4 is used because it is much
+ * cleaner than the Verilog preprocessor (which is bad).
+ */
+
 /*********************************************************/
 /********************** M4 macros ************************/
 /*********************************************************/
+
+/* This macro is used in the module declaration.
+ * The first argument is the number of wires the select switch must
+ * support (2 for most DACs, 3 for the control loop DAC).
+ * The second argument is the DAC number.
+ */
 m4_define(m4_dac_wires, ⟨
 	input [$1-1:0] dac_sel_$2,
 	output dac_finished_$2,
@@ -27,11 +40,19 @@ m4_define(m4_dac_wires, ⟨
 	input wf_ram_valid_$2
 ⟩)
 
+/* Same thing but for ADCs */
+
 m4_define(m4_adc_wires, ⟨
 	output adc_finished_$2,
 	input adc_arm_$2,
 	output [$1-1:0] from_adc_$2
 ⟩)
+
+/* This is used in the body of the module. It declares the interconnect
+ * for each DAC. The first argument is the amount of switch ports the
+ * DAC requires (2 for most DACs, 3 for the control loop DAC). The
+ * second argument is the DAC number.
+ */
 
 m4_define(m4_dac_switch, ⟨
 	wire [$1-1:0] mosi_port_$2;
@@ -110,6 +131,8 @@ m4_define(m4_dac_switch, ⟨
 		.ss_L(ss_L_port_$2[1])
 	)
 ⟩)
+
+/* Same thing but for ADCs */
 
 m4_define(m4_adc_switch, ⟨
 	spi_master_ss_no_write #(

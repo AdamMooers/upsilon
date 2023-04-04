@@ -7,9 +7,19 @@ int dac_release(int dac);
 int dac_read_write(int dac, creole_word send, k_timeout_t timeout,
                    creole_word *recv);
 
+/* These ports are defined in firmware/rtl/base/base.v.m4 */
+#define DAC_SPI_PORT 0
+#define DAC_WF_PORT 1
+#define DAC_CLOOP_PORT 2
+int dac_switch(int dac, int setting, k_timeout_t timeout);
+
 int adc_take(int adc, k_timeout_t timeout);
 int adc_release(int adc);
 int adc_read(int adc, k_timeout_t timeout, creole_word *wrd);
+
+#define ADC_SPI_PORT 0
+#define ADC_CLOOP_PORT 1
+int adc_switch(int adc, int setting, k_timeout_t timeout);
 
 int cloop_take(k_timeout_t timeout);
 int cloop_read(int code, uint32_t *high_reg, uint32_t *low_reg,
