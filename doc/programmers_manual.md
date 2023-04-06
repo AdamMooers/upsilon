@@ -123,7 +123,9 @@ hardware that is executing the scan.
 LiteX further uses F4PGA to compile the HDL code. F4PGA is primarily
 made up of Yosys (synthesis) and nextpnr (place and route).
 
-# Setting up the Toolchain
+# Compile Process
+
+## Setting up the Toolchain
 
 The toolchain is primarily designed around modern Linux. It may not work
 properly on Windows or MacOS. If you have access to a computational
@@ -131,7 +133,115 @@ cluster (if you are at FSU physics, ask the Physics department) then
 you should set up the toolchain on their servers. You will be able to
 compile things on any computer with an internet connection.
 
-TODO
+### F4PGA
+
+1. Clone [F4PGA](https://github.com/chipsalliance/f4pga) (if you want,
+   checkout commit `b6c5fff`, but you should try checking out master
+   first)
+2. Run `scripts/prepare_environment.sh`. Note that you will need to change
+   the environment variable `$F4PGA_INSTALL_DIR` if you do not have access
+   to the default directory (which is root access).
+3. Run `scripts/activate.sh`. If you run into problems, open the file and
+   copy the `source` and `conda` commands manually into your terminal.
+4. Install meson and ninja through pip.
+
+All commands should be done in the conda environment.
+
+### Zephyr OS
+
+These instructions are based on [these][zephyr_getting_started], but the Zephyr
+environment should be installed into the F4PGA conda environment,
+
+[zephyr_getting_started]: https://docs.zephyrproject.org/latest/develop/getting_started/index.html
+
+1. Run `pip3 install west`
+2. Run
+   ```
+   west init $ZEPHYR_DIRECTORY/zephyrproject
+   cd $ZEPHYR_DIRECTORY/zephyrproject
+   west update
+   west zephyr-export
+   pip install -r ~/zephyrproject/zephyr/scripts/requirements.txt
+   cd $ZEPHYR_DIRECTORY/zephyrproject
+   wget https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.0/zephyr-sdk-0.16.0_linux-x86_64.tar.xz
+   wget -O - https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v0.16.0/sha256.sum | shasum --check --ignore-missing
+   tar xvf zephyr-sdk-0.16.0_linux-x86_64.tar.xz
+   cd zephyr-sdk-0.16.0
+   ./setup.sh
+   ```
+
+### LiteX
+
+1. Download `litex_setup.py` from the [LiteX repository][litex_repo], Upsilon
+   uses 2022.08 to some directory (don't put it in your home directory because
+   there will be a bunch of downloaded repositories.
+2. Run `litex_setup.py --init --install --user --tag 2022.08`
+3. Download a GCC RISC-V cross compiler. If you have root access to the build
+   machine, then you can probably install this with your package manager. Users
+   of Ubuntu 14 can download the [sifive][sifive_gcc] GCC. Otherwise you will have
+   to compile a cross compiler (`x86_64` host to RV32I target) manually.
+4. Put the GCC RISC-V cross compiler in your `$PATH` variable.
+
+[litex_repo]: https://github.com/enjoy-digital/litex
+[sifive_gcc]: https://github.com/sifive/freedom-tools/releases
+
+## FPGA Build System
+
+Make sure F4PGA and a RISC-V GCC compiler are in your path. Then just go into
+the `firmware` folder and run `make`. This should generate everything you need
+and compile the software. The synthesis suite is single threaded. This will
+take about 15-20 minutes on a good computer.
+
+The FPGA firmware (aka gateware) build system is designed in a recursive
+manner. That means that each directory has a Makefile that processes all the
+files in the directory. There is a `common.makefile` in the `rtl/` directory
+that is used when a rule (such as preprocessing a Verilog source file)
+is used in multiple Makefiles.
+
+For the Arty A7, the bitstream is `firmware/build/digilent_arty/gateware/digilent_arty.bit`.
+
+## Software Build System
+
+This requires at least CMake 3.20.0 (you can install this using `conda`).
+Afterwards just run `make` and everything should work. Everything is
+managed by the `CMakeLists.txt` and the `prj.conf`, see the Zephyr OS
+documentation.
+
+The kernel is `/software/build/zephyr/zephyr.bin`
+
+# Loading the Software and Firmware
+
+## Network Setup
+
+You will need the FPGA and the controlling computer on the same wired
+network. **DO NOT CONNECT THE FPGA TO A WIDE NETWORK. USE A PRIVATE LAN
+THAT ONLY CONTAINS THE CONTROLLING COMPUTER AND THE FPGA. DO NOT ATTEMPT
+TO CONNECT THE FPGA TO THE INTERNET.** The controlling computer can
+still connect to the internet, but through another LAN port. The best
+thing to do is to buy a USB to Ethernet adapter.
+
+You will need some way to do DHCP. The best way is to use a router, but
+a standard wireless router will not fly with any IT department because
+of the security risk. You need to find a non-wireless router (like a
+managed switch). You can even retrofit an old computer into a router
+(just needs another ethernet port).
+
+The default TFTP client connects to 192.168.1.50.
+
+## Loading the Firmware
+
+Connect the FPGA to a computer using a Micro-USB to USB cable. Run
+`openFPGALoader -c digilent digilent_arty.bit` to upload the firmware
+(gateware) to the controller.
+
+You can load the software using serial boot but this is very slow. The
+better thing to do is to use TFTP boot, which goes over Ethernet.
+**WHEN YOU RUN TFTP, DO NOT EXPOSE YOUR INTERFACE TO THE INTERNET
+CONNECTED NETWORK INTERFACE. THIS IS A BIG SECURITY RISK. ONLY RUN
+TFTP FOR THE AMOUNT OF TIME REQUIRED TO BOOT THE CONTROL SOFTWARE.**
+You can read about how to setup a TFTP server on the [OpenWRT wiki][owrt_wiki].
+
+[owrt_wiki]: https://openwrt.org/docs/guide-user/troubleshooting/tftpserver
 
 # Design Testing Process
 
@@ -301,7 +411,7 @@ write big Creole programs.
 
 # Hacks and Pitfalls
 
-The open source toolchain that Upsilon uses is novel and unstable.
+The open source software stack that Upsilon uses is novel and unstable.
 
 ## F4PGA
 
@@ -333,3 +443,37 @@ Verilator. For example, if you have a file called `mod.v` in the folder
 (putting it after all other generated files). The file
 `firmware/rtl/common.makefile` should automatically generate the
 preprocessed file for you.
+
+## If The Controlling Computer Cannot Connect to the Internet
+
+When you connect your computer to the controller over Ethernet, your computer
+may attempt to route all traffic over the controller network (since it is
+wired) instead of another network (like a wireless network). This means that
+your computer can't connect to the internet (or your connection is really slow).
+If this happens to you on a Linux machine, you can change the routing table.
+
+Run `route -n` (or `ip route` if this does not work) to print the routing table.
+Find the entry named `default via [...] dev eth-interface`. This is the default route
+for the ethernet device. Remove it using `ip route del default via [...] dev eth-interface`.
+
+If the route keeps on reappearing, delete it and quickly enter
+`ip route del default via [...] dev eth0 metric 65534`. This will make the
+route the last priority.
+
+## Getting The Correct IP for the Controlling Computer
+
+Some routers can automatically assign IPs based on MAC address. If your computer
+can do that, great. Otherwise you will need to configure your computer with a
+static ip.
+
+1. Remove your computer from the DHCP list that the router has.
+2. Run `ip link set eth-interface down`.
+3. Then run `ip addr` and run `ip addr remove del [ip] dev eth-interface` on
+   each ip on the ethernet interface that is connected to the controller.
+3. Run `ip addr add 192.168.1.100/24 dev eth-interface` (or whatever ip + subnet
+   mask you need)
+4. Run `ip route add 192.168.1.0/24 dev eth0 proto kernel scope link` (again,
+   change depending on different situations)
+
+This will use the static ip `192.168.1.100`, which is the default TFTP boot
+IP.

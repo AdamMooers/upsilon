@@ -213,8 +213,8 @@ class CryoSNOM1SoC(SoCCore):
 		self.submodules.base = Base(ClockSignal(), self.sdram, platform)
 
 def main():
-	soc = CryoSNOM1SoC("a7-35")
-	builder = Builder(soc, csr_json="csr.json", compile_software=False)
+	soc = CryoSNOM1SoC("a7-100")
+	builder = Builder(soc, csr_json="csr.json", compile_software=True)
 	builder.build()
 
 if __name__ == "__main__":
