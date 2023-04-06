@@ -1,4 +1,4 @@
-.PHONY: cpu clean
+.PHONY: cpu clean rtl_codegen
 
 DEVICETREE_GEN_DIR=.
 
