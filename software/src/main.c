@@ -126,18 +126,18 @@ read_size(int s)
 }
 
 static void
-exec_entry(void *client_p, void *threadnum_p,
+exec_entry(void *client_p, void *connection_num_p,
            void *unused __attribute__((unused)))
 {
 	intptr_t client = (intptr_t)client_p;
-	intptr_t threadnum = (intptr_t)threadnum_p;
-	LOG_DBG("Entered thread %d", (int)threadnum);
-	int size = read_size(client);
-
+	intptr_t connection_num = (intptr_t)connection_num_p;
 	char thread_name[64];
-	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, client, threadnum);
+	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, client, connection_num);
 	k_thread_name_set(k_current_get(), thread_name);
 
+	LOG_DBG("%s: entered thread", get_thread_name());
+
+	int size = read_size(client);
 	if (size < 0) {
 		LOG_WRN("%s: error in read size: %d", get_thread_name(), size);
 		zsock_close(client);
@@ -154,6 +154,7 @@ exec_entry(void *client_p, void *threadnum_p,
 
 	exec_creole(readbuf[threadnum], size, (int)client);
 	zsock_close(client);
+	LOG_INF("Exiting thread %s", get_thread_name());
 }
 
 /* TODO: main thread must be higher priority than execution threads */
@@ -172,9 +173,8 @@ main_loop(int srvsock)
 				thread_ever_used[i] = true;
 				k_thread_create(&threads[i], stacks[i],
 				THREAD_STACK_SIZ, exec_entry,
-				(void*) client, (void*) i,
-				(void*) connection_counter,
-				1, 0, K_NO_WAIT);
+				(void*) client, (void*) connection_counter,
+				NULL, 1, 0, K_NO_WAIT);
 				break;
 			}
 		}
