@@ -31,7 +31,7 @@ server_init_sock(int port)
 		k_fatal_halt(K_ERR_KERNEL_PANIC);
 	}
 
-	if (zsock_listen(sock, 2) < 0) {
+	if (zsock_listen(sock, 5) < 0) {
 		LOG_ERR("error: listen: %d", errno);
 		k_fatal_halt(K_ERR_KERNEL_PANIC);
 	}

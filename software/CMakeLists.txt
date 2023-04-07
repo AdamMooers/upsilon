@@ -15,3 +15,4 @@ include_directories("../firmware/rtl/control_loop")
 
 # Add all source files here.
 target_sources(app PRIVATE src/access.c src/buf.c src/main.c src/sock.c ../creole/creole.c)
+# target_sources(app PRIVATE src/tests/test_ethernet.c)

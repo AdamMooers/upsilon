@@ -186,9 +186,16 @@ main_loop(int srvsock)
 	}
 }
 
+/* For reproducible builds if needed */
+#ifdef SOURCE_DATE_EPOCH
+# define BUILD_TIME SOURCE_DATE_EPOCH
+#else
+# define BUILD_TIME __DATE__ " " __TIME__
+#endif
 void
 main(void)
 {
+	LOG_PRINTK("Upsilon on ZephyrOS, built on %s\n", BUILD_TIME);
 	access_init();
 	k_thread_name_set(k_current_get(), "main thread");
 	for (;;) {

@@ -417,14 +417,27 @@ access_release_thread(void)
 void
 access_init(void)
 {
-	k_mutex_init(&cloop_mutex);
+	if (k_mutex_init(&cloop_mutex) != 0) {
+		LOG_ERR("err: cloop mutex");
+		k_fatal_halt(K_ERR_KERNEL_PANIC);
+	}
 
 	for (int i = 0; i < DAC_MAX; i++) {
-		k_mutex_init(dac_mutex + i);
-		k_mutex_init(waveform_mutex + i);
+		if (k_mutex_init(dac_mutex + i) != 0) {
+			LOG_ERR("err: dac mutex %d", i);
+			k_fatal_halt(K_ERR_KERNEL_PANIC);
+		}
+
+		if (k_mutex_init(waveform_mutex + i) != 0) {
+			LOG_ERR("err: waveform mutex %d", i);
+			k_fatal_halt(K_ERR_KERNEL_PANIC);
+		}
 	}
 
 	for (int i = 0; i < ADC_MAX; i++) {
-		k_mutex_init(adc_mutex + i);
+		if (k_mutex_init(adc_mutex + i) != 0) {
+			LOG_ERR("err: adc mutex %d", i);
+			k_fatal_halt(K_ERR_KERNEL_PANIC);
+		}
 	}
 }

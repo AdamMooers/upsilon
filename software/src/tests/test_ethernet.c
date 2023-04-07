@@ -77,9 +77,9 @@ print_buf_escaped(const char *buf, size_t len)
 {
 	for (size_t i = 0; i < len; i++) {
 		if (*buf < 0x20 || *buf >= 0x7F)
-			LOG_PRINTK("[%02x]", *buf);
+			LOG_PRINTK("[%02x]", *buf++);
 		else
-			LOG_PRINTK("%c", *buf);
+			LOG_PRINTK("%c", *buf++);
 	}
 }
 
