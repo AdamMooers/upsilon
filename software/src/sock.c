@@ -70,6 +70,8 @@ sock_read_buf(int sock, struct bufptr *bp, bool entire)
 {
 	do {
 		ssize_t l = zsock_recv(sock, bp->p, bp->left, 0);
+		if (l == 0)
+			return -ECONNRESET;
 		if (l < 0)
 			return -errno;
 
@@ -88,6 +90,8 @@ sock_write_buf(int sock, struct bufptr *bp)
 	 */
 	while (bp->left) {
 		ssize_t l = zsock_send(sock, bp->p, bp->left, 0);
+		if (l == 0)
+			return -ECONNRESET;
 		if (l < 0)
 			return -errno;
 		bp->p += l;
