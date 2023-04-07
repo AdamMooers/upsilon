@@ -104,8 +104,8 @@ sock_write_buf(int sock, struct bufptr *bp)
 int
 sock_vprintf(int sock, struct bufptr *bp, const char *fmt, va_list va)
 {
-	int r = buf_writevf(bp, fmt, va);
 	struct bufptr store_bp = *bp;
+	int r = buf_writevf(bp, fmt, va);
 	if (r != BUF_OK)
 		return r;
 

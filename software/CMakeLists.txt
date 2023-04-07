@@ -13,6 +13,9 @@ include_directories("src/")
 include_directories("../creole")
 include_directories("../firmware/rtl/control_loop")
 
+set_source_files_properties(src/main.c PROPERTIES COMPILE_FLAGS -DMAIN_LOG_LEVEL=4)
+set_source_files_properties(../creole/creole.c PROPERTIES COMPILE_FLAGS -DCREOLE_LOG_LEVEL=4)
+
 # Add all source files here.
 target_sources(app PRIVATE src/access.c src/buf.c src/main.c src/sock.c ../creole/creole.c)
 # target_sources(app PRIVATE src/tests/test_ethernet.c)

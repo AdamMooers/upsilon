@@ -9,7 +9,7 @@
 #include "sock.h"
 #include "buf.h"
 
-LOG_MODULE_REGISTER(main);
+LOG_MODULE_REGISTER(main, 4);
 
 #define THREAD_STACK_SIZ 1024*32
 #define THREADNUM 32
@@ -93,6 +93,7 @@ exec_creole(unsigned char *buf, int size, int sock)
 	for (;;) {
 		creole_word sc;
 		e = creole_step(&env, &sc);
+		LOG_DBG("%s: %s", get_thread_name(), run_ret_str[e]);
 		switch (e) {
 		case CREOLE_STEP_CONTINUE:
 			continue;
@@ -127,12 +128,13 @@ read_size(int s)
 
 static void
 exec_entry(void *client_p, void *connection_num_p,
-           void *unused __attribute__((unused)))
+           void *threadnum_p)
 {
 	intptr_t client = (intptr_t)client_p;
 	intptr_t connection_num = (intptr_t)connection_num_p;
+	intptr_t threadnum = (intptr_t)threadnum_p;
 	char thread_name[64];
-	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, client, connection_num);
+	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, threadnum, connection_num);
 	k_thread_name_set(k_current_get(), thread_name);
 
 	LOG_DBG("%s: entered thread", get_thread_name());
@@ -143,6 +145,7 @@ exec_entry(void *client_p, void *connection_num_p,
 		zsock_close(client);
 		return;
 	}
+	LOG_INF("%s: program length: %d", get_thread_name(), size);
 
 	struct bufptr bp = {readbuf[threadnum], size};
 	int e = sock_read_buf(client, &bp, true);
@@ -151,6 +154,7 @@ exec_entry(void *client_p, void *connection_num_p,
 		zsock_close(client);
 		return;
 	}
+	LOG_DBG("%s: read program", get_thread_name());
 
 	exec_creole(readbuf[threadnum], size, (int)client);
 	zsock_close(client);
