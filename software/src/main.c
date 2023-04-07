@@ -20,17 +20,6 @@ static unsigned char readbuf[THREADNUM][READBUF_SIZ];
 static struct k_thread threads[THREADNUM];
 static bool thread_ever_used[THREADNUM];
 
-static int
-read_size(int s)
-{
-	char buf[2];
-	struct bufptr bp = {buf, sizeof(buf)};
-	int e = sock_read_buf(s, &bp, true);
-	if (e != 0)
-		return e;
-	return (unsigned char)buf[0] | (unsigned char) buf[1] << 8;
-}
-
 static const char *const compiler_ret_str[CREOLE_COMPILE_RET_LEN] = {
 	[CREOLE_COMPILE_OK] = "compile ok",
 	[CREOLE_OPCODE_READ_ERROR] = "opcode read error",
@@ -125,19 +114,29 @@ exec_creole(unsigned char *buf, int size, int sock)
 	}
 }
 
+static int
+read_size(int s)
+{
+	char buf[2];
+	struct bufptr bp = {buf, sizeof(buf)};
+	int e = sock_read_buf(s, &bp, true);
+	if (e != 0)
+		return e;
+	return (unsigned char)buf[0] | (unsigned char) buf[1] << 8;
+}
+
 static void
 exec_entry(void *client_p, void *threadnum_p,
            void *unused __attribute__((unused)))
 {
 	intptr_t client = (intptr_t)client_p;
 	intptr_t threadnum = (intptr_t)threadnum_p;
+	LOG_DBG("Entered thread %d", (int)threadnum);
 	int size = read_size(client);
 
 	char thread_name[64];
 	snprintk(thread_name, sizeof(thread_name), "%"PRIdPTR":%"PRIdPTR, client, threadnum);
 	k_thread_name_set(k_current_get(), thread_name);
-
-	LOG_INF("%s: Connection initiated", thread_name);
 
 	if (size < 0) {
 		LOG_WRN("%s: error in read size: %d", get_thread_name(), size);
@@ -167,14 +166,16 @@ main_loop(int srvsock)
 		int i;
 
 		for (i = 0; i < THREADNUM; i++) {
-			if (!thread_ever_used[i]
-			    || k_thread_join(&threads[i], K_NO_WAIT) == 0) {
+			if (!thread_ever_used[i] || k_thread_join(&threads[i], K_NO_WAIT) == 0) {
+				LOG_DBG("launching thread %d", i);
 				connection_counter++;
+				thread_ever_used[i] = true;
 				k_thread_create(&threads[i], stacks[i],
 				THREAD_STACK_SIZ, exec_entry,
 				(void*) client, (void*) i,
 				(void*) connection_counter,
 				1, 0, K_NO_WAIT);
+				break;
 			}
 		}
 

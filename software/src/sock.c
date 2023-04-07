@@ -35,7 +35,6 @@ server_init_sock(int port)
 		LOG_ERR("error: listen: %d", errno);
 		k_fatal_halt(K_ERR_KERNEL_PANIC);
 	}
-
 	LOG_INF("Upsilon waiting on %d", port);
 
 	return sock;
@@ -52,6 +51,9 @@ server_accept_client(int server)
 	 * so other threads can run.
 	 */
 	do {
+		LOG_DBG("Accept");
+		struct zsock_pollfd server_fd = { .fd = server, .events = ZSOCK_POLLIN };
+		zsock_poll(&server_fd, 1, -1);
 		client = zsock_accept(server, (struct sockaddr *)&addr, &len);
 		if (client < 0)
 			LOG_WRN("error in accept: %d", errno);
@@ -67,7 +69,7 @@ int
 sock_read_buf(int sock, struct bufptr *bp, bool entire)
 {
 	do {
-		ssize_t l = zsock_recv(sock, bp->p, bp->left - 1, 0);
+		ssize_t l = zsock_recv(sock, bp->p, bp->left, 0);
 		if (l < 0)
 			return -errno;
 

@@ -220,6 +220,9 @@ documentation.
 
 The kernel is `/software/build/zephyr/zephyr.bin`
 
+If you make a change to `CMakeLists.txt` or to `prj.conf`, run `make clean`
+before `make`.
+
 # Loading the Software and Firmware
 
 ## Network Setup
