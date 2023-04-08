@@ -58,90 +58,81 @@ class Base(Module, AutoCSR):
 	keyword arguments to pass all the arguments.
 	"""
 
+	def _make_csr(self, name, csrclass, csrlen, description, num=None):
+		""" Add a CSR for a pin `f"{name_{num}"` with CSR type
+		`csrclass`. This will automatically handle the `i_` and
+		`o_` prefix in the keyword arguments.
+		"""
+
+		if header_name not in self.csrset:
+			self.csrdict[name] = csrlen
+		if num is not None:
+			name = f"{name}_{num}"
+
+		csr = csrclass(csrlen, name=name, description=description)
+		setattr(self, name, csr)
+
+		if csrclass is CSRStorage:
+			self.kwargs[f'i_{name}'] = csr.storage
+		elif csrclass is CSRStatus:
+			self.kwargs[f'o_{name}'] = csr.status
+		else:
+			raise Exception(f"Unknown class {csrclass}")
+
 	def __init__(self, clk, sdram, platform):
-		kwargs = {}
+		self.kwargs = {}
+		self.csrdict = {}
 
 		for i in range(0,8):
-			setattr(self, f"dac_sel_{i}", CSRStorage(3, name=f"dac_sel_{i}", description=f"Select DAC {i} Output"))
-			kwargs[f"i_dac_sel_{i}"] = getattr(self, f"dac_sel_{i}").storage
-
-			setattr(self, f"dac_finished_{i}", CSRStatus(1, name=f"dac_finished_{i}", description=f"DAC {i} Transmission Finished Flag"))
-			kwargs[f"o_dac_finished_{i}"] = getattr(self, f"dac_finished_{i}").status
-
-			setattr(self, f"dac_arm_{i}", CSRStorage(1, name=f"dac_arm_{i}", description=f"DAC {i} Arm Flag"))
-			kwargs[f"i_dac_arm_{i}"] = getattr(self, f"dac_arm_{i}").storage
-
-			setattr(self, f"from_dac_{i}", CSRStatus(24, name=f"from_dac_{i}", description=f"DAC {i} Received Data"))
-			kwargs[f"o_from_dac_{i}"] = getattr(self, f"from_dac_{i}").status
-
-			setattr(self, f"to_dac_{i}", CSRStorage(24, name=f"to_dac_{i}", description=f"DAC {i} Data to Send"))
-			kwargs[f"i_to_dac_{i}"] = getattr(self, f"to_dac_{i}").storage
-
-			setattr(self, f"wf_arm_{i}", CSRStorage(1, name=f"wf_arm_{i}", description=f"Waveform {i} Arm Flag"))
-			kwargs[f"i_wf_arm_{i}"] = getattr(self, f"wf_arm_{i}").storage
-
-			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1, name=f"wf_halt_on_finish_{i}", description=f"Waveform {i} Halt on Finish Flag"))
-			kwargs[f"i_wf_halt_on_finish_{i}"] = getattr(self, f"wf_halt_on_finish_{i}").storage
-
-			setattr(self, f"wf_finished_{i}", CSRStatus(1, name=f"wf_finished_{i}", description=f"Waveform {i} Finished Flag"))
-			kwargs[f"o_wf_finished_{i}"] = getattr(self, f"wf_finished_{i}").status
-
-			setattr(self, f"wf_running_{i}", CSRStatus(1, name=f"wf_running_{i}", description=f"Waveform {i} Running Flag"))
-			kwargs[f"o_wf_running_{i}"] = getattr(self, f"wf_running_{i}").status
-
-			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16, name=f"wf_time_to_wait_{i}", description=f"Waveform {i} Wait Time"))
-			kwargs[f"i_wf_time_to_wait_{i}"] = getattr(self, f"wf_time_to_wait_{i}").storage
-
-			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1, name=f"wf_refresh_start_{i}", description=f"Waveform {i} Data Refresh Start Flag"))
-			kwargs[f"i_wf_refresh_start_{i}"] = getattr(self, f"wf_refresh_start_{i}").storage
-
-			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1, name=f"wf_refresh_finished_{i}", description=f"Waveform {i} Data Refresh Finished Flag"))
-			kwargs[f"o_wf_refresh_finished_{i}"] = getattr(self, f"wf_refresh_finished_{i}").status
-
-			setattr(self, f"wf_start_addr_{i}", CSRStorage(32, name=f"wf_start_addr_{i}", description=f"Waveform {i} Data Addr"))
-			kwargs[f"i_wf_start_addr_{i}"] = getattr(self, f"wf_start_addr_{i}").storage
+			self._make_csr("dac_sel", CSRStorage, 3, f"Select DAC {i} Output", num=i)
+			self._make_csr("dac_finished", CSRStatus, 1, f"DAC {i} Transmission Finished Flag", num=i)
+			self._make_csr("dac_arm", CSRStorage, 1, f"DAC {i} Arm Flag", num=i)
+			self._make_csr("from_dac", CSRStatus, 24, f"DAC {i} Received Data", num=i)
+			self._make_csr("to_dac", CSRStorage, 24, f"DAC {i} Data to Send", num=i)
+			self._make_csr("wf_arm", CSRStorage, 1, f"Waveform {i} Arm Flag", num=i)
+			self._make_csr("wf_halt_on_finish", CSRStorage, 1, f"Waveform {i} Halt on Finish Flag", num=i)
+			self._make_csr("wf_finished", CSRStatus, 1, f"Waveform {i} Finished Flag", num=i)
+			self._make_csr("wf_running", CSRStatus, 1, f"Waveform {i} Running Flag", num=i)
+			self._make_csr("wf_time_to_wait", CSRStorage, 16, f"Waveform {i} Wait Time", num=i)
+			self._make_csr("wf_refresh_start", CSRStorage, 1, f"Waveform {i} Data Refresh Start Flag", num=i)
+			self._make_csr("wf_refresh_finished", CSRStatus, 1, f"Waveform {i} Data Refresh Finished Flag", num=i)
+			self._make_csr("wf_start_addr", CSRStorage, 32, f"Waveform {i} Data Addr", num=i)
 
 			port = sdram.crossbar.get_port()
-
 			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
 			cur_sdram = getattr(self, f"wf_sdram_{i}")
-			kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
-			kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
-			kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
-			kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
 
-			setattr(self, f"adc_finished_{i}", CSRStatus(1, name=f"adc_finished_{i}", description=f"ADC {i} Finished Flag"))
-			kwargs[f"o_adc_finished_{i}"] = getattr(self, f"adc_finished_{i}").status
+			self.kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
+			self.kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
+			self.kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
+			self.kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
 
-			setattr(self, f"adc_arm_{i}", CSRStorage(1, name=f"adc_arm_{i}", description=f"ADC {i} Arm Flag"))
-			kwargs[f"i_adc_arm_{i}"] = getattr(self, f"adc_arm_{i}").storage
+			self._make_csr("adc_finished", CSRStatus, 1, f"ADC {i} Finished Flag", num=i)
+			self._make_csr("adc_arm", CSRStorage, 1, f"ADC {i} Arm Flag", num=i)
+			self._make_csr("from_adc", CSRStatus, 32, f"ADC {i} Received Data", num=i)
 
-			setattr(self, f"from_adc_{i}", CSRStatus(32, name=f"from_adc_{i}", description=f"ADC {i} Received Data"))
-			kwargs[f"o_from_adc_{i}"] = getattr(self, f"from_adc_{i}").status
+		self._make_csr("adc_sel_0", CSRStorage, 2, "Select ADC 0 Output")
+		self._make_csr("cl_in_loop", CSRStatus, 1, "Control Loop Loop Enabled Flag")
+		self._make_csr("cl_cmd", CSRStorage, 8, "Control Loop Command Input")
+		self._make_csr("cl_word_in", CSRStorage, 64, "Control Loop Data Input")
+		self._make_csr("cl_word_out", CSRStatus, 64, "Control Loop Data Output")
+		self._make_csr("cl_start_cmd", CSRStorage, 1, "Control Loop Command Start Flag")
+		self._make_csr("cl_finish_cmd", CSRStatus, 1, "Control Loop Command Finished Flag")
 
-		self.adc_sel_0 = CSRStorage(2, description=f"Select ADC 0 Output")
-		kwargs["i_adc_sel_0"] = self.adc_sel_0.storage
-		self.cl_in_loop = CSRStatus(1, description="Control Loop Loop Enabled Flag")
-		kwargs["o_cl_in_loop"] = self.cl_in_loop.status
-		self.cl_cmd = CSRStorage(8, description="Control Loop Command Input")
-		kwargs["i_cl_cmd"] = self.cl_cmd.storage
-		self.cl_word_in = CSRStorage(64, description="Control Loop Data Input")
-		kwargs["i_cl_word_in"] = self.cl_word_in.storage
-		self.cl_word_out = CSRStatus(64, description="Control Loop Data Output")
-		kwargs["o_cl_word_out"] = self.cl_word_out.status
-		self.cl_start_cmd = CSRStorage(1, description="Control Loop Command Start Flag")
-		kwargs["i_cl_start_cmd"] = self.cl_start_cmd.storage
-		self.cl_finish_cmd = CSRStatus(1, description="Control Loop Command Finished Flag")
-		kwargs["o_cl_finish_cmd"] = self.cl_finish_cmd.status
+		self.kwargs["i_clk"] = clk
+		self.kwargs["i_dac_miso"] = platform.request("dac_miso")
+		self.kwargs["o_dac_mosi"] = platform.request("dac_mosi")
+		self.kwargs["o_dac_sck"] = platform.request("dac_sck")
+		self.kwargs["o_dac_ss_L"] = platform.request("dac_ss_L")
+		self.kwargs["o_adc_conv"] = platform.request("adc_conv")
+		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
+		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
 
-		kwargs["i_clk"] = clk
-		kwargs["i_dac_miso"] = platform.request("dac_miso")
-		kwargs["o_dac_mosi"] = platform.request("dac_mosi")
-		kwargs["o_dac_sck"] = platform.request("dac_sck")
-		kwargs["o_dac_ss_L"] = platform.request("dac_ss_L")
-		kwargs["o_adc_conv"] = platform.request("adc_conv")
-		kwargs["i_adc_sdo"] = platform.request("adc_sdo")
-		kwargs["o_adc_sck"] = platform.request("adc_sck")
+		with f as open("io_widths.h", mode='w'):
+			print('#pragma once', file=f)
+			for key in self.csrdict:
+				print(f'#define {key.upper()}_LEN {self.csrdict[key]}', file=f)
+
 		self.specials += Instance("base", **kwargs)
 
 # Clock and Reset Generator
