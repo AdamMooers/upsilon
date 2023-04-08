@@ -3,6 +3,8 @@ of the GNU GPL v3.0 (or any later version), or under the [CC BY-SA 4.0][CC].
 
 [CC]: https://creativecommons.org/licenses/by-sa/4.0/legalcode
 
+# Introduction
+
 This document is aimed at maintainers of this software who are not
 experienced programmers (in either software or hardware). Its goal is
 to contain any pertinent information to the devlopment process of Upsilon.
@@ -11,7 +13,18 @@ You do not need to read and digest the entire manual in sequence. Many
 things will seem confusing and counterintuitive, and will require some time
 to properly understand.
 
-# Required Knowledge
+## Organization of the Project
+
+Upsilon uses LiteX and ZephyrOS for it's FPGA code. LiteX generates HDL
+and glues it together. It also forms the build system of the hardware
+portion of Upsilon. ZephyrOS is the kernel portion, which deals with
+communication between the computer that receives scan data and the
+hardware that is executing the scan.
+
+LiteX further uses F4PGA to compile the HDL code. F4PGA is primarily
+made up of Yosys (synthesis) and nextpnr (place and route).
+
+## Required Knowledge
 
 Verilog is critical for writing hardware. You should hopefully not have
 to write much of it.
@@ -36,92 +49,6 @@ which in turn uses migen.
 You do not need to know a lot about migen, but LiteX's documentation
 is poor so you will need to know some migen in order to read the
 code and understand how some modules work.
-
-# FPGA Concepts
-
-Upsilon runs on a Field Programmable Gate Array (FPGA). FPGAs are sets
-of logic gates and other peripherals that can be changed by a computer.
-FPGAs can implement CPUs, digital filters, and control code at a much
-higher speed than a computer. The downside is that FPGAs are much more
-difficult to program for.
-
-A large part of Upsilon is written in Verilog. Verilog is a Hardware
-Description Language (HDL), which is similar to a programming language
-(such as C++ or Python).
-
-The difference is, is that Verilog compiles to a *piece of hardware* that
-deals with individual bits executing operations in sync with a clock. This
-differs from a *piece of software*, which is a set of instructions that a
-computer follows. Verilog is usually much less abstract than regular code.
-
-Regular code is tested on the system in which it is run. Hardware,
-on the other hand, is very difficult to test on the device that it
-is actually running on. Hardware is usually *simulated*. This project
-primarily simulates Verilog code using the program Verilator, where the
-code that runs the simulation is written in C++.
-
-Instead of strings, integers, and classes, the basic components of all
-Verilog code is the wire and the register, which store bits (1 and 0).
-Wires connect components together, and registers store data, in a similar
-way to variables in software. Unlike usual programming languages, where
-code executes one step at a time, most FPGA code runs at the tick of
-the system clock in parallel.
-
-To compile Verilog to a format suitable for execution on an FPGA, you
-*synthesize* the Verilog into a low-level format that uses the specific
-resources of the FPGA you are using, and then you run a *place and route*
-program to allocate resources on the FPGA to fit your design. Running
-synthesis on its own can help you understand how much resources a module
-uses. Place-and-route gives you *timing reports*, which tell you about
-major design problems that outstrip the capabilities of the FPGA (or the
-programs you are using). You should look up what "timing" on an FPGA is
-and learn as much as you can about it, because it is an issue that does
-not happen in standard software and can be very difficult to fix when
-you run into it.
-
-Once a bitstream is synthesized, it is loaded onto a FPGA through a cable
-(for this project, openFPGALoader).
-
-## Recommendations to Learners
-
-[Gisselquist Technology][GT] is the best free online resource for FPGA
-programming out there. These articles will help you understand how to
-write *good* FPGA code, not just valid code.
-
-[GT]: https://zipcpu.com/
-
-Here are some exercises for you to ease yourself into FPGA programming.
-
-* Write an FPGA program that implements addition without using the `+`
-  operator. This program should add each number bit by bit, handling
-  carried digits properly. This is called a *full adder*.
-* Write an FPGA program that multiplies two signed integers together,
-  without using the `*` operator.  The width of these integers should
-  not be hard-coded: it should be easy to change. What you write in
-  this is something that is actually a part of this project: see
-  `boothmul.v`. You do not (and should not!) write it just like Upsilon
-  has written it.
-* Write an FPGA program that communicates over SPI. For simplicity,
-  you only need to write it for a single SPI mode: look up on the internet
-  for details. There is an SPI slave device in this repository that you
-  can use to simulate an end for the SPI master you write, but you should
-  write the SPI slave yourself. For bonus points, connect your SPI master
-  to a real SPI device and confirm that your communication works.
-
-For each of these exercises, follow the complete "Design Testing Process"
-below. At the very least, write simulations and test your programs on
-real hardware.
-
-# Organization
-
-Upsilon uses LiteX and ZephyrOS for it's FPGA code. LiteX generates HDL
-and glues it together. It also forms the build system of the hardware
-portion of Upsilon. ZephyrOS is the kernel portion, which deals with
-communication between the computer that receives scan data and the
-hardware that is executing the scan.
-
-LiteX further uses F4PGA to compile the HDL code. F4PGA is primarily
-made up of Yosys (synthesis) and nextpnr (place and route).
 
 # Compile Process
 
@@ -271,9 +198,84 @@ In the root of the TFTP server, have `boot.bin` be the kernel binary
 
 [owrt_wiki]: https://openwrt.org/docs/guide-user/troubleshooting/tftpserver
 
-# Design Testing Process
+# FPGA
 
-## Simulation
+Upsilon runs on a Field Programmable Gate Array (FPGA). FPGAs are sets
+of logic gates and other peripherals that can be changed by a computer.
+FPGAs can implement CPUs, digital filters, and control code at a much
+higher speed than a computer. The downside is that FPGAs are much more
+difficult to program for.
+
+A large part of Upsilon is written in Verilog. Verilog is a Hardware
+Description Language (HDL), which is similar to a programming language
+(such as C++ or Python).
+
+The difference is, is that Verilog compiles to a *piece of hardware* that
+deals with individual bits executing operations in sync with a clock. This
+differs from a *piece of software*, which is a set of instructions that a
+computer follows. Verilog is usually much less abstract than regular code.
+
+Regular code is tested on the system in which it is run. Hardware,
+on the other hand, is very difficult to test on the device that it
+is actually running on. Hardware is usually *simulated*. This project
+primarily simulates Verilog code using the program Verilator, where the
+code that runs the simulation is written in C++.
+
+Instead of strings, integers, and classes, the basic components of all
+Verilog code is the wire and the register, which store bits (1 and 0).
+Wires connect components together, and registers store data, in a similar
+way to variables in software. Unlike usual programming languages, where
+code executes one step at a time, most FPGA code runs at the tick of
+the system clock in parallel.
+
+To compile Verilog to a format suitable for execution on an FPGA, you
+*synthesize* the Verilog into a low-level format that uses the specific
+resources of the FPGA you are using, and then you run a *place and route*
+program to allocate resources on the FPGA to fit your design. Running
+synthesis on its own can help you understand how much resources a module
+uses. Place-and-route gives you *timing reports*, which tell you about
+major design problems that outstrip the capabilities of the FPGA (or the
+programs you are using). You should look up what "timing" on an FPGA is
+and learn as much as you can about it, because it is an issue that does
+not happen in standard software and can be very difficult to fix when
+you run into it.
+
+Once a bitstream is synthesized, it is loaded onto a FPGA through a cable
+(for this project, openFPGALoader).
+
+## Recommendations to Learners
+
+[Gisselquist Technology][GT] is the best free online resource for FPGA
+programming out there. These articles will help you understand how to
+write *good* FPGA code, not just valid code.
+
+[GT]: https://zipcpu.com/
+
+Here are some exercises for you to ease yourself into FPGA programming.
+
+* Write an FPGA program that implements addition without using the `+`
+  operator. This program should add each number bit by bit, handling
+  carried digits properly. This is called a *full adder*.
+* Write an FPGA program that multiplies two signed integers together,
+  without using the `*` operator.  The width of these integers should
+  not be hard-coded: it should be easy to change. What you write in
+  this is something that is actually a part of this project: see
+  `boothmul.v`. You do not (and should not!) write it just like Upsilon
+  has written it.
+* Write an FPGA program that communicates over SPI. For simplicity,
+  you only need to write it for a single SPI mode: look up on the internet
+  for details. There is an SPI slave device in this repository that you
+  can use to simulate an end for the SPI master you write, but you should
+  write the SPI slave yourself. For bonus points, connect your SPI master
+  to a real SPI device and confirm that your communication works.
+
+For each of these exercises, follow the complete "Design Testing Process"
+below. At the very least, write simulations and test your programs on
+real hardware.
+
+## Design Testing Process
+
+### Simulation
 
 When you write or modify a verilog module, the first thing you should do
 is write/run a simulation of that module. A simulation of that module
@@ -311,7 +313,7 @@ Verilog only.** See `firmware/rtl/waveform/waveform_sim.v` and
 `firmware/rtl/waveform/dma_sim.v` for an example of Verilog files only
 used for tests.
 
-## Test Synthesis
+### Test Synthesis
 
 **Yosys only accepts a subset of Verilog. You might write a bunch of
 code that Verilator will happily simulate but that will fail to go
@@ -333,7 +335,7 @@ the current limitations that F4PGA has. The file `xc7.f4pga.tcl` that
 F4PGA downloads is the complete synthesis script, read it to understand
 the internals of what F4PGA does to compile your verilog.
 
-## Test Compilation
+### Test Compilation
 
 I haven't been able to do this for most of this project. The basic idea
 is to use `firmware/rtl/soc.py` to load only the module to test, and
