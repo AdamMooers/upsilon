@@ -9,9 +9,8 @@ This document is aimed at maintainers of this software who are not
 experienced programmers (in either software or hardware). Its goal is
 to contain any pertinent information to the devlopment process of Upsilon.
 
-You do not need to read and digest the entire manual in sequence. Many
-things will seem confusing and counterintuitive, and will require some time
-to properly understand.
+This manual is (hopefully) modular enough that you can just skip to the
+section you need without having to read the entire thing.
 
 ## Organization of the Project
 
@@ -273,6 +272,12 @@ For each of these exercises, follow the complete "Design Testing Process"
 below. At the very least, write simulations and test your programs on
 real hardware.
 
+## Control and Status Registers in Hardware
+
+LiteX uses "Control and Status Registers" (CSRs) to communicate between
+the CPU and any Verilog modules. (RISC-V CPUs have something with the
+same name, but Upsilon does not use that.)
+
 ## Design Testing Process
 
 ### Simulation
@@ -430,6 +435,20 @@ output unusuable.
 When you are done, set `4` to `3` in that line.
 
 TODO: Ethernet debugging output.
+
+## Control and Status Registers in Software
+
+CSRs can be used in software by using `litex_write8`,
+`litex_read16`, etc. In the Zephyr source, look at
+`soc/riscv/litex-vexriscv/soc.h` for the complete implementation.
+Also look at `include/zephyr/arch/common/sys_io.h` to see how these
+functions are implemented.
+
+Do not directly write to CSR ports without using `litex_writeN` and
+`litex_readN`, and do not directly use `sys_io.h` functions. If you are
+not careful you will not access the registers correctly and you will
+crash the software.
+
 
 # Controlling Computer
 
