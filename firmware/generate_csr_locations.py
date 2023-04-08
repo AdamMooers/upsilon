@@ -19,9 +19,9 @@ class CSRGenerator:
 
 	def print_array(self, name, num):
 		if num == 1:
-			self.print(f'uintptr_t {name} = {self.get_reg(name, None)};\n')
+			self.print(f'static const uintptr_t {name} = {self.get_reg(name, None)};\n')
 		else:
-			self.print(f'uintptr_t {name}[{num}] = {{', self.get_reg(name, 0))
+			self.print(f'static const uintptr_t {name}[{num}] = {{', self.get_reg(name, 0))
 			for i in range(1,num):
 				self.print(',', self.get_reg(name, i))
 			self.print('};\n\n')
