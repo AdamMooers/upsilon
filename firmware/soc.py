@@ -18,8 +18,6 @@ from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
 # Refer to `A7-constraints.xdc` for pin names.
-# IO with Subsignals make Record types, which have the name of the
-# subsignal as an attribute.
 io = [
 	("dac_ss_L", 0, Pins("G13 D13 E15 J17 U12 U14 D4 E2"), IOStandard("LVCMOS33")),
 	("dac_mosi", 0, Pins("B11 B18 E16 J18 V12 V14 D3 D2"), IOStandard("LVCMOS33")),
@@ -30,48 +28,77 @@ io = [
 	("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33"))
 ]
 
+# TODO: Generate widths based off of include files (m4 generated)
+
 class Base(Module, AutoCSR):
+	""" The subclass AutoCSR will automatically make CSRs related
+	to this class when those CSRs are attributes (i.e. accessed by
+	`self.csr_name`) of instances of this class.
+
+	Since there are a lot of input and output wires, the CSRs are
+	assigned using `setattr()`.
+
+	CSRs are for input wires (`CSRStorage`) or output wires
+	(`CSRStatus`).	The first argument to the CSR constructor is
+	the amount of bits the CSR takes. The `name` keyword argument
+	is required since the constructor needs the name of the attribute.
+	The `description` keyword is used for documentation.
+
+	In LiteX, modules in separate Verilog files are instantiated as
+	    self.specials += Instance(
+	        "module_name",
+	        PARAMETER_NAME=value,
+	        i_input = input_port,
+	        o_output = output_port,
+	        ...
+	    )
+
+	Since the "base" module has a bunch of repeated input and output
+	pins that have to be connected to CSRs, the LiteX wrapper uses
+	keyword arguments to pass all the arguments.
+	"""
+
 	def __init__(self, clk, sdram, platform):
 		kwargs = {}
 
 		for i in range(0,8):
-			setattr(self, f"dac_sel_{i}", CSRStorage(3, name=f"dac_sel_{i}"))
+			setattr(self, f"dac_sel_{i}", CSRStorage(3, name=f"dac_sel_{i}", description=f"Select DAC {i} Output"))
 			kwargs[f"i_dac_sel_{i}"] = getattr(self, f"dac_sel_{i}").storage
 
-			setattr(self, f"dac_finished_{i}", CSRStatus(1, name=f"dac_finished_{i}"))
+			setattr(self, f"dac_finished_{i}", CSRStatus(1, name=f"dac_finished_{i}", description=f"DAC {i} Transmission Finished Flag"))
 			kwargs[f"o_dac_finished_{i}"] = getattr(self, f"dac_finished_{i}").status
 
-			setattr(self, f"dac_arm_{i}", CSRStorage(1, name=f"dac_arm_{i}"))
+			setattr(self, f"dac_arm_{i}", CSRStorage(1, name=f"dac_arm_{i}", description=f"DAC {i} Arm Flag"))
 			kwargs[f"i_dac_arm_{i}"] = getattr(self, f"dac_arm_{i}").storage
 
-			setattr(self, f"from_dac_{i}", CSRStatus(24, name=f"from_dac_{i}"))
+			setattr(self, f"from_dac_{i}", CSRStatus(24, name=f"from_dac_{i}", description=f"DAC {i} Received Data"))
 			kwargs[f"o_from_dac_{i}"] = getattr(self, f"from_dac_{i}").status
 
-			setattr(self, f"to_dac_{i}", CSRStorage(24, name=f"to_dac_{i}"))
+			setattr(self, f"to_dac_{i}", CSRStorage(24, name=f"to_dac_{i}", description=f"DAC {i} Data to Send"))
 			kwargs[f"i_to_dac_{i}"] = getattr(self, f"to_dac_{i}").storage
 
-			setattr(self, f"wf_arm_{i}", CSRStorage(1, name=f"wf_arm_{i}"))
+			setattr(self, f"wf_arm_{i}", CSRStorage(1, name=f"wf_arm_{i}", description=f"Waveform {i} Arm Flag"))
 			kwargs[f"i_wf_arm_{i}"] = getattr(self, f"wf_arm_{i}").storage
 
-			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1, name=f"wf_halt_on_finish_{i}")),
+			setattr(self, f"wf_halt_on_finish_{i}", CSRStorage(1, name=f"wf_halt_on_finish_{i}", description=f"Waveform {i} Halt on Finish Flag"))
 			kwargs[f"i_wf_halt_on_finish_{i}"] = getattr(self, f"wf_halt_on_finish_{i}").storage
 
-			setattr(self, f"wf_finished_{i}", CSRStatus(1, name=f"wf_finished_{i}")),
+			setattr(self, f"wf_finished_{i}", CSRStatus(1, name=f"wf_finished_{i}", description=f"Waveform {i} Finished Flag"))
 			kwargs[f"o_wf_finished_{i}"] = getattr(self, f"wf_finished_{i}").status
 
-			setattr(self, f"wf_running_{i}", CSRStatus(1, name=f"wf_running_{i}")),
+			setattr(self, f"wf_running_{i}", CSRStatus(1, name=f"wf_running_{i}", description=f"Waveform {i} Running Flag"))
 			kwargs[f"o_wf_running_{i}"] = getattr(self, f"wf_running_{i}").status
 
-			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16, name=f"wf_time_to_wait_{i}"))
+			setattr(self, f"wf_time_to_wait_{i}", CSRStorage(16, name=f"wf_time_to_wait_{i}", description=f"Waveform {i} Wait Time"))
 			kwargs[f"i_wf_time_to_wait_{i}"] = getattr(self, f"wf_time_to_wait_{i}").storage
 
-			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1, name=f"wf_refresh_start_{i}"))
+			setattr(self, f"wf_refresh_start_{i}", CSRStorage(1, name=f"wf_refresh_start_{i}", description=f"Waveform {i} Data Refresh Start Flag"))
 			kwargs[f"i_wf_refresh_start_{i}"] = getattr(self, f"wf_refresh_start_{i}").storage
 
-			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1, name=f"wf_refresh_finished_{i}"))
+			setattr(self, f"wf_refresh_finished_{i}", CSRStatus(1, name=f"wf_refresh_finished_{i}", description=f"Waveform {i} Data Refresh Finished Flag"))
 			kwargs[f"o_wf_refresh_finished_{i}"] = getattr(self, f"wf_refresh_finished_{i}").status
 
-			setattr(self, f"wf_start_addr_{i}", CSRStorage(32, name=f"wf_start_addr_{i}"))
+			setattr(self, f"wf_start_addr_{i}", CSRStorage(32, name=f"wf_start_addr_{i}", description=f"Waveform {i} Data Addr"))
 			kwargs[f"i_wf_start_addr_{i}"] = getattr(self, f"wf_start_addr_{i}").storage
 
 			port = sdram.crossbar.get_port()
@@ -83,28 +110,28 @@ class Base(Module, AutoCSR):
 			kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
 			kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
 
-			setattr(self, f"adc_finished_{i}", CSRStatus(1, name=f"adc_finished_{i}"))
+			setattr(self, f"adc_finished_{i}", CSRStatus(1, name=f"adc_finished_{i}", description=f"ADC {i} Finished Flag"))
 			kwargs[f"o_adc_finished_{i}"] = getattr(self, f"adc_finished_{i}").status
 
-			setattr(self, f"adc_arm_{i}", CSRStorage(1, name=f"adc_arm_{i}"))
+			setattr(self, f"adc_arm_{i}", CSRStorage(1, name=f"adc_arm_{i}", description=f"ADC {i} Arm Flag"))
 			kwargs[f"i_adc_arm_{i}"] = getattr(self, f"adc_arm_{i}").storage
 
-			setattr(self, f"from_adc_{i}", CSRStatus(32, name=f"from_adc_{i}"))
+			setattr(self, f"from_adc_{i}", CSRStatus(32, name=f"from_adc_{i}", description=f"ADC {i} Received Data"))
 			kwargs[f"o_from_adc_{i}"] = getattr(self, f"from_adc_{i}").status
 
-		self.adc_sel_0 = CSRStorage(2)
+		self.adc_sel_0 = CSRStorage(2, description=f"Select ADC 0 Output")
 		kwargs["i_adc_sel_0"] = self.adc_sel_0.storage
-		self.cl_in_loop = CSRStatus(1)
+		self.cl_in_loop = CSRStatus(1, description="Control Loop Loop Enabled Flag")
 		kwargs["o_cl_in_loop"] = self.cl_in_loop.status
-		self.cl_cmd = CSRStorage(64)
+		self.cl_cmd = CSRStorage(8, description="Control Loop Command Input")
 		kwargs["i_cl_cmd"] = self.cl_cmd.storage
-		self.cl_word_in = CSRStorage(32)
+		self.cl_word_in = CSRStorage(64, description="Control Loop Data Input")
 		kwargs["i_cl_word_in"] = self.cl_word_in.storage
-		self.cl_word_out = CSRStatus(32)
+		self.cl_word_out = CSRStatus(64, description="Control Loop Data Output")
 		kwargs["o_cl_word_out"] = self.cl_word_out.status
-		self.cl_start_cmd = CSRStorage(1)
+		self.cl_start_cmd = CSRStorage(1, description="Control Loop Command Start Flag")
 		kwargs["i_cl_start_cmd"] = self.cl_start_cmd.storage
-		self.cl_finish_cmd = CSRStatus(1)
+		self.cl_finish_cmd = CSRStatus(1, description="Control Loop Command Finished Flag")
 		kwargs["o_cl_finish_cmd"] = self.cl_finish_cmd.status
 
 		kwargs["i_clk"] = clk
@@ -115,10 +142,11 @@ class Base(Module, AutoCSR):
 		kwargs["o_adc_conv"] = platform.request("adc_conv")
 		kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		kwargs["o_adc_sck"] = platform.request("adc_sck")
-
 		self.specials += Instance("base", **kwargs)
 
 # Clock and Reset Generator
+# I don't know how this works, I only know that it does.
+# TODO: Connect cpu_reset pin to Verilog modules.
 class _CRG(Module):
 	def __init__(self, platform, sys_clk_freq, with_dram=True, with_rst=True):
 		self.rst = Signal()
@@ -155,6 +183,10 @@ class CryoSNOM1SoC(SoCCore):
 		sys_clk_freq = int(100e6)
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
 		self.submodules.crg = _CRG(platform, sys_clk_freq, True)
+		# These source files need to be sorted so that modules
+		# that rely on another module come later. For instance,
+		# `control_loop` depends on `control_loop_math`, so
+		# control_loop_math.v comes before control_loop.v
 		platform.add_source("rtl/spi/spi_switch_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_no_write_preprocessed.v")
@@ -177,7 +209,7 @@ class CryoSNOM1SoC(SoCCore):
 				toolchain="symbiflow", 
 				platform = platform,
 				bus_standard = "wishbone",
-				ident = f"Arty-{variant} F4PGA LiteX VexRiscV Zephyr CryoSNOM1 0.1",
+				ident = f"Arty-{variant} F4PGA LiteX VexRiscV Zephyr - Upsilon",
 				bus_data_width = 32,
 				bus_address_width = 32,
 				bus_timeout = int(1e6),
