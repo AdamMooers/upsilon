@@ -400,10 +400,34 @@ Each script that runs on the kernel is a separate connection. Each
 connection runs on a separate thread, because each thread runs a Creole
 interpreter.
 
+TODO
+
 ## Logging
 
 Logging is done via UART. Connect the micro-USB slot to the controlling
 computer to get debug output.
+
+All you need to know is
+
+* Use `LOG_WRN` for errors that you can recover from (i.e. closing a
+  connection
+* Use `LOG_ERR` for errors that are fatal and halt the firmware,
+  requiring a reset
+* Use `LOG_INF` for misc information (i.e. initialization completed,
+  accepted connection, closing connection)
+* Use `LOG_DBG` for debugging output
+
+If you need debugging output, add a line of the form
+
+	set_source_file_properties(src_file PROPERTIES COMPILE_FLAGS -DFILE_LOG_LEVEL=4
+
+This will enable debugging output for this file only. Do not enable
+debugging output for the entire system! This will make the debugging
+output unusuable.
+
+When you are done, set `4` to `3` in that line.
+
+TODO: Ethernet debugging output.
 
 # Controlling Computer
 
