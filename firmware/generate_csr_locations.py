@@ -2,6 +2,12 @@
 import json
 import sys
 
+"""
+This file takes the csr.json file output by LiteX and extracts all
+CSRs that are handled by Upsilon directly. See the output file csr.json
+for layout.
+"""
+
 class CSRGenerator:
 	def __init__(self, json_file, registers, f):
 		self.registers = registers
