@@ -13,15 +13,15 @@ class CSRGenerator:
 			regname = f"base_{name}"
 		else:
 			regname = f"base_{name}_{num}"
-		return f'(csr_t) {self.j["csr_registers"][regname]["addr"]}'
+		return f'{self.j["csr_registers"][regname]["addr"]}'
 	def print(self, *args):
 		print(*args, end='', file=self.file)
 
 	def print_array(self, name, num):
 		if num == 1:
-			self.print(f'csr_t {name} = {self.get_reg(name, None)};\n')
+			self.print(f'uintptr_t {name} = {self.get_reg(name, None)};\n')
 		else:
-			self.print(f'csr_t {name}[{num}] = {{', self.get_reg(name, 0))
+			self.print(f'uintptr_t {name}[{num}] = {{', self.get_reg(name, 0))
 			for i in range(1,num):
 				self.print(',', self.get_reg(name, i))
 			self.print('};\n\n')
@@ -31,7 +31,6 @@ class CSRGenerator:
 			self.print_array(name, num)
 	def print_file(self):
 		self.print(f'''#pragma once
-typedef volatile uint32_t *csr_t;
 #define ADC_MAX {adc_num}
 #define DAC_MAX {dac_num}
 ''')
