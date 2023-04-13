@@ -64,7 +64,7 @@ class Base(Module, AutoCSR):
 		`o_` prefix in the keyword arguments.
 		"""
 
-		if header_name not in self.csrset:
+		if name not in self.csrdict.keys():
 			self.csrdict[name] = csrlen
 		if num is not None:
 			name = f"{name}_{num}"
@@ -128,12 +128,12 @@ class Base(Module, AutoCSR):
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
 
-		with f as open("io_widths.h", mode='w'):
+		with open("io_widths.h", mode='w') as f:
 			print('#pragma once', file=f)
 			for key in self.csrdict:
 				print(f'#define {key.upper()}_LEN {self.csrdict[key]}', file=f)
 
-		self.specials += Instance("base", **kwargs)
+		self.specials += Instance("base", **self.kwargs)
 
 # Clock and Reset Generator
 # I don't know how this works, I only know that it does.
