@@ -32,3 +32,4 @@ firmware/rtl/raster/route.log
 firmware/rtl/raster/synth.log
 firmware/rtl/raster/synth_test_yosys.v
 firmware/rtl/raster/yosys_output
+firmware/csr_bitwidth.json
