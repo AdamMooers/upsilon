@@ -14,12 +14,12 @@
 #include <zephyr/logging/log.h>
 #include "upsilon.h"
 #include "access.h"
-#include "pin_io.h"
 #include "control_loop_cmds.h"
 
 LOG_MODULE_REGISTER(access);
+#include "pin_io.c"
 
-/* The values from converters are not aligned to an 8-bit byte.
+/* The values from converters are not aligned to 32 bits.
  * These values are still in twos compliment and have to be
  * manually sign-extended.
  */
@@ -61,8 +61,8 @@ dac_release(int dac)
 		return -EFAULT;
 
 	if (dac_locked[dac] == 1) {
-		*dac_arm[dac] = 0;
-		while (!*dac_finished[dac]);
+		write_dac_arm(0, dac);
+		while (!read_dac_finished(dac));
 	}
 
 	int e = k_mutex_unlock(dac_mutex + dac);
@@ -81,20 +81,20 @@ dac_read_write(int dac, creole_word send, k_timeout_t timeout,
 		return e;
 	dac_switch(dac, DAC_SPI_PORT, K_NO_WAIT);
 
-	litex_write32(send, to_dac[dac]);
-	litex_write8(1, dac_arm[dac]);
+	write_to_dac(send, dac);
+	write_dac_arm(1, dac);
 
-	/* Recursive locks should busy wait. */
+	/* Non-recursive locks should busy wait. */
 	/* 10ns * (2 * 10 cycles per half DAC cycle)
 	        * 24 bits
 	 */
 	if (dac_locked[dac] > 1)
 		k_sleep(K_NSEC(10*2*10*24));
-	while (!litex_read8(dac_finished[dac]));
+	while (!read_dac_finished(dac));
 
 	if (recv)
-		*recv = sign_extend(litex_read32(from_dac[dac]), 20);
-	litex_write8(0, dac_arm[dac]);
+		*recv = sign_extend(read_from_dac(dac), 20);
+	write_dac_arm(0, dac);
 
 	dac_release(dac);
 	return 0;
@@ -107,7 +107,7 @@ dac_switch(int dac, int setting, k_timeout_t timeout)
 	if (e != 0)
 		return e;
 
-	litex_write8(setting, dac_sel[dac]);
+	write_dac_sel(setting, dac);
 
 	dac_release(dac);
 	return 0;
@@ -140,8 +140,8 @@ adc_release(int adc)
 		return -EFAULT;
 
 	if (adc_locked[adc] == 1) {
-		*adc_arm[adc] = 0;
-		while (!*adc_finished[adc]);
+		write_adc_arm(0, adc);
+		while (!read_adc_finished(adc));
 	}
 
 	int e = k_mutex_unlock(adc_mutex + adc);
@@ -164,7 +164,7 @@ adc_switch(int adc, int setting, k_timeout_t timeout)
 	if (e != 0)
 		return e;
 
-	litex_write8(setting, adc_sel_0);
+	write_adc_sel_0(setting);
 
 	adc_release(adc);
 	return 0;
@@ -178,15 +178,15 @@ adc_read(int adc, k_timeout_t timeout, creole_word *wrd)
 		return e;
 
 	adc_switch(adc, ADC_SPI_PORT, K_NO_WAIT);
-	litex_write8(1, adc_arm[adc]);
+	write_adc_arm(1, adc);
 
 	/* Recursive locks should busy wait. */
 	if (adc_locked[adc] > 1)
 		k_sleep(K_NSEC(550 + 24*2*10*10));
-	while (!litex_read8(adc_finished[adc]));
+	while (!read_adc_finished(adc));
 
-	*wrd = sign_extend(litex_read32(from_adc[adc]), 20);
-	litex_write8(0, adc_arm[adc]);
+	*wrd = sign_extend(read_from_adc(adc), 20);
+	write_adc_arm(0, adc);
 
 	adc_release(adc);
 	return 0;
@@ -231,11 +231,11 @@ cloop_read(int code, uint32_t *high_reg, uint32_t *low_reg,
 	if (cloop_take(timeout) != 0)
 		return 0;
 
-	litex_write8(code, cl_cmd);
-	litex_write8(1, cl_start_cmd);
-	while (!litex_read8(cl_finish_cmd));
-	v = litex_read64(cl_word_out);
-	litex_write8(0, cl_start_cmd);
+	write_cl_cmd(code);
+	write_cl_start_cmd(1);
+	while (!read_cl_finish_cmd());
+	v = read_cl_word_out();
+	write_cl_start_cmd(0);
 
 	*high_reg = v >> 32;
 	*low_reg = v & 0xFFFFFFFF;
@@ -251,11 +251,11 @@ cloop_write(int code, uint32_t high_val, uint32_t low_val,
 	if (cloop_take(timeout) != 0)
 		return 0;
 
-	litex_write8(code, cl_cmd);
-	litex_write64((uint64_t) high_val << 32 | low_val, cl_word_in);
-	litex_write8(1, cl_start_cmd);
-	while (!litex_read8(cl_finish_cmd));
-	litex_write8(0, cl_start_cmd);
+	write_cl_cmd(code);
+	write_cl_word_in((uint64_t) high_val << 32 | low_val);
+	write_cl_start_cmd(1);
+	while (!read_cl_finish_cmd());
+	write_cl_start_cmd(0);
 
 	cloop_release();
 	return 1;
@@ -284,11 +284,9 @@ waveform_take(int waveform, k_timeout_t timeout)
 static void
 waveform_disarm_wait(int wf)
 {
-	litex_write8(0, wf_arm[wf]);
-	if (*wf_running[wf]) {
-		// k_sleep(K_NSEC(10* *wf_time_to_wait[wf]));
-		while (litex_read8(wf_running[wf]));
-	}
+	write_wf_arm(0, wf);
+	/* TODO: add wait */
+	while (read_wf_running(wf));
 }
 
 int
@@ -328,10 +326,10 @@ waveform_load(uint32_t buf[MAX_WL_SIZE], int slot, k_timeout_t timeout)
 	if (waveform_take(slot, timeout) != 0)
 		return 0;
 
-	litex_write32((uint32_t) buf, wf_start_addr[slot]);
-	litex_write8(1, wf_refresh_start[slot]);
-	while (!litex_read8(wf_refresh_finished[slot]));
-	litex_write8(0, wf_refresh_start[slot]);
+	write_wf_start_addr((uint32_t) buf, slot);
+	write_wf_refresh_start(1, slot);
+	while (!read_wf_refresh_finished(slot));
+	write_wf_refresh_start(0, slot);
 
 	waveform_release(slot);
 	return 1;
@@ -340,8 +338,8 @@ waveform_load(uint32_t buf[MAX_WL_SIZE], int slot, k_timeout_t timeout)
 int
 waveform_halt_until_finished(int slot)
 {
-	litex_write8(1, wf_halt_on_finish[slot]);
-	while (!litex_read(wf_finished[slot]));
+	write_wf_halt_on_finish(1, slot);
+	while (!read_wf_finished(slot));
 	return 1;
 }
 
@@ -357,9 +355,9 @@ waveform_arm(int slot, bool halt_on_finish, uint32_t wait, k_timeout_t timeout)
 
 	dac_switch(slot, DAC_WF_PORT, K_NO_WAIT);
 
-	litex_write8(halt_on_finish, wf_halt_on_finish[slot]);
-	litex_write16(wait, wf_time_to_wait[slot]);
-	litex_write8(1, wf_arm[slot]);
+	write_wf_halt_on_finish(halt_on_finish, slot);
+	write_wf_time_to_wait(wait, slot);
+	write_wf_arm(1, slot);
 
 	return 1;
 }
@@ -401,9 +399,6 @@ access_release_thread(void)
 			LOG_WRN("%s: waveform mutex %d counter mismatch", get_thread_name(), i);
 			waveform_locked[i] = 0;
 		}
-	}
-
-	for (int i = 0; i < DAC_MAX; i++) {
 	}
 
 	for (int i = 0; i < ADC_MAX; i++) {

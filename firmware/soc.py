@@ -128,10 +128,9 @@ class Base(Module, AutoCSR):
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
 
-		with open("io_widths.h", mode='w') as f:
-			print('#pragma once', file=f)
-			for key in self.csrdict:
-				print(f'#define {key.upper()}_LEN {self.csrdict[key]}', file=f)
+		with open("csr_bitwidth.json", mode='w') as f:
+			import json
+			json.dump(self.csrdict, f)
 
 		self.specials += Instance("base", **self.kwargs)
 

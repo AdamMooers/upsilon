@@ -5,7 +5,7 @@ firmware/litex_json2dts_zephyr.py
 firmware/overlay.config
 firmware/overlay.cmake
 firmware/overlay.dts
-firmware/pin_io.h
+firmware/pin_io.c
 misc/
 software/build/
 *.fst
