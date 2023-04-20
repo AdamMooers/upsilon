@@ -247,6 +247,8 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	output reg [CL_DATA_WID-1:0] cl_word_out,
 	input cl_start_cmd,
 	output reg cl_finish_cmd
+
+	,output reg test_clock
 );
 
 wire [ADC_NUM-1:0] adc_conv_L;
@@ -260,6 +262,17 @@ m4_dac_switch(DAC_PORTS, 4);
 m4_dac_switch(DAC_PORTS, 5);
 m4_dac_switch(DAC_PORTS, 6);
 m4_dac_switch(DAC_PORTS, 7);
+
+reg [ADC_CYCLE_HALF_WAIT_SIZ-1:0] counter = 0;
+
+always @ (posedge clk) begin
+	if (counter >= ADC_CYCLE_HALF_WAIT) begin
+		counter <= 0;
+		test_clock <= !test_clock;
+	end else begin
+		counter <= counter + 1;
+	end
+end
 
 /* 1st adc is Type 1 (18 bit) */
 

@@ -25,7 +25,8 @@ io = [
 	("dac_sck", 0, Pins("D12 K16 C15 J15 V11 U13 F3 G2"), IOStandard("LVCMOS33")),
 	("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
 	("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
-	("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33"))
+	("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
+	("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
 
 # TODO: Generate widths based off of include files (m4 generated)
@@ -127,6 +128,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["o_adc_conv"] = platform.request("adc_conv")
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
+		self.kwargs["o_test_clock"] = platform.request("test_clock")
 
 		with open("csr_bitwidth.json", mode='w') as f:
 			import json
