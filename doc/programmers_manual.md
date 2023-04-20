@@ -25,6 +25,9 @@ made up of Yosys (synthesis) and nextpnr (place and route).
 
 ## Required Knowledge
 
+This document is written under the assumption that you are using Linux.
+You can make this work on other platforms but I don't know how to.
+
 Verilog is critical for writing hardware. You should hopefully not have
 to write much of it.
 
@@ -193,7 +196,7 @@ TFTP FOR THE AMOUNT OF TIME REQUIRED TO BOOT THE CONTROL SOFTWARE.**
 You can read about how to setup a TFTP server on the [OpenWRT wiki][owrt_wiki].
 On Linux, run
 
-	dnsmasq --port=0 --enable-tftp --tftp-root=/path/to/firmware/directory --user=root --group=root --interface=$INTERFACE
+	dnsmasq -d --port=0 --enable-tftp --tftp-root=/path/to/firmware/directory --user=root --group=root --interface=$INTERFACE
 
 Do not use `--tftp-no-blocksize`. The controller will only read the first
 512 bytes of the kernel.
@@ -552,7 +555,7 @@ static ip.
 
 1. Remove your computer from the DHCP list that the router has.
 2. Run `ip link set eth-interface up`.
-3. Then run `ip addr` and run `ip addr remove del [ip] dev eth-interface` on
+3. Then run `ip addr` and run `ip addr del [ip] dev eth-interface` on
    each ip on the ethernet interface that is connected to the controller.
 3. Run `ip addr add 192.168.1.100/24 dev eth-interface` (or whatever ip + subnet
    mask you need)
