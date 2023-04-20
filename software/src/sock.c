@@ -52,8 +52,10 @@ server_accept_client(int server)
 	 */
 	do {
 		LOG_DBG("Accept");
+		/*
 		struct zsock_pollfd server_fd = { .fd = server, .events = ZSOCK_POLLIN };
 		zsock_poll(&server_fd, 1, -1);
+		*/
 		client = zsock_accept(server, (struct sockaddr *)&addr, &len);
 		if (client < 0)
 			LOG_WRN("error in accept: %d", errno);
