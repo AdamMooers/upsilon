@@ -29,6 +29,7 @@ See also [Dan Gisselquist][1]'s rules for FPGA development.
   takes care of connecting modules together and assigning each register
   a memory location.
 * Keep all Verilog as generic as possible.
+* Always initialize registers.
 
 # Software
 
