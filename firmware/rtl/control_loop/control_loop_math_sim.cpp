@@ -67,6 +67,7 @@ static void calculate() {
 int main(int argc, char **argv) {
 	init(argc, argv);
 	mod->arm = 0;
+	mod->rst_L = 1;
 	run_clock();
 	Transfer func = Transfer{150, 0, 2, 1.1, 10, -1};
 

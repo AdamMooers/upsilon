@@ -12,6 +12,7 @@ module bram_interface_sim #(
 	parameter RAM_WORD_INCR = 2
 ) (
 	input clk,
+	input rst_L,
 
 	/* autoapproach interface */
 	output [WORD_WID-1:0] word,
@@ -59,6 +60,7 @@ bram_interface #(
 	.RAM_WORD_INCR(RAM_WORD_INCR)
 ) bram_interface (
 	.clk(clk),
+	.rst_L(rst_L),
 	.word(word),
 	.word_next(word_next),
 	.word_last(word_last),

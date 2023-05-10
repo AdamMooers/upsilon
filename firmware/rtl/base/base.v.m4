@@ -43,6 +43,7 @@ m4_define(m4_dac_wires, ⟨
 /* Same thing but for ADCs */
 
 m4_define(m4_adc_wires, ⟨
+	input [$3-1:0] adc_sel_$2,
 	output adc_finished_$2,
 	input adc_arm_$2,
 	output [$1-1:0] from_adc_$2
@@ -86,6 +87,7 @@ m4_define(m4_dac_switch, ⟨
 		.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
 	) dac_master_$2 (
 		.clk(clk),
+		.rst_L(rst_L),
 		.mosi(mosi_port_$2[0]),
 		.miso(miso_port_$2[0]),
 		.sck_wire(sck_port_$2[0]),
@@ -135,6 +137,27 @@ m4_define(m4_dac_switch, ⟨
 /* Same thing but for ADCs */
 
 m4_define(m4_adc_switch, ⟨
+	wire adc_mosi_unused_output_$2;
+	wire [$3-1:0] adc_mosi_port_$2; /* Unused! */
+	wire [$3-1:0] adc_sdo_port_$2;
+	wire [$3-1:0] adc_sck_port_$2;
+	wire [$3-1:0] adc_conv_L_port_$2;
+
+	spi_switch #(
+		.PORTS($3)
+	) adc_switch_$2 (
+		.select(adc_sel_$2),
+		.mosi(adc_mosi_unused_output_$2),
+		.miso(adc_sdo[$2]),
+		.sck(adc_sck[$2]),
+		.ss_L(adc_conv_L[$2]),
+
+		.mosi_ports(adc_mosi_port_$2),
+		.miso_ports(adc_sdo_port_$2),
+		.sck_ports(adc_sck_port_$2),
+		.ss_L_ports(adc_conv_L_port_$2)
+	);
+
 	spi_master_ss_no_write #(
 		.WID($1),
 		.WID_LEN(ADC_WID_SIZ),
@@ -146,13 +169,21 @@ m4_define(m4_adc_switch, ⟨
 		.PHASE(ADC_PHASE)
 	) adc_master_$2 (
 		.clk(clk),
-		.miso(adc_sdo[$2]),
-		.sck_wire(adc_sck[$2]),
-		.ss_L(adc_conv_L[$2]),
+		.rst_L(rst_L),
+		.miso(adc_sdo_port_$2[0]),
+		.sck_wire(adc_sck_port_$2[0]),
+		.ss_L(adc_conv_L_port_$2[0]),
 		.finished(adc_finished_$2),
 		.arm(adc_arm_$2),
 		.from_slave(from_adc_$2)
-	)
+	);
+
+/* 2nd option for each ADC is the non-converting option.
+ * This is used to flush output from reset ADCs.
+ */
+	assign adc_sdo_port[1] = adc_sdo_port[0];
+	assign adc_sck_port[1] = adc_sck_port[0];
+	assign adc_conv_L_port[1] = 1;
 ⟩)
 
 /*********************************************************/
@@ -181,7 +212,7 @@ m4_define(DAC_PORTS_CONTROL_LOOP, (DAC_PORTS + 1))
 	parameter WF_RAM_WORD_WID = 16,
 	parameter WF_RAM_WORD_INCR = 2,
 
-	parameter ADC_PORTS = 1,
+	parameter ADC_PORTS = 2,
 m4_define(ADC_PORTS_CONTROL_LOOP, (ADC_PORTS + 1))
 	parameter ADC_NUM = 8,
 	/* Three types of ADC. For now assume that their electronics
@@ -211,6 +242,7 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	parameter CL_CYCLE_COUNT_WID = 18
 ) (
 	input clk,
+	input rst_L,
 
 	output [DAC_NUM-1:0] dac_mosi,
 	input  [DAC_NUM-1:0] dac_miso,
@@ -230,16 +262,14 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	m4_dac_wires(DAC_PORTS, 6),
 	m4_dac_wires(DAC_PORTS, 7),
 
-	input [ADC_PORTS_CONTROL_LOOP-1:0] adc_sel_0,
-
-	m4_adc_wires(ADC_TYPE1_WID, 0),
-	m4_adc_wires(ADC_TYPE1_WID, 1),
-	m4_adc_wires(ADC_TYPE1_WID, 2),
-	m4_adc_wires(ADC_TYPE1_WID, 3),
-	m4_adc_wires(ADC_TYPE1_WID, 4),
-	m4_adc_wires(ADC_TYPE1_WID, 5),
-	m4_adc_wires(ADC_TYPE1_WID, 6),
-	m4_adc_wires(ADC_TYPE1_WID, 7),
+	m4_adc_wires(ADC_TYPE1_WID, 0, ADC_PORTS_CONTROL_LOOP),
+	m4_adc_wires(ADC_TYPE1_WID, 1, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 2, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 3, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 4, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 5, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 6, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE1_WID, 7, ADC_PORTS),
 
 	output cl_in_loop,
 	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
@@ -263,58 +293,53 @@ m4_dac_switch(DAC_PORTS, 5);
 m4_dac_switch(DAC_PORTS, 6);
 m4_dac_switch(DAC_PORTS, 7);
 
-reg [ADC_CYCLE_HALF_WAIT_SIZ-1:0] counter = 0;
+initial test_clock <= 0;
+reg [8-1:0] counter = 0;
 
+/*
 always @ (posedge clk) begin
-	if (counter >= ADC_CYCLE_HALF_WAIT) begin
+	if (!rst_L) begin
+		counter <= 0;
+		test_clock <= 0;
+	end else if (counter >= ADC_CYCLE_HALF_WAIT) begin
 		counter <= 0;
 		test_clock <= !test_clock;
 	end else begin
 		counter <= counter + 1;
 	end
 end
+*/
+/*
+always @ (posedge clk) begin
+	if(!rst_L) begin
+		test_clock <= 0;
+	end else begin
+		test_clock <= !test_clock;
+	end
+end
+*/
+always @ (posedge clk) begin
+	if (!rst_L) begin
+		counter <= 0;
+		test_clock <= 0;
+	end else begin
+		if (counter >= 3) begin
+			counter <= 0;
+			test_clock <= !test_clock;
+		end else begin
+			counter <= counter + 1;
+		end
+	end
+end
 
-/* 1st adc is Type 1 (18 bit) */
-
-wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_conv_L_port_0;
-wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_sdo_port_0;
-wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_sck_port_0;
-wire [ADC_PORTS_CONTROL_LOOP-1:0] adc_mosi_port_0_unassigned;
-wire adc_mosi_unassigned;
-
-spi_switch #(
-	.PORTS(ADC_PORTS_CONTROL_LOOP)
-) switch_adc_0 (
-	.select(adc_sel_0),
-	.mosi(adc_mosi_unassigned),
-	.miso(adc_sdo[0]),
-	.sck(adc_sck[0]),
-	.ss_L(adc_conv_L[0]),
-
-	.mosi_ports(adc_mosi_port_0_unassigned),
-	.miso_ports(adc_sdo_port_0),
-	.sck_ports(adc_sck_port_0),
-	.ss_L_ports(adc_conv_L_port_0)
-);
-
-spi_master_ss_no_write #(
-	.WID(ADC_TYPE1_WID),
-	.WID_LEN(ADC_WID_SIZ),
-	.CYCLE_HALF_WAIT(ADC_CYCLE_HALF_WAIT),
-	.TIMER_LEN(ADC_CYCLE_HALF_WAIT_SIZ),
-	.SS_WAIT(ADC_CONV_WAIT),
-	.SS_WAIT_TIMER_LEN(ADC_CONV_WAIT_SIZ),
-	.POLARITY(ADC_POLARITY),
-	.PHASE(ADC_PHASE)
-) adc_master_0 (
-	.clk(clk),
-	.miso(adc_sdo_port_0[0]),
-	.sck_wire(adc_sck_port_0[0]),
-	.ss_L(adc_conv_L_port_0[0]),
-	.finished(adc_finished_0),
-	.arm(adc_arm_0),
-	.from_slave(from_adc_0)
-);
+m4_adc_switch(ADC_TYPE1_WID, 0, ADC_PORTS_CONTROL_LOOP);
+m4_adc_switch(ADC_TYPE1_WID, 1, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 2, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 3, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 4, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 5, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 6, ADC_PORTS);
+m4_adc_switch(ADC_TYPE1_WID, 7, ADC_PORTS);
 
 control_loop #(
 	.ADC_WID(ADC_TYPE1_WID),
@@ -342,27 +367,20 @@ control_loop #(
 	.DAC_SS_WAIT_SIZ(DAC_SS_WAIT_SIZ)
 ) cl (
 	.clk(clk),
+	.rst_L(rst_L),
 	.in_loop(cl_in_loop),
 	.dac_mosi(mosi_port_0[2]),
 	.dac_miso(miso_port_0[2]),
 	.dac_ss_L(ss_L_port_0[2]),
 	.dac_sck(sck_port_0[2]),
-	.adc_miso(adc_sdo_port_0[1]),
-	.adc_conv_L(adc_conv_L_port_0[1]),
-	.adc_sck(adc_sck_port_0[1]),
+	.adc_miso(adc_sdo_port_0[2]),
+	.adc_conv_L(adc_conv_L_port_0[2]),
+	.adc_sck(adc_sck_port_0[2]),
 	.cmd(cl_cmd),
 	.word_in(cl_word_in),
 	.word_out(cl_word_out),
 	.start_cmd(cl_start_cmd),
 	.finish_cmd(cl_finish_cmd)
 );
-
-m4_adc_switch(ADC_TYPE1_WID, 1);
-m4_adc_switch(ADC_TYPE1_WID, 2);
-m4_adc_switch(ADC_TYPE1_WID, 3);
-m4_adc_switch(ADC_TYPE1_WID, 4);
-m4_adc_switch(ADC_TYPE1_WID, 5);
-m4_adc_switch(ADC_TYPE1_WID, 6);
-m4_adc_switch(ADC_TYPE1_WID, 7);
 
 endmodule

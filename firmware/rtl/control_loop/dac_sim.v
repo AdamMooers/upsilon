@@ -6,6 +6,7 @@ module dac_sim #(
 	parameter WID_LEN = 5
 ) (
 	input clk,
+	input rst_L,
 
 	output reg [DATA_WID-1:0] curset,
 
@@ -23,7 +24,12 @@ wire spi_fin;
 reg [WID-4-1:0] ctrl_register = 0;
 
 always @ (posedge clk) begin
-	if (spi_fin) begin
+	if (!rst_L) begin
+		curset <= 0;
+		to_master <= 0;
+		rdy <= 0;
+		ctrl_register <= 0;
+	end else if (spi_fin) begin
 		rdy <= 0;
 		case (from_master[WID-1:WID-4])
 		4'b1001: begin
@@ -56,6 +62,7 @@ spi_slave #(
 	.clk(clk),
 	.sck(sck),
 	.ss_L(ss_L),
+	.rst_L(rst_L),
 	.miso(miso),
 	.mosi(mosi),
 	.from_master(from_master),

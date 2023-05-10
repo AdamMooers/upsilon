@@ -1,6 +1,7 @@
 # Makefile for tests and hardware verification.
 
 .PHONY: test clean codegen
+include ../common.makefile
 
 all: test codegen
 test: obj_dir/Vspi_switch

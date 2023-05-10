@@ -41,6 +41,7 @@ m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 	parameter DAC_SS_WAIT_SIZ = 3
 ) (
 	input clk,
+	input rst_L,
 	output in_loop,
 
 	output dac_mosi,
@@ -64,6 +65,7 @@ m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 
 reg dac_arm;
 reg dac_finished;
+wire dac_ready_to_arm_unused;
 
 reg [DAC_WID-1:0] to_dac;
 /* verilator lint_off UNUSED */
@@ -80,6 +82,8 @@ spi_master_ss #(
 	.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
 ) dac_master (
 	.clk(clk),
+	.rst_L(rst_L),
+	.ready_to_arm(dac_ready_to_arm_unused),
 	.mosi(dac_mosi),
 	.miso(dac_miso),
 	.sck_wire(dac_sck),
@@ -93,6 +97,7 @@ spi_master_ss #(
 reg adc_arm;
 reg adc_finished;
 wire [ADC_WID-1:0] measured_value;
+wire adc_ready_to_arm_unused;
 
 localparam [3-1:0] DAC_REGISTER = 3'b001;
 
@@ -107,6 +112,8 @@ spi_master_ss_no_write #(
 	.SS_WAIT_TIMER_LEN(ADC_CONV_WAIT_SIZ)
 ) adc_master (
 	.clk(clk),
+	.ready_to_arm(adc_ready_to_arm_unused),
+	.rst_L(rst_L),
 	.arm(adc_arm),
 	.from_slave(measured_value),
 	.miso(adc_miso),
@@ -166,6 +173,7 @@ control_loop_math #(
 	.ADC_TO_DAC({32'b01000001100, 32'b01001001101110100101111000110101})
 ) math (
 	.clk(clk),
+	.rst_L(rst_L),
 	.arm(arm_math),
 	.finished(math_finished),
 	.setpt(setpt),
@@ -228,7 +236,10 @@ reg [DELAY_WID-1:0] timer = 0;
 
 /**** Timing. ****/
 always @ (posedge clk) begin
-	if (state == CYCLE_START && timer == 0) begin
+	if (!rst_L) begin
+		counting_timer <= 0;
+		last_timer <= 0;
+	end else if (state == CYCLE_START && timer == 0) begin
 		counting_timer <= 1;
 		last_timer <= counting_timer;
 	end else if (running) begin
@@ -245,7 +256,11 @@ wire write_control = state == CYCLE_START || !running;
 reg dirty_bit = 0;
 
 always @ (posedge clk) begin
-	if (start_cmd && !finish_cmd) begin
+	if (!rst_L) begin
+		dirty_bit <= 0;
+		finish_cmd <= 0;
+		word_out <= 0;
+	end else if (start_cmd && !finish_cmd) begin
 		case (cmd)
 		M4_CONTROL_LOOP_NOOP:
 			finish_cmd <= 1;
@@ -331,7 +346,21 @@ end
 assign in_loop = state != INIT_READ_FROM_DAC || running;
 
 always @ (posedge clk) begin
-	case (state)
+	if (!rst_L) begin
+		to_dac <= 0;
+		dac_arm <= 0;
+		state <= INIT_READ_FROM_DAC;
+		timer <= 0;
+		stored_dac_val <= 0;
+		setpt <= 0;
+		dely <= 0;
+		cl_I_reg <= 0;
+		adjval_prev <= 0;
+		err_prev <= 0;
+
+		adc_arm <= 0;
+		arm_math <= 0;
+	end else case (state)
 	INIT_READ_FROM_DAC: begin
 		if (running) begin
 			to_dac <= {1'b1, DAC_REGISTER, 20'b0};

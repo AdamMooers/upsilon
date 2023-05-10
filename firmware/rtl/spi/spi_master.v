@@ -1,4 +1,4 @@
-/* (c) Peter McGoron 2022 v0.2
+/* (c) Peter McGoron 2022 v0.3
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v.2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -30,6 +30,7 @@ spi_master
 )
 (
 	input clk,
+	input rst_L,
 `ifndef SPI_MASTER_NO_READ
 	output reg [WID-1:0] from_slave,
 	input miso,
@@ -40,6 +41,7 @@ spi_master
 `endif
 	output reg sck_wire,
 	output reg finished,
+	output reg ready_to_arm,
 	input arm
 );
 
@@ -134,17 +136,39 @@ task cycle_change();
 	end
 endtask
 
+initial ready_to_arm = 1;
+
 always @ (posedge clk) begin
-	case (state)
+	if (!rst_L) begin
+		idle_state();
+		finished <= 0;
+		state <= WAIT_ON_ARM;
+		ready_to_arm <= 1;
+`ifndef SPI_MASTER_NO_READ
+		from_slave <= 0;
+`endif
+`ifndef SPI_MASTER_NO_WRITE
+		send_buf <= 0;
+`endif
+	end else case (state)
 	WAIT_ON_ARM: begin
+`ifdef SIMULATION
+		if (!ready_to_arm)
+			$error("not ready to arm in wait_on_arm");
+`endif
 		if (!arm) begin
 			idle_state();
 			finished <= 0;
 		end else begin
 			setup_bits();
+			ready_to_arm <= 0;
 		end
 	end
 	ON_CYCLE: begin
+`ifdef SIMULATION
+		if (ready_to_arm)
+			$error("ready_to_arm while on cycle");
+`endif
 		if (sck) begin // rising edge
 			if (PHASE == 1) begin
 				write_data();
@@ -174,6 +198,10 @@ always @ (posedge clk) begin
 		end
 	end
 	CYCLE_WAIT: begin
+`ifdef SIMULATION
+		if (ready_to_arm)
+			$error("ready_to_arm while in cycle wait");
+`endif
 		if (timer == CYCLE_HALF_WAIT) begin
 			timer <= 1;
 			cycle_change();
@@ -182,10 +210,15 @@ always @ (posedge clk) begin
 		end
 	end
 	WAIT_FINISHED: begin
+`ifdef SIMULATION
+		if (ready_to_arm)
+			$error("ready_to_arm while in wait finished");
+`endif
 		finished <= 1;
 		idle_state();
 		if (!arm) begin
 			state <= WAIT_ON_ARM;
+			ready_to_arm <= 1;
 		end
 	end
 	endcase

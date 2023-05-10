@@ -21,6 +21,7 @@ module waveform_sim #(
 	parameter RAM_WORD_INCR = 2
 ) (
 	input clk,
+	input rst_L,
 	input arm,
 	input halt_on_finish,
 	output waveform_finished,
@@ -52,6 +53,7 @@ spi_slave_no_write #(
 ) slave (
 	.clk(clk),
 	.sck(sck),
+	.rst_L(rst_L),
 	.ss_L(ss_L),
 	.mosi(mosi),
 	.from_master(from_master),
@@ -101,6 +103,7 @@ waveform #(
 ) waveform (
 	.clk(clk),
 	.arm(arm),
+	.rst_L(rst_L),
 	.halt_on_finish(halt_on_finish),
 	.running(running),
 	.finished(waveform_finished),

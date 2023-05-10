@@ -19,6 +19,7 @@ module control_loop_sim_top #(
 	parameter DELAY_WID = 16
 )(
 	input clk,
+	input rst_L,
 	output in_loop,
 
 	output [DAC_DATA_WID-1:0] curset,
@@ -53,6 +54,7 @@ adc_sim #(
 	.PHASE(ADC_PHASE)
 ) adc (
 	.clk(clk),
+	.rst_L(rst_L),
 	.indat(measured_value),
 	.request(request),
 	.fulfilled(fulfilled),
@@ -77,6 +79,7 @@ dac_sim #(
 	.PHASE(DAC_PHASE)
 ) dac (
 	.clk(clk),
+	.rst_L(rst_L),
 	.curset(curset),
 	.mosi(dac_mosi),
 	.miso(dac_miso),
@@ -105,6 +108,7 @@ control_loop #(
 	.DAC_PHASE(DAC_PHASE)
 ) cloop (
 	.clk(clk),
+	.rst_L(rst_L),
 	.in_loop(in_loop),
 	.dac_mosi(dac_mosi),
 	.dac_miso(dac_miso),

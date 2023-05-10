@@ -26,7 +26,7 @@ obj_dir/Vwaveform_sim.mk: $(waveform_src)
 	verilator --cc --exe -Wall --trace --trace-fst -I../spi \
 		-CFLAGS -DWORD_AMNT=2048 \
 		-CFLAGS -DRAM_WID=32 \
-		-D VERILATOR_SIMULATION \
+		-DVERILATOR_SIMULATION \
 		$(waveform_src)
 obj_dir/Vwaveform_sim: obj_dir/Vwaveform_sim.mk $(waveform_src)
 	cd obj_dir && make -f Vwaveform_sim.mk

@@ -1,6 +1,5 @@
 /* Write a waveform to a DAC. */
-/* TODO: Add reset pin.
- *       Add "how many values to go" counter. */
+/* TODO: Add "how many values to go" counter. */
 module waveform #(
 	parameter DAC_WID = 24,
 	parameter DAC_WID_SIZ = 5,
@@ -19,6 +18,7 @@ module waveform #(
 	parameter RAM_WORD_INCR = 2
 ) (
 	input clk,
+	input rst_L,
 	input arm,
 	input halt_on_finish,
 	/* NOTE:
@@ -55,10 +55,10 @@ module waveform #(
 );
 
 wire [WORD_WID-1:0] word;
-reg word_next;
+reg word_next = 0;
 wire word_ok;
 wire word_last;
-reg word_rst;
+reg word_rst = 1;
 
 bram_interface #(
 	.WORD_WID(WORD_WID),
@@ -69,6 +69,7 @@ bram_interface #(
 	.RAM_WORD_INCR(RAM_WORD_INCR)
 ) bram (
 	.clk(clk),
+	.rst_L(rst_L),
 	.word(word),
 	.word_next(word_next),
 	.word_last(word_last),
@@ -86,8 +87,9 @@ bram_interface #(
 );
 
 wire dac_finished;
-reg dac_arm;
-reg [DAC_WID-1:0] dac_out;
+reg dac_arm = 0;
+reg [DAC_WID-1:0] dac_out = 0;
+wire dac_ready_to_arm_unused;
 
 spi_master_ss_no_read #(
 	.WID(DAC_WID),
@@ -100,6 +102,8 @@ spi_master_ss_no_read #(
 	.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
 ) dac_master (
 	.clk(clk),
+	.rst_L(rst_L),
+	.ready_to_arm(dac_ready_to_arm_unused),
 	.mosi(mosi),
 	.sck_wire(sck),
 	.ss_L(ss_L),
@@ -119,11 +123,20 @@ reg [TIMER_WID-1:0] wait_timer = 0;
 
 assign running = state != WAIT_ON_ARM;
 
-always @ (posedge clk) case (state)
+always @ (posedge clk) if (!rst_L) begin
+	state <= WAIT_ON_ARM;
+	wait_timer <= 0;
+	finished <= 0;
+	word_rst <= 1;
+	word_next <= 0;
+	dac_out <= 0;
+	dac_arm <= 0;
+end else case (state)
 WAIT_ON_ARM: begin
 	finished <= 0;
 	if (arm) begin
 		state <= DO_WAIT;
+		word_rst <= 0;
 		wait_timer <= time_to_wait;
 	end else begin
 		word_rst <= 1;

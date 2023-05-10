@@ -26,6 +26,7 @@ io = [
 	("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
 	("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
 	("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
+	("module_reset", 0, Pins("D9"), IOStandard("LVCMOS33")),
 	("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
 
@@ -121,6 +122,7 @@ class Base(Module, AutoCSR):
 		self._make_csr("cl_finish_cmd", CSRStatus, 1, "Control Loop Command Finished Flag")
 
 		self.kwargs["i_clk"] = clk
+		self.kwargs["i_rst_L"] = ~platform.request("module_reset")
 		self.kwargs["i_dac_miso"] = platform.request("dac_miso")
 		self.kwargs["o_dac_mosi"] = platform.request("dac_mosi")
 		self.kwargs["o_dac_sck"] = platform.request("dac_sck")
@@ -138,9 +140,8 @@ class Base(Module, AutoCSR):
 
 # Clock and Reset Generator
 # I don't know how this works, I only know that it does.
-# TODO: Connect cpu_reset pin to Verilog modules.
 class _CRG(Module):
-	def __init__(self, platform, sys_clk_freq, with_dram=True, with_rst=True):
+	def __init__(self, platform, sys_clk_freq, with_dram, rst_pin):
 		self.rst = Signal()
 		self.clock_domains.cd_sys	   = ClockDomain()
 		self.clock_domains.cd_eth	   = ClockDomain()
@@ -151,7 +152,7 @@ class _CRG(Module):
 
 		# Clk/Rst.
 		clk100 = platform.request("clk100")
-		rst	= ~platform.request("cpu_reset") if with_rst else 0
+		rst	= ~rst_pin if rst_pin is not None else 0
 
 		# PLL.
 		self.submodules.pll = pll = S7PLL(speedgrade=-1)
@@ -174,7 +175,8 @@ class CryoSNOM1SoC(SoCCore):
 	def __init__(self, variant):
 		sys_clk_freq = int(100e6)
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
-		self.submodules.crg = _CRG(platform, sys_clk_freq, True)
+		rst = platform.request("cpu_reset")
+		self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
 		# These source files need to be sorted so that modules
 		# that rely on another module come later. For instance,
 		# `control_loop` depends on `control_loop_math`, so

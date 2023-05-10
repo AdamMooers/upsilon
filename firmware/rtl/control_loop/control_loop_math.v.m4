@@ -42,6 +42,7 @@ m4_define(M4_E_WID, (DAC_WID + 1))
 ) (
 	input clk,
 	input arm,
+	input rst_L,
 	output reg finished,
 
 	input signed [ADC_WID-1:0] setpt,
@@ -86,6 +87,7 @@ boothmul #(
 	.a1(a1),
 	.a2(a2),
 	.clk(clk),
+	.rst_L(rst_L),
 	.outn(out_untrunc),
 	.fin(mul_fin),
 	.arm(mul_arm)
@@ -175,7 +177,23 @@ wire signed [M4_CONSTS_WID-1:0] tmpstore_view = tmpstore[M4_CONSTS_WID-1:0];
 
 
 always @ (posedge clk) begin
-	case (state)
+	if (!rst_L) begin
+		state <= WAIT_ON_ARM;
+		a1 <= 0;
+		finished <= 0;
+		mul_arm <= 0;
+		a2 <= 0;
+		e_cur <= 0;
+`ifdef DEBUG_CONTROL_LOOP_MATH
+		dt_reg <= 0;
+		idt_reg <= 0;
+		epidt_reg <= 0;
+		ep_reg <= 0;
+`endif
+		add_sat <= 0;
+		adj_val <= 0;
+		tmpstore <= 0;
+	end else case (state)
 	WAIT_ON_ARM:
 		if (arm) begin
 			a1[CONSTS_FRAC-1:0] <= 0;

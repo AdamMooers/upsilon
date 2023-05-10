@@ -7,6 +7,7 @@ module adc_sim #(
 	input clk,
 
 	input [WID-1:0] indat,
+	input rst_L,
 	output reg request,
 	input fulfilled,
 	output err,
@@ -26,7 +27,14 @@ reg rdy = 0;
 wire spi_fin;
 
 always @ (posedge clk) begin
-	if (ss && !ss_raised) begin
+	if (!rst_L) begin
+		ss_raised <= 0;
+		fulfilled_raised <= 0;
+		ss_buf_L <= 1;
+		data <= 0;
+		rdy <= 0;
+		request <= 0;
+	end else if (ss && !ss_raised) begin
 		request <= 1;
 		ss_raised <= 1;
 	end else if (ss_raised && !ss) begin
@@ -56,6 +64,7 @@ spi_slave_no_read #(
 ) spi (
 	.clk(clk),
 	.sck(sck),
+	.rst_L(rst_L),
 	.ss_L(ss_buf_L),
 	.miso(miso),
 	.to_master(data),

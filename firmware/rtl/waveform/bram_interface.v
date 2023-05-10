@@ -8,6 +8,7 @@ module bram_interface #(
 	parameter RAM_WORD_INCR = 2
 ) (
 	input clk,
+	input rst_L,
 
 	/* autoapproach interface */
 	output reg [WORD_WID-1:0] word,
@@ -35,6 +36,7 @@ initial refresh_finished = 0;
 initial ram_dma_addr = 0;
 initial ram_read = 0;
 
+/* TODO: how to initialize? */
 reg [WORD_WID-1:0] backing_buffer [WORD_AMNT:0];
 
 localparam WAIT_ON_REFRESH = 0;
@@ -42,10 +44,20 @@ localparam READ_LOW_WORD = 1;
 localparam READ_HIGH_WORD = 2;
 localparam WAIT_ON_REFRESH_DEASSERT = 3;
 
-reg [1:0] refresh_state = 0;
+reg [1:0] refresh_state = WAIT_ON_REFRESH;
 reg [WORD_AMNT_WID-1:0] word_cntr_refresh = 0;
 
-always @ (posedge clk) case (refresh_state)
+always @ (posedge clk) if (!rst_L) begin
+	word <= 0;
+	word_last <= 0;
+	word_ok <= 0;
+	refresh_finished <= 0;
+	ram_dma_addr <= 0;
+	ram_read <= 0;
+	/* Do not reset backing buffer because that would take too long */
+	refresh_state <= WAIT_ON_REFRESH;
+	word_cntr_refresh <= 0;
+end else case (refresh_state)
 WAIT_ON_REFRESH: if (refresh_start) begin
 	ram_dma_addr <= start_addr;
 	refresh_state <= READ_LOW_WORD;
@@ -84,7 +96,7 @@ endcase
 
 reg [WORD_AMNT_WID-1:0] auto_cntr = 0;
 
-always @ (posedge clk) if (word_rst) begin
+always @ (posedge clk) if (word_rst || !rst_L) begin
 	auto_cntr <= 0;
 	word_ok <= 0;
 	word_last <= 0;

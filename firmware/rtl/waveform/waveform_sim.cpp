@@ -1,3 +1,4 @@
+/* TODO: impleement reset for dma and test both separetely */
 #include <vector>
 #include "Vwaveform_sim.h"
 #include "../testbench.hpp"
@@ -65,6 +66,7 @@ int main(int argc, char *argv[]) {
 
 	tb = new WaveformTestbench();
 	tb->mod.rdy = 1;
+	tb->mod.rst_L = 1;
 	tb->refresh_data();
 	tb->mod.time_to_wait = 10;
 	tb->mod.halt_on_finish = 1;

@@ -1,4 +1,4 @@
-/* (c) Peter McGoron 2022 v0.2
+/* (c) Peter McGoron 2022 v0.3
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v.2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
@@ -20,6 +20,7 @@ spi_slave
 )
 (
 	input clk,
+	input rst_L,
 	input sck,
 	input ss_L,
 `ifndef SPI_SLAVE_NO_READ
@@ -96,58 +97,69 @@ task check_counter();
 endtask
 
 always @ (posedge clk) begin
-	sck_delay <= sck;
-	ss_delay <= ss;
-
-	case ({ss_delay, ss})
-	2'b01: begin // rising edge of SS
+	if (!rst_L) begin
+		sck_delay <= 0;
 		bit_counter <= 0;
+		ss_delay <= 0;
+		ready_at_start <= 0;
+`ifndef SPI_SLAVE_NO_READ
+		from_master <= 0;
+`endif
+`ifndef SPI_SLAVE_NO_WRITE
+		miso <= 0;
+		send_buf <= 0;
+`endif
 		finished <= 0;
 		err <= 0;
-		ready_at_start <= rdy;
+	end else begin
+		sck_delay <= sck;
+		ss_delay <= ss;
 
-		setup_bits();
-	end
-	2'b10: begin // falling edge
-		finished <= ready_at_start;
-	end
-	2'b11: begin
-		case ({sck_delay, sck})
-		2'b01: begin // rising edge
-			if (PHASE == 1) begin
-				write_data();
-			end else begin
-				read_data();
-			end
+		case ({ss_delay, ss})
+		2'b01: begin // rising edge of SS
+			bit_counter <= 0;
+			finished <= 0;
+			err <= 0;
+			ready_at_start <= rdy;
 
-			if (POLARITY == 0) begin
-				check_counter();
-			end
+			setup_bits();
 		end
 		2'b10: begin // falling edge
-			if (PHASE == 1) begin
-				read_data();
-			end else begin
-				write_data();
-			end
-
-			if (POLARITY == 1) begin
-				check_counter();
-			end
+			finished <= ready_at_start;
 		end
-		default: ;
-		endcase
-	end
-	2'b00: begin
-		if (!rdy) begin
+		2'b11: begin
+			case ({sck_delay, sck})
+			2'b01: begin // rising edge
+				if (PHASE == 1) begin
+					write_data();
+				end else begin
+					read_data();
+				end
+
+				if (POLARITY == 0) begin
+					check_counter();
+				end
+			end
+			2'b10: begin // falling edge
+				if (PHASE == 1) begin
+					read_data();
+				end else begin
+					write_data();
+				end
+
+				if (POLARITY == 1) begin
+					check_counter();
+				end
+			end
+			default: ;
+			endcase
+		end
+		2'b00: if (!rdy) begin
 			finished <= 0;
 			err <= 0;
 		end
-`ifndef SPI_SLAVE_NO_WRITE
-		miso <= 0;
-`endif
+		endcase
 	end
-	endcase
 end
 
 endmodule

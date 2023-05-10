@@ -88,11 +88,14 @@ int main(int argc, char *argv[]) {
 	Verilated::fatalOnError(false);
 
 	tb = new TB<Vbram_interface_sim>();
+	tb->mod.rst_L = 1;
 
 	printf("test basic read/write\n");
 	refresh_data();
+	printf("\ttest 1\n");
 	test_aa_read_1();
 	refresh_data();
+	printf("\ttest 2\n");
 	test_aa_read_1();
 
 	printf("test resetting\n");

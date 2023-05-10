@@ -1,3 +1,8 @@
+/* (c) Peter McGoron 2022 v0.3
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v.2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
 /* spi master with integrated ability to wait a certain amount of cycles
  * after activating SS.
  */
@@ -17,6 +22,7 @@ module `SPI_MASTER_SS_NAME
 )
 (
 	input clk,
+	input rst_L,
 `ifndef SPI_MASTER_NO_READ
 	output [WID-1:0] from_slave,
 	input miso,
@@ -27,6 +33,7 @@ module `SPI_MASTER_SS_NAME
 `endif
 	output sck_wire,
 	output finished,
+	output ready_to_arm,
 	output ss_L,
 	input arm
 );
@@ -44,6 +51,7 @@ assign ss_L = !ss;
 	.PHASE(PHASE)
 ) master (
 	.clk(clk),
+	.rst_L(rst_L),
 `ifndef SPI_MASTER_NO_READ
 	.from_slave(from_slave),
 	.miso(miso),
@@ -54,6 +62,7 @@ assign ss_L = !ss;
 `endif
 	.sck_wire(sck_wire),
 	.finished(finished),
+	.ready_to_arm(ready_to_arm),
 	.arm(arm_master)
 );
 
@@ -70,7 +79,12 @@ task master_arm();
 endtask
 
 always @ (posedge clk) begin
-	case (state)
+	if (!rst_L) begin
+		state <= WAIT_ON_ARM;
+		timer <= 0;
+		arm_master <= 0;
+		ss <= 0;
+	end else case (state)
 	WAIT_ON_ARM: begin
 		if (arm) begin
 			timer <= 1;
