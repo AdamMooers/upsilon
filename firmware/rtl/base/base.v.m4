@@ -245,6 +245,7 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 ) (
 	input clk,
 	input rst_L,
+	output [11-1:0] set_low,
 
 	output [DAC_NUM-1:0] dac_mosi,
 	input  [DAC_NUM-1:0] dac_miso,
@@ -282,6 +283,8 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 
 	,output reg test_clock
 );
+
+assign set_low = 0;
 
 wire [ADC_NUM-1:0] adc_conv_L;
 assign adc_conv = ~adc_conv_L;

@@ -18,11 +18,30 @@ from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
 # Refer to `A7-constraints.xdc` for pin names.
+"""
+DAC: SS MOSI MISO SCK
+  0:  1    2    3   4 (PMOD A top, right to left)
+  1:  1    2    3   4 (PMOD A bottom, right to left)
+  2:  1    2    3   4 (PMOD B top, right to left)
+  3:  0    1    2   3 (Analog header)
+  4:  0    1    2   3 (PMOD C top, right to left)
+  5:  4    5    6   8 (Analog header)
+  6:  1    2    3   4 (PMOD D top, right to left)
+  7:  1    2    3   4 (PMOD D bottom, right to left)
+
+
+Outer chip header (C=CONV, K=SCK, D=SDO, XX=not connected)
+26  27  28  29  30  31  32  33  34  35  36  37  38  39  40  41
+C4  K4  D4  C5  K5  D5  XX  XX  C6  K6  D6  C7  K7  D7  XX  XX
+C0  K0  D0  C1  K1  D1  XX  XX  C2  K2  D2  C3  K3  D3
+0   1   2   3   4   5   6   7   8   9   10  11  12  13
+"""
 io = [
-	("dac_ss_L", 0, Pins("G13 D13 E15 J17 U12 U14 D4 E2"), IOStandard("LVCMOS33")),
-	("dac_mosi", 0, Pins("B11 B18 E16 J18 V12 V14 D3 D2"), IOStandard("LVCMOS33")),
-	("dac_miso", 0, Pins("A11 A18 D15 K15 V10 T13 F4 H2"), IOStandard("LVCMOS33")),
-	("dac_sck", 0, Pins("D12 K16 C15 J15 V11 U13 F3 G2"), IOStandard("LVCMOS33")),
+	("differntial_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
+	("dac_ss_L", 0, Pins("G13 D13 E15 F5 U12 D7 D4 E2"), IOStandard("LVCMOS33")),
+	("dac_mosi", 0, Pins("B11 B18 E16 D8 V12 D5 D3 D2"), IOStandard("LVCMOS33")),
+	("dac_miso", 0, Pins("A11 A18 D15 C7 V10 B7 F4 H2"), IOStandard("LVCMOS33")),
+	("dac_sck", 0, Pins("D12 K16 C15 E7 V11 E6 F3 G2"), IOStandard("LVCMOS33")),
 	("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
 	("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
 	("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
@@ -113,7 +132,6 @@ class Base(Module, AutoCSR):
 			self._make_csr("adc_arm", CSRStorage, 1, f"ADC {i} Arm Flag", num=i)
 			self._make_csr("from_adc", CSRStatus, 32, f"ADC {i} Received Data", num=i)
 
-		self._make_csr("adc_sel_0", CSRStorage, 2, "Select ADC 0 Output")
 		self._make_csr("cl_in_loop", CSRStatus, 1, "Control Loop Loop Enabled Flag")
 		self._make_csr("cl_cmd", CSRStorage, 8, "Control Loop Command Input")
 		self._make_csr("cl_word_in", CSRStorage, 64, "Control Loop Data Input")
@@ -131,6 +149,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
 		self.kwargs["o_test_clock"] = platform.request("test_clock")
+		self.kwargs["o_set_low"] = platform.request("differntial_output_low")
 
 		with open("csr_bitwidth.json", mode='w') as f:
 			import json
