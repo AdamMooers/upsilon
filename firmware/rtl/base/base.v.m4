@@ -296,30 +296,9 @@ m4_dac_switch(DAC_PORTS, 6);
 m4_dac_switch(DAC_PORTS, 7);
 
 initial test_clock <= 0;
-reg [8-1:0] counter = 0;
 
-/*
-always @ (posedge clk) begin
-	if (!rst_L) begin
-		counter <= 0;
-		test_clock <= 0;
-	end else if (counter >= ADC_CYCLE_HALF_WAIT) begin
-		counter <= 0;
-		test_clock <= !test_clock;
-	end else begin
-		counter <= counter + 1;
-	end
-end
-*/
-/*
-always @ (posedge clk) begin
-	if(!rst_L) begin
-		test_clock <= 0;
-	end else begin
-		test_clock <= !test_clock;
-	end
-end
-*/
+`ifdef MAKE_TEST_CLOCK
+reg [8-1:0] counter = 0;
 always @ (posedge clk) begin
 	if (!rst_L) begin
 		counter <= 0;
@@ -333,6 +312,9 @@ always @ (posedge clk) begin
 		end
 	end
 end
+`else
+assign test_clock = 0;
+`endif
 
 m4_adc_switch(ADC_TYPE1_WID, 0, ADC_PORTS_CONTROL_LOOP);
 m4_adc_switch(ADC_TYPE1_WID, 1, ADC_PORTS);
