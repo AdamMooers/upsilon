@@ -62,7 +62,8 @@ dac_release(int dac)
 
 	if (dac_locked[dac] == 1) {
 		write_dac_arm(0, dac);
-		while (!read_dac_finished(dac));
+		// TODO: Flush DAC?
+		// while (!read_dac_finished(dac));
 	}
 
 	int e = k_mutex_unlock(dac_mutex + dac);
@@ -145,7 +146,7 @@ adc_release(int adc)
 	LOG_DBG("%s: in adc_release", get_thread_name());
 	if (adc_locked[adc] == 1) {
 		write_adc_arm(0, adc);
-		// while (!read_adc_finished(adc));
+		// TODO: flush ADC?
 	}
 
 	int e = k_mutex_unlock(adc_mutex + adc);
