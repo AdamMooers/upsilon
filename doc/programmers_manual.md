@@ -418,7 +418,19 @@ interpreter.
 
 TODO
 
+### Static IPs
+
+The client and controller IPs are baked into the software *and firmware*
+at build time. The software configuration is in `software/prj.conf`. The
+firmware configuration is in `firmware/soc.py` (see `local_ip` and `remote_ip`
+settings in `SoCCore`).
+
+The controlling computer must have it's static IP on the interface connected
+to the controller to be the same as `remote_ip`. By default this is `91.168.1.100`.
+
 ## Logging
+
+TODO: Do logging via UDP?
 
 Logging is done via UART. Connect the micro-USB slot to the controlling
 computer to get debug output.
@@ -500,6 +512,17 @@ write big Creole programs.
 
 The open source software stack that Upsilon uses is novel and unstable.
 
+## LiteX
+
+Set `compile_software` to `False` in `soc.py` when checking for Verilog
+compile errors. Set it back when you do an actual compile run, or your
+program will not boot.
+
+If LiteX complains about not having a RiscV compiler, that is because
+your system does not have compatible RISC-V compiler in your `$PATH`.
+Refer to the LiteX install instructions above to see how to set up the
+SiFive GCC, which will work.
+
 ## F4PGA
 
 This is really a Yosys (and really, an abc bug). F4PGA defaults to using
@@ -515,6 +538,18 @@ Yosys fails to calculate computed parameter values correctly. For instance,
 
 Yosys will *silently* fail to compile this, setting `VALUE` to be equal
 to 0. The solution is to use macros.
+
+## Reset Pins
+
+On the Arty A7 there is a Reset button. This is connected to the CPU and only
+resets the CPU. Possibly due to timing issues modules get screwed up if they
+share a reset pin with the CPU. The code currently connects button 0 to reset
+the modules seperately from the CPU.
+
+## Clock Speeds
+
+The output pins on the FPGA (except for the high speed PMOD outputs) cannot
+switch fast enough to
 
 ## Macros
 
@@ -559,7 +594,8 @@ static ip.
    each ip on the ethernet interface that is connected to the controller.
 3. Run `ip addr add 192.168.1.100/24 dev eth-interface` (or whatever ip + subnet
    mask you need)
-4. Run `ip route add 192.168.1.0/24 dev eth0 proto kernel scope link` (again,
+4. If `ip route` does not give a routing entry for `192.168.1.0/24`, run
+   `ip route add 192.168.1.0/24 dev eth0 proto kernel scope link` (again,
    change depending on different situations)
 
 This will use the static ip `192.168.1.100`, which is the default TFTP boot

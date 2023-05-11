@@ -16,7 +16,7 @@
 #include "access.h"
 #include "control_loop_cmds.h"
 
-LOG_MODULE_REGISTER(access);
+LOG_MODULE_REGISTER(access, 4);
 #include "pin_io.c"
 
 /* The values from converters are not aligned to 32 bits.
@@ -126,10 +126,13 @@ adc_take(int adc, k_timeout_t timeout)
 	if (adc < 0 || adc >= ADC_MAX)
 		return -EFAULT;
 
+	LOG_DBG("%s: taking adc %d", get_thread_name(), adc);
 	int e = k_mutex_lock(adc_mutex + adc, timeout);
+	LOG_DBG("%s: adc %d taken", get_thread_name(), adc);
 	if (e == 0) {
 		adc_locked[adc] += 1;
 	}
+	LOG_DBG("%s: adc %d lockeg", get_thread_name(), adc);
 	return e;
 }
 
@@ -139,9 +142,10 @@ adc_release(int adc)
 	if (adc < 0 || adc >= ADC_MAX)
 		return -EFAULT;
 
+	LOG_DBG("%s: in adc_release", get_thread_name());
 	if (adc_locked[adc] == 1) {
 		write_adc_arm(0, adc);
-		while (!read_adc_finished(adc));
+		// while (!read_adc_finished(adc));
 	}
 
 	int e = k_mutex_unlock(adc_mutex + adc);
@@ -414,6 +418,7 @@ access_release_thread(void)
 void
 access_init(void)
 {
+	LOG_INF("access_init");
 	if (k_mutex_init(&cloop_mutex) != 0) {
 		LOG_ERR("err: cloop mutex");
 		k_fatal_halt(K_ERR_KERNEL_PANIC);
@@ -437,4 +442,5 @@ access_init(void)
 			k_fatal_halt(K_ERR_KERNEL_PANIC);
 		}
 	}
+	LOG_INF("access_init done");
 }

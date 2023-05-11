@@ -180,6 +180,8 @@ m4_define(m4_adc_switch, ⟨
 
 /* 2nd option for each ADC is the non-converting option.
  * This is used to flush output from reset ADCs.
+ * TODO: Lower power consumption by having SCK low while converter is
+ * not running? May require change to spi code.
  */
 	assign adc_sdo_port[1] = adc_sdo_port[0];
 	assign adc_sck_port[1] = adc_sck_port[0];
