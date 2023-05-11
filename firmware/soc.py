@@ -30,7 +30,7 @@ io = [
 	("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
 
-# TODO: Generate widths based off of include files (m4 generated)
+# TODO: Assign widths to ADCs here using parameters
 
 class Base(Module, AutoCSR):
 	""" The subclass AutoCSR will automatically make CSRs related
@@ -190,7 +190,7 @@ class CryoSNOM1SoC(SoCCore):
 		platform.add_source("rtl/spi/spi_master_ss_no_read_preprocessed.v")
 		platform.add_source("rtl/control_loop/sign_extend.v")
 		platform.add_source("rtl/control_loop/intsat.v")
-		platform.add_source("rtl/control_loop/boothmul.v")
+		platform.add_source("rtl/control_loop/boothmul_preprocessed.v")
 		platform.add_source("rtl/control_loop/control_loop_math.v")
 		platform.add_source("rtl/control_loop/control_loop.v")
 		platform.add_source("rtl/waveform/bram_interface_preprocessed.v")

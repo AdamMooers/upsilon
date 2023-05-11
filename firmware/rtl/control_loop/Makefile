@@ -49,7 +49,7 @@ obj_dir/Vcontrol_loop_sim_top: obj_dir/Vcontrol_loop_sim_top.mk control_loop_cmd
 ####### Codegen ########
 
 include ../common.makefile
-CODEGEN_FILES=control_loop_cmds.h boothmul.v control_loop_math.v control_loop.v control_loop_cmds.vh
+CODEGEN_FILES=control_loop_cmds.h boothmul_preprocessed.v control_loop_math.v control_loop.v control_loop_cmds.vh
 codegen: ${CODEGEN_FILES}
 control_loop_cmds.vh: control_loop_cmds.m4
 	m4 -P control_loop_cmds.vh.m4  > control_loop_cmds.vh
