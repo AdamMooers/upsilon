@@ -47,6 +47,7 @@ static const char *const run_ret_str[CREOLE_RUN_RET_LEN] = {
 	[CREOLE_JUMP_OVERFLOW] = "jump overflow"
 };
 
+/* Returns 0 if the sock is still connected. */
 static int
 hup(int sock)
 {
@@ -115,6 +116,7 @@ exec_creole(unsigned char *buf, int size, int sock)
 	}
 }
 
+/* Read the size of the message from the socket. */
 static int
 read_size(int s)
 {
@@ -126,6 +128,7 @@ read_size(int s)
 	return (unsigned char)buf[0] | (unsigned char) buf[1] << 8;
 }
 
+/* Thread entry. Reads the program send by the connection and executes it. */
 static void
 exec_entry(void *client_p, void *connection_num_p,
            void *threadnum_p)
@@ -161,7 +164,6 @@ exec_entry(void *client_p, void *connection_num_p,
 	LOG_INF("Exiting thread %s", get_thread_name());
 }
 
-/* TODO: main thread must be higher priority than execution threads */
 static void
 main_loop(int srvsock)
 {

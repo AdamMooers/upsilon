@@ -105,6 +105,7 @@ class Base(Module, AutoCSR):
 		self.csrdict = {}
 
 		for i in range(0,8):
+			self._make_csr("adc_sel", CSRStorage, 3, f"Select ADC {i} Output", num=i)
 			self._make_csr("dac_sel", CSRStorage, 3, f"Select DAC {i} Output", num=i)
 			self._make_csr("dac_finished", CSRStatus, 1, f"DAC {i} Transmission Finished Flag", num=i)
 			self._make_csr("dac_arm", CSRStorage, 1, f"DAC {i} Arm Flag", num=i)

@@ -131,7 +131,7 @@ if __name__ == "__main__":
 		(False, "adc_arm", adc_num),
 		(True, "from_adc", adc_num),
 
-		(False, "adc_sel_0", 1),
+		(False, "adc_sel", adc_num),
 		(True, "cl_in_loop", 1),
 		(False, "cl_cmd", 1),
 		(False, "cl_word_in", 1),

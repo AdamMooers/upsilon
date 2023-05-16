@@ -7,6 +7,7 @@ m4_include(../control_loop/control_loop_cmds.m4)
  * arrays (which would make everything much cleaner) cannot be used.
  * A preprocessor is used instead, and M4 is used because it is much
  * cleaner than the Verilog preprocessor (which is bad).
+ * TODO: individual RST pins
  */
 
 /*********************************************************/
