@@ -1,0 +1,34 @@
+#Target options
+BR2_riscv=y
+BR2_RISCV_32=y
+
+# Instruction Set Extensions
+BR2_riscv_custom=y
+BR2_RISCV_ISA_CUSTOM_RVM=y
+BR2_RISCV_ISA_CUSTOM_RVA=y
+BR2_RISCV_ISA_CUSTOM_RVC=n
+BR2_RISCV_ABI_ILP32=y
+
+# GCC
+BR2_GCC_VERSION_10_X=y
+BR2_BINUTILS_VERSION_2_37_X=y
+
+# System
+BR2_TARGET_GENERIC_GETTY=y
+BR2_TARGET_GENERIC_GETTY_PORT="console"
+
+# Filesystem
+BR2_TARGET_ROOTFS_CPIO=y
+
+# Kernel (litex-rebase branch)
+BR2_LINUX_KERNEL=y
+BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(BR2_EXTERNAL_UPSILON_PATH)/board/litex_vexriscv/linux.config"
+BR2_LINUX_KERNEL_IMAGE=y
+
+# Rootfs customisation
+BR2_ROOTFS_OVERLAY="$(BR2_EXTERNAL_UPSILON_PATH)/board/litex_vexriscv/rootfs_overlay"
+
+# Extra packages
+BR2_PACKAGE_MICROPYTHON=y
+BR2_PACKAGE_MICROPYTHON_LIB=y
