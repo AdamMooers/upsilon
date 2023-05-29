@@ -1,4 +1,4 @@
-Upsilon Maintenance Manual. This document may be distributed under the terms
+Upsilon Maintenance Manual. This document may be distributed under your choice
 of the GNU GPL v3.0 (or any later version), or under the [CC BY-SA 4.0][CC].
 
 [CC]: https://creativecommons.org/licenses/by-sa/4.0/legalcode

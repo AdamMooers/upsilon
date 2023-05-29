@@ -1,11 +1,7 @@
-The files "board/litex_vexriscv/linux.config" and
-"configs/litex_vexriscv_defconfig" incorporate code from
-    https://github.com/litex-hub/linux-on-litex-vexriscv
-________________________________________________________________________
-
 BSD 2-Clause License
 
 Copyright (c) 2019-2021, Linux-on-LiteX-VexRiscv Developers
+Copyright (c) 2023 Peter McGoron
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
