@@ -2,7 +2,7 @@
 
 DEVICETREE_GEN_DIR=.
 
-all: rtl_codegen build/digilent_arty/digilent_arty.bit overlay.dts overlay.cmake pin_io.c
+all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb pin_io.c
 
 rtl_codegen:
 	cd rtl && make
@@ -13,7 +13,7 @@ clean:
 	cd rtl && make clean
 
 arty.dts: csr.json
-	litex_json2dts_linux.py csr.json > arty.dts
+	litex_json2dts_linux csr.json > arty.dts
 arty.dtb: arty.dts
 	dtc -O dtb -o arty.dtb arty.dts
 
