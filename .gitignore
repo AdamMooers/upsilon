@@ -16,7 +16,6 @@ firmware/rtl/control_loop/control_loop_cmds.h
 firmware/rtl/raster/ram_shim_cmds.h
 firmware/rtl/raster/raster_cmds.h
 firmware/rtl/base/base.v
-firmware/rtl/control_loop/boothmul.v
 firmware/rtl/control_loop/control_loop.v
 firmware/rtl/control_loop/control_loop_cmds.vh
 firmware/rtl/control_loop/control_loop_math.v

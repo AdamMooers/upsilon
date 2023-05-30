@@ -1,3 +1,4 @@
+##########################################################################
 # Portions of this file incorporate code licensed under the
 # BSD 2-Clause License.
 #
@@ -30,6 +31,7 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+##########################################################################
 
 # There is nothing fundamental about the Arty A7(35|100)T to this
 # design, but another eval board will require some porting.
@@ -221,7 +223,7 @@ class _CRG(Module):
 		if with_dram:
 			self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
-class CryoSNOM1SoC(SoCCore):
+class UpsilonSoC(SoCCore):
 	def __init__(self, variant):
 		sys_clk_freq = int(100e6)
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
@@ -291,7 +293,7 @@ class CryoSNOM1SoC(SoCCore):
 		self.submodules.base = Base(ClockSignal(), self.sdram, platform)
 
 def main():
-	soc = CryoSNOM1SoC("a7-100")
+	soc =UpsilonSoC("a7-100")
 	builder = Builder(soc, csr_json="csr.json", compile_software=True)
 	builder.build()
 
