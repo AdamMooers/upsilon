@@ -11,19 +11,45 @@
 #include <sbi/sbi_const.h>
 #include <sbi/sbi_hart.h>
 #include <sbi/sbi_platform.h>
-#include <sbi_utils/serial/litex_serial.h>
-#include <sbi_utils/sys/clint.h>
+#include <sbi_utils/ipi/aclint_mswi.h>
+#include <sbi_utils/irqchip/plic.h>
+#include <sbi_utils/timer/aclint_mtimer.h>
+
+// LiteX VexRISC-V only supports CLINT, not updated ACLINT
 
 /* clang-format off */
 
 #define VEX_HART_COUNT         1
-#define VEX_PLATFORM_FEATURES  (SBI_PLATFORM_HAS_TIMER_VALUE | SBI_PLATFORM_HAS_MFAULTS_DELEGATION)
+#define VEX_PLATFORM_FEATURES  (SBI_PLATFORM_HAS_MFAULTS_DELEGATION)
+// hardcoded in SoC Generator
 #define VEX_CLINT_ADDR         0xF0010000
-#define VEX_HART_STACK_SIZE	   SBI_PLATFORM_DEFAULT_STACK_SIZE
+#define VEX_PLIC_ADDR          0xF0C00000
+#define VEX_HART_STACK_SIZE	   SBI_PLATFORM_DEFAULT_HART_STACK_SIZE
+#define VEX_MSWI_ADDR (VEX_CLINT_ADDR + CLINT_MSWI_OFFSET)
+#define VEX_MTIMER_ADDR (VEX_CLINT_ADDR + CLINT_MTIMER_OFFSET)
+#define VEX_MTIMER_FREQ 100000000 // XXX: System clock frequency?
 
 /* clang-format on */
 
-static struct clint_data clint = {VEX_CLINT_ADDR, 0, VEX_HART_COUNT, true};
+static struct aclint_mswi_data clint_mswi = {
+	.addr = VEX_CLINT_ADDR + CLINT_MSWI_OFFSET,
+	.first_hartid = 0,
+	.hart_count = VEX_HART_COUNT,
+	.size = ACLINT_MSWI_SIZE
+};
+
+static struct aclint_mtimer_data mtimer = {
+	.mtime_freq = VEX_MTIMER_FREQ,
+	.mtime_addr = VEX_MTIMER_ADDR +
+		      ACLINT_DEFAULT_MTIME_OFFSET,
+	.mtime_size = ACLINT_DEFAULT_MTIME_SIZE,
+	.mtimecmp_addr = VEX_MTIMER_ADDR +
+			 ACLINT_DEFAULT_MTIMECMP_OFFSET,
+	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
+	.first_hartid = 0,
+	.hart_count = VEX_HART_COUNT,
+	.has_64bit_mmio = true
+};
 
 static int vex_early_init(bool cold_boot)
 {
@@ -45,24 +71,24 @@ static int vex_ipi_init(bool cold_boot)
 	int rc;
 
 	if (cold_boot) {
-		rc = clint_cold_ipi_init(&clint);
+		rc = aclint_mswi_cold_init(&clint_mswi);
 		if (rc)
 			return rc;
 	}
 
-	return clint_warm_ipi_init();
+	return aclint_mswi_warm_init();
 }
 
 static int vex_timer_init(bool cold_boot)
 {
 	int rc;
 	if (cold_boot) {
-		rc = clint_cold_timer_init(&clint, NULL); /* Timer has no reference */
+		rc = aclint_mtimer_cold_init(&mtimer, NULL); /* Timer has no reference */
 		if (rc)
 			return rc;
 	}
 
-	return clint_warm_timer_init();
+	return aclint_mtimer_warm_init();
 }
 
 const struct sbi_platform_operations platform_ops = {

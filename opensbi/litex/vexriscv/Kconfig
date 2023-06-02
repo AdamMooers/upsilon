@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: BSD-2-Clause
+
+config PLATFORM_LITEX_VEXRISCV
+	bool
+	select FDT
+	select FDT_SERIAL
+	select TIMER_MTIMER
+	select FDT_SERIAL_LITEX
+	default y
