@@ -24,8 +24,9 @@ m4_define(m4_dac_wires, ⟨
 	output dac_finished_$2,
 	input dac_arm_$2,
 	output [DAC_WID-1:0] from_dac_$2,
-	input [DAC_WID-1:0] to_dac_$2,
+	input [DAC_WID-1:0] to_dac_$2
 
+/*
 	input wf_arm_$2,
 	input wf_halt_on_finish_$2,
 	output wf_finished_$2,
@@ -39,6 +40,7 @@ m4_define(m4_dac_wires, ⟨
 	input [WF_RAM_WORD_WID-1:0] wf_ram_word_$2,
 	output wf_ram_read_$2,
 	input wf_ram_valid_$2
+*/
 ⟩)
 
 /* Same thing but for ADCs */
@@ -97,8 +99,9 @@ m4_define(m4_dac_switch, ⟨
 		.arm(dac_arm_$2),
 		.from_slave(from_dac_$2),
 		.to_slave(to_dac_$2)
-	);
+	)
 
+/*
 	waveform #(
 		.DAC_WID(DAC_WID),
 		.DAC_WID_SIZ(DAC_WID_SIZ),
@@ -133,6 +136,7 @@ m4_define(m4_dac_switch, ⟨
 		.sck(sck_port_$2[1]),
 		.ss_L(ss_L_port_$2[1])
 	)
+*/
 ⟩)
 
 /* Same thing but for ADCs */
@@ -194,7 +198,7 @@ m4_define(m4_adc_switch, ⟨
 /*********************************************************/
 
 module base #(
-	parameter DAC_PORTS = 2,
+	parameter DAC_PORTS = 1,
 m4_define(DAC_PORTS_CONTROL_LOOP, (DAC_PORTS + 1))
 
 	parameter DAC_NUM = 8,
@@ -357,10 +361,10 @@ control_loop #(
 	.clk(clk),
 	.rst_L(rst_L),
 	.in_loop(cl_in_loop),
-	.dac_mosi(mosi_port_0[2]),
-	.dac_miso(miso_port_0[2]),
-	.dac_ss_L(ss_L_port_0[2]),
-	.dac_sck(sck_port_0[2]),
+	.dac_mosi(mosi_port_0[1]),
+	.dac_miso(miso_port_0[1]),
+	.dac_ss_L(ss_L_port_0[1]),
+	.dac_sck(sck_port_0[1]),
 	.adc_miso(adc_sdo_port_0[2]),
 	.adc_conv_L(adc_conv_L_port_0[2]),
 	.adc_sck(adc_sck_port_0[2]),

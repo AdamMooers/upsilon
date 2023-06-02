@@ -143,23 +143,23 @@ class Base(Module, AutoCSR):
 			self._make_csr("dac_arm", CSRStorage, 1, f"DAC {i} Arm Flag", num=i)
 			self._make_csr("from_dac", CSRStatus, 24, f"DAC {i} Received Data", num=i)
 			self._make_csr("to_dac", CSRStorage, 24, f"DAC {i} Data to Send", num=i)
-			self._make_csr("wf_arm", CSRStorage, 1, f"Waveform {i} Arm Flag", num=i)
-			self._make_csr("wf_halt_on_finish", CSRStorage, 1, f"Waveform {i} Halt on Finish Flag", num=i)
-			self._make_csr("wf_finished", CSRStatus, 1, f"Waveform {i} Finished Flag", num=i)
-			self._make_csr("wf_running", CSRStatus, 1, f"Waveform {i} Running Flag", num=i)
-			self._make_csr("wf_time_to_wait", CSRStorage, 16, f"Waveform {i} Wait Time", num=i)
-			self._make_csr("wf_refresh_start", CSRStorage, 1, f"Waveform {i} Data Refresh Start Flag", num=i)
-			self._make_csr("wf_refresh_finished", CSRStatus, 1, f"Waveform {i} Data Refresh Finished Flag", num=i)
-			self._make_csr("wf_start_addr", CSRStorage, 32, f"Waveform {i} Data Addr", num=i)
-
-			port = sdram.crossbar.get_port()
-			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
-			cur_sdram = getattr(self, f"wf_sdram_{i}")
-
-			self.kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
-			self.kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
-			self.kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
-			self.kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
+#			self._make_csr("wf_arm", CSRStorage, 1, f"Waveform {i} Arm Flag", num=i)
+#			self._make_csr("wf_halt_on_finish", CSRStorage, 1, f"Waveform {i} Halt on Finish Flag", num=i)
+#			self._make_csr("wf_finished", CSRStatus, 1, f"Waveform {i} Finished Flag", num=i)
+#			self._make_csr("wf_running", CSRStatus, 1, f"Waveform {i} Running Flag", num=i)
+#			self._make_csr("wf_time_to_wait", CSRStorage, 16, f"Waveform {i} Wait Time", num=i)
+#			self._make_csr("wf_refresh_start", CSRStorage, 1, f"Waveform {i} Data Refresh Start Flag", num=i)
+#			self._make_csr("wf_refresh_finished", CSRStatus, 1, f"Waveform {i} Data Refresh Finished Flag", num=i)
+#			self._make_csr("wf_start_addr", CSRStorage, 32, f"Waveform {i} Data Addr", num=i)
+#
+#			port = sdram.crossbar.get_port()
+#			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
+#			cur_sdram = getattr(self, f"wf_sdram_{i}")
+#
+#			self.kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
+#			self.kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
+#			self.kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
+#			self.kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
 
 			self._make_csr("adc_finished", CSRStatus, 1, f"ADC {i} Finished Flag", num=i)
 			self._make_csr("adc_arm", CSRStorage, 1, f"ADC {i} Arm Flag", num=i)
@@ -245,8 +245,8 @@ class UpsilonSoC(SoCCore):
 		platform.add_source("rtl/control_loop/boothmul_preprocessed.v")
 		platform.add_source("rtl/control_loop/control_loop_math.v")
 		platform.add_source("rtl/control_loop/control_loop.v")
-		platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
-		platform.add_source("rtl/waveform/waveform_preprocessed.v")
+#		platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
+#		platform.add_source("rtl/waveform/waveform_preprocessed.v")
 		platform.add_source("rtl/base/base.v")
 
 		# SoCCore does not have sane defaults (no integrated rom)
