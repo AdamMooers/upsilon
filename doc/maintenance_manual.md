@@ -169,13 +169,7 @@ TO CONNECT THE FPGA TO THE INTERNET.** The controlling computer can
 still connect to the internet, but through another LAN port. The best
 thing to do is to buy a USB to Ethernet adapter.
 
-You will need some way to do DHCP. The best way is to use a router, but
-a standard wireless router will not fly with any IT department because
-of the security risk. You need to find a non-wireless router (like a
-managed switch). You can even retrofit an old computer into a router
-(just needs another ethernet port).
-
-The default TFTP client connects to 192.168.1.50.
+The default TFTP client connects to 192.168.1.100.
 
 ## Connecting to the FPGA Over USB
 
@@ -194,7 +188,8 @@ better thing to do is to use TFTP boot, which goes over Ethernet.
 CONNECTED NETWORK INTERFACE. THIS IS A BIG SECURITY RISK. ONLY RUN
 TFTP FOR THE AMOUNT OF TIME REQUIRED TO BOOT THE CONTROL SOFTWARE.**
 You can read about how to setup a TFTP server on the [OpenWRT wiki][owrt_wiki].
-On Linux, run
+
+Using DNSMasq on linux, run
 
 	dnsmasq -d --port=0 --enable-tftp --tftp-root=/path/to/firmware/directory --user=root --group=root --interface=$INTERFACE
 

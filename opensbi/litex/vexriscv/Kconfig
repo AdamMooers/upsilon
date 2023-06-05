@@ -5,5 +5,6 @@ config PLATFORM_LITEX_VEXRISCV
 	select FDT
 	select FDT_SERIAL
 	select TIMER_MTIMER
+	select IPI_MSWI
 	select FDT_SERIAL_LITEX
 	default y

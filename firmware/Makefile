@@ -7,7 +7,7 @@ all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb pin_io.c
 rtl_codegen:
 	cd rtl && make
 csr.json build/digilent_arty/digilent_arty.bit: soc.py
-	python3 soc.py
+	TFTP_SERVER_PORT=6969 python3 soc.py
 clean:
 	rm -rf build csr.json overlay.config overlay.dts pin_io.h arty.dts arty.dtb
 	cd rtl && make clean
