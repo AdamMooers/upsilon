@@ -273,11 +273,11 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	m4_adc_wires(ADC_TYPE1_WID, 0, ADC_PORTS_CONTROL_LOOP),
 	m4_adc_wires(ADC_TYPE1_WID, 1, ADC_PORTS),
 	m4_adc_wires(ADC_TYPE1_WID, 2, ADC_PORTS),
-	m4_adc_wires(ADC_TYPE1_WID, 3, ADC_PORTS),
-	m4_adc_wires(ADC_TYPE1_WID, 4, ADC_PORTS),
-	m4_adc_wires(ADC_TYPE1_WID, 5, ADC_PORTS),
-	m4_adc_wires(ADC_TYPE1_WID, 6, ADC_PORTS),
-	m4_adc_wires(ADC_TYPE1_WID, 7, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE2_WID, 3, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE2_WID, 4, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE2_WID, 5, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE3_WID, 6, ADC_PORTS),
+	m4_adc_wires(ADC_TYPE3_WID, 7, ADC_PORTS),
 
 	output cl_in_loop,
 	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
@@ -305,14 +305,15 @@ m4_dac_switch(DAC_PORTS, 7);
 
 initial test_clock <= 0;
 
+`define MAKE_TEST_CLOCK
 `ifdef MAKE_TEST_CLOCK
-reg [8-1:0] counter = 0;
+reg [3-1:0] counter = 0;
 always @ (posedge clk) begin
 	if (!rst_L) begin
 		counter <= 0;
 		test_clock <= 0;
 	end else begin
-		if (counter >= 3) begin
+		if (counter == 3) begin
 			counter <= 0;
 			test_clock <= !test_clock;
 		end else begin
