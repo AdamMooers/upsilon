@@ -1,1 +1,10 @@
-Upsilon on Linux, LiteX VexRiscV
+Welcome to Upsilon, the free and open source system-on-a-chip for scientific
+equipment.
+
+Upsilon is distributed multiple free software licenses. You can find the
+complete terms and conditions, along with the source code, at
+	https://software.mcgoron.com/peter/upsilon
+
+Upsilon is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the licenses for more information.

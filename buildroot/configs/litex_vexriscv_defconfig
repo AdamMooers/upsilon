@@ -4,6 +4,8 @@ BR2_RISCV_32=y
 
 # Build options
 BR2_CCACHE=y
+BR2_TARGET_GENERIC_HOSTNAME="upsilon"
+BR2_TARGET_GENERIC_ISSUE="Welcome to Upsilon"
 BR2_TARGET_GENERIC_ROOT_PASSWD="upsilon"
 
 # Instruction Set Extensions
