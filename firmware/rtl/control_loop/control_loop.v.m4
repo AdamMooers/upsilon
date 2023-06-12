@@ -168,9 +168,7 @@ control_loop_math #(
 	.CONSTS_SIZ(CONSTS_SIZ),
 	.ADC_WID(ADC_WID),
 	.DAC_WID(DAC_DATA_WID),
-	.CYCLE_COUNT_WID(CYCLE_COUNT_WID),
-	.SEC_PER_CYCLE('b10101011110011000),
-	.ADC_TO_DAC({32'b01000001100, 32'b01001001101110100101111000110101})
+	.CYCLE_COUNT_WID(CYCLE_COUNT_WID)
 ) math (
 	.clk(clk),
 	.rst_L(rst_L),
@@ -252,7 +250,7 @@ end
  * the main loop is clearing the dirty bit.
  */
 
-wire write_control = state == CYCLE_START || !running;
+wire write_control = state == WAIT_ON_DAC || !running;
 reg dirty_bit = 0;
 
 always @ (posedge clk) begin

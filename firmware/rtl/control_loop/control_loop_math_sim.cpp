@@ -25,13 +25,14 @@ static void init(int argc, char **argv) {
 	Verilated::traceEverOn(true);
 	mod = new ModType;
 	mod->clk = 0;
+	mod->rst_L = 1;
 }
 
 #define MASK(n) ((1 << (n)) - 1)
 using V = int64_t;
 
 constexpr V per100 = 0b010101011110011000;
-constexpr V adc_to_dac = 0b0100000110001001001101110100101111000110101;
+constexpr V adc_to_dac = 0b0101110111000000000000000000000000000000000;
 
 static void calculate() {
 	/* Multiplication adds an extra CONSTS_FRAC bits to the end,

@@ -11,6 +11,8 @@ csr.json build/digilent_arty/digilent_arty.bit: soc.py
 clean:
 	rm -rf build csr.json overlay.config overlay.dts pin_io.h arty.dts arty.dtb
 	cd rtl && make clean
+test:
+	cd rtl && make test
 
 arty.dts: csr.json
 	litex_json2dts_linux csr.json > arty.dts

@@ -1,5 +1,7 @@
-all: make_base make_spi make_control_loop make_waveform
+all: make_base make_spi make_control_loop
 
+test:
+	cd control_loop && make test
 make_base:
 	cd base && make codegen
 make_spi:

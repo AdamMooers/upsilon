@@ -32,10 +32,17 @@ m4_define(M4_CONSTS_WID, (CONSTS_WHOLE + CONSTS_FRAC))
 
 	parameter ADC_WID = 18,
 	parameter [M4_CONSTS_WID-1:0] SEC_PER_CYCLE = 'b10101011110011000,
-	/* The conversion between the ADC bit (20/2**18) and DAC bit (20.48/2**20)
-	 * is 0.256.
+	/* To calculate this value:
+	 * Load doc/fixedpoint.py
+	 * run bin(string_to_fixed_point(str((ADC_RANGE/2**ADC_WID)/(DAC_RANGE/2**DAC_WID)), CONSTS_FRAC))
+	 * This value is the value to put below.
+	 * This value uses ADC_RANGE=20.48, DAC_RANGE=30
+	 * The ranges are the range of values REPRESENTABLE by the ADC and DAC,
+	 * not the values you expect to get!
 	 */
-	parameter [M4_CONSTS_WID-1:0] ADC_TO_DAC = 64'b0100000110001001001101110100101111000110101,
+	parameter [M4_CONSTS_WID-1:0] ADC_TO_DAC =
+/* 64'b0100000110001001001101110100101111000110101, */
+64'b0101110111000000000000000000000000000000000,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 20
 m4_define(M4_E_WID, (DAC_WID + 1))

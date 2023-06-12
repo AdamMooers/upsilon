@@ -14,8 +14,8 @@ CONSTS_FRAC=43
 E_WID=21
 
 test: obj_dir/Vcontrol_loop_sim_top obj_dir/Vcontrol_loop_math
-	# obj_dir/Vcontrol_loop_math
-
+	obj_dir/Vcontrol_loop_math
+	obj_dir/Vcontrol_loop_sim_top
 obj_dir/Vcontrol_loop_math.mk: control_loop_math_sim.cpp ${COMMON} \
                                ${control_loop_math_verilog}
 	verilator --cc --exe -Wall --trace --trace-fst \
