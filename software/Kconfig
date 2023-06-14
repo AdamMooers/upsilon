@@ -1,3 +1,0 @@
-mainmenu "CryoSNOM 1"
-
-source "Kconfig.zephyr"
