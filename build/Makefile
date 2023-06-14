@@ -27,16 +27,16 @@ hardware-copy: upsilon-hardware.tar.gz
 hardware-execute:
 	docker exec -ti upsilon-hardware /bin/bash -lc ' \
 		tar -xvf upsilon-hardware.tar.gz && \
-		cd upsilon/firmware && \
+		cd upsilon/gateware && \
 		source ~/conda/xc7/conda/etc/profile.d/conda.sh && \
 		conda activate xc7 && \
 		make clean && make'
 hardware-shell:
 	docker exec -ti upsilon-hardware /bin/bash -l
 hardware-get:
-	docker cp upsilon-hardware:/home/user/upsilon/firmware/build/digilent_arty/gateware/digilent_arty.bit ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/firmware/arty.dtb ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/firmware/csr.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/build/digilent_arty/gateware/digilent_arty.bit ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/arty.dtb ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr.json ../boot/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware
@@ -77,7 +77,7 @@ verilator-shell:
 verilator-execute:
 	docker exec -ti upsilon-verilator /bin/bash -c ' \
 		tar -xvf upsilon-hardware.tar.gz && \
-		cd upsilon/firmware && \
+		cd upsilon/gateware && \
 		make clean && \
 		make test \
 		'
@@ -142,7 +142,7 @@ litex:
 		git checkout -B upsilon_stable c6ccb626e88168045edacced3743f6bd98746742
 
 upsilon-hardware.tar.gz:
-	tar -czvf upsilon-hardware.tar.gz ../firmware/
+	tar -czvf upsilon-hardware.tar.gz ../gateware/
 upsilon-buildroot.tar.gz:
 	tar -czvf upsilon-buildroot.tar.gz ../buildroot/
 # This script only works for GNU tar. It renames the extraction directory.

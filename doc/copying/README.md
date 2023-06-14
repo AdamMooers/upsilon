@@ -1,7 +1,7 @@
 Upsilon is a copyleft hardware project, which brings its own difficulties.
 Upsilon is dual-licensed in many locations.
 
-The files under `firmware/` are disjunctive dual-licensed under the CERN-OHL-S
+The files under `gateware/` are disjunctive dual-licensed under the CERN-OHL-S
 v2.0 (or any later version), or the GNU GPL v3.0 (or any later version).
 
 The files under `buildroot/` and `opensbi/` are licensed under a BSD
