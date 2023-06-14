@@ -79,4 +79,4 @@ without smoothing the change. In the setup for which this code was designed
 for, this is not a problem because the DAC is connected to an amplifier which
 cannot respond that quickly
 and will smooth out changes itself. For your design, you may need to use
-code found in `firmware/rtl/spi/ramp.v`.
+code found in `gateware/rtl/spi/ramp.v`.
