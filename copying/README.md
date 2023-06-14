@@ -14,6 +14,8 @@ The files under `software/` are disjunctively dual-licensed under the
 CERN-OHL-S v2.0 (or any later version), or the GNU GPL v3.0 (or any later
 version).
 
+All files under `build/` are licensed under the Apache 2.0 license.
+
 All license files under `copying/` (except this one) are licensed according
 to the text of the license.
 
