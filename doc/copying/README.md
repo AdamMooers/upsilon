@@ -16,7 +16,7 @@ version).
 
 All files under `build/` are licensed under the Apache 2.0 license.
 
-All license files under `copying/` (except this one) are licensed according
+All license files under `doc/copying/` (except this one) are licensed according
 to the text of the license.
 
 Any other file is licensed under the GNU GPL v3.0 (or any later version).
