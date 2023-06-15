@@ -1,4 +1,0 @@
-read_verilog raster.v
-synth_xilinx -flatten -nosrl -noclkbuf -nodsp -iopad -nowidelut
-# synth_xilinx -flatten -abc9 -nosrl -noclkbuf -nodsp -iopad -nowidelut
-write_verilog synth_test_yosys.v

@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 #include "control_loop_math_implementation.h"
 
 #define BITMASK(n) (((V)1 << (n)) - 1)

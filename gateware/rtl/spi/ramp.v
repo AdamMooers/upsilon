@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* Dynamically adjustable DAC ramping.
  * Given an increment voltage and a speed setting, increase the voltage
  * to that voltage in increments over a period of time.

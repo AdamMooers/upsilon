@@ -1,3 +1,9 @@
+# Copyright 2023 (C) Peter McGoron
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon
+# source distribution.
+#
 .PHONY: cpu clean rtl_codegen
 
 DEVICETREE_GEN_DIR=.

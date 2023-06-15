@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* This module is used to simulate direct memory access, where only
  * a small amount of memory is valid to read.
  */

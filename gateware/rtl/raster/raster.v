@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* Raster scanner. This module sweeps two DACs (the X and Y piezos)
  * across a box, where the X and Y axes may be at an angle. After
  * a single step, the ADCs connected to the raster scanner are

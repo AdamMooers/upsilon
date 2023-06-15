@@ -1,6 +1,8 @@
-# Copyright 2023 Peter McGoron
-#
-# SPDX-License-Identifier: Apache-2.0
+# Copyright 2023 (C) Peter McGoron
+# 
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon 
+# source distribution.
 
 .PHONY: images f4pga buildroot litex clone help attach hardware-image \
 	buildroot-image litex-f4pga-image \
@@ -112,7 +114,7 @@ buildroot-clean:
 ###### TFTP
 
 tftp:
-	cd upsilon/boot && py3tftp --host 192.168.1.100 -p 6969 -v
+	cd ../boot && py3tftp --host 192.168.1.100 -p 6969 -v
 
 ###### External projects
 
@@ -142,9 +144,9 @@ litex:
 		git checkout -B upsilon_stable c6ccb626e88168045edacced3743f6bd98746742
 
 upsilon-hardware.tar.gz:
-	tar -czvf upsilon-hardware.tar.gz ../gateware/
+	tar -czvf upsilon-hardware.tar.gz ../gateware/ --transform 's|gateware|upsilon/gateware|'
 upsilon-buildroot.tar.gz:
-	tar -czvf upsilon-buildroot.tar.gz ../buildroot/
+	tar -czvf upsilon-buildroot.tar.gz ../buildroot/ --transform 's|buildroot|upsilon/buildroot|'
 # This script only works for GNU tar. It renames the extraction directory.
 upsilon-opensbi.tar.gz:
 	tar -czvf upsilon-opensbi.tar.gz ../opensbi/ --transform 's|opensbi|opensbi/platform|'

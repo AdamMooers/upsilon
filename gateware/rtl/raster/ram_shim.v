@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* Ram shim. This is an interface designed for a LiteX RAM DMA module.
  * It can also be connected to a simulator.
  *

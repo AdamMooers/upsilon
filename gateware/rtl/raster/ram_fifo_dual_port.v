@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* YOSYS has a difficult time infering single port BRAM. It can infer
  * double-port block ram, however. This module is written as a double
  * port block ram, even though both clocks will end up being the same.

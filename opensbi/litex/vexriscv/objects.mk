@@ -3,6 +3,7 @@
 #
 # Copyright (c) 2020 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2020 Dolu1990 <charles.papon.90@gmail.com>
+# Copyright (c) 2023 Peter McGoron
 #
 
 # Command for platform specific "make run"

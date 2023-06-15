@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: BSD-2-Clause
+# Copyright 2023 (C) Peter McGoron
 
 config PLATFORM_LITEX_VEXRISCV
 	bool

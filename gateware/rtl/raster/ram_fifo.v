@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* Implements a synchronous(!) FIFO using inferred Block RAM. This
  * must wrap "ram_fifo_dual_port" due to difficulties YOSYS has with
  * inferring Block RAM: refer to that module for details.

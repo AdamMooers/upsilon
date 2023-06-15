@@ -1,3 +1,9 @@
+/* Copyright 2022 (C) Peter McGoron
+ * Copyright 2022 (C) Nicolas Azzi
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 #include <memory>
 #include <limits>
 #include <cstdint>

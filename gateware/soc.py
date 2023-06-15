@@ -1,3 +1,4 @@
+"""
 ##########################################################################
 # Portions of this file incorporate code licensed under the
 # BSD 2-Clause License.
@@ -32,6 +33,12 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##########################################################################
+# Copyright 2023 (C) Peter McGoron
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon
+# source distribution.
+"""
 
 # There is nothing fundamental about the Arty A7(35|100)T to this
 # design, but another eval board will require some porting.

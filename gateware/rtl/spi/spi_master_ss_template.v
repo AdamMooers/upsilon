@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 /* (c) Peter McGoron 2022 v0.3
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v.2.0. If a copy of the MPL was not distributed with this

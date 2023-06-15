@@ -2,6 +2,13 @@ m4_changequote(`⟨', `⟩')
 m4_changecom(⟨/*⟩, ⟨*/⟩)
 m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
 m4_include(../control_loop/control_loop_cmds.m4)
+/*
+# Copyright 2023 (C) Peter McGoron
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon
+# source distribution.
+*/
 
 /* Since yosys only allows for standard Verilog (no system verilog),
  * arrays (which would make everything much cleaner) cannot be used.

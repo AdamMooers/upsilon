@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 module waveform_sim #(
 	parameter DAC_WID = 24,
 	parameter DAC_WID_SIZ = 5,

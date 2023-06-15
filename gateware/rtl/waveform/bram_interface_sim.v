@@ -1,3 +1,8 @@
+/* Copyright 2023 (C) Peter McGoron
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 module bram_interface_sim #(
 	parameter WORD_WID = 20,
 	parameter WORD_AMNT_WID = 11,
