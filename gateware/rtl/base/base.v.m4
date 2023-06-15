@@ -305,7 +305,6 @@ m4_dac_switch(DAC_PORTS, 7);
 
 initial test_clock <= 0;
 
-`define MAKE_TEST_CLOCK
 `ifdef MAKE_TEST_CLOCK
 reg [3-1:0] counter = 0;
 always @ (posedge clk) begin
