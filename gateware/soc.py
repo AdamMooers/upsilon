@@ -56,8 +56,8 @@ from litedram.modules import MT41K128M16
 from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
-# Refer to `A7-constraints.xdc` for pin names.
 """
+Refer to `A7-constraints.xdc` for pin names.
 DAC: SS MOSI MISO SCK
   0:  1    2    3   4 (PMOD A top, right to left)
   1:  1    2    3   4 (PMOD A bottom, right to left)
@@ -74,6 +74,12 @@ Outer chip header (C=CONV, K=SCK, D=SDO, XX=not connected)
 C4  K4  D4  C5  K5  D5  XX  XX  C6  K6  D6  C7  K7  D7  XX  XX
 C0  K0  D0  C1  K1  D1  XX  XX  C2  K2  D2  C3  K3  D3
 0   1   2   3   4   5   6   7   8   9   10  11  12  13
+
+The `io` list maps hardware pins to names used by the SoC
+generator. These pins are then connected to Verilog modules.
+
+If there is more than one pin in the Pins string, the resulting
+name will be a vector of pins.
 """
 io = [
 	("differntial_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
@@ -93,7 +99,8 @@ io = [
 class Base(Module, AutoCSR):
 	""" The subclass AutoCSR will automatically make CSRs related
 	to this class when those CSRs are attributes (i.e. accessed by
-	`self.csr_name`) of instances of this class.
+	`self.csr_name`) of instances of this class. (CSRs are MMIO,
+    they are NOT RISC-V CSRs!)
 
 	Since there are a lot of input and output wires, the CSRs are
 	assigned using `setattr()`.
@@ -119,9 +126,19 @@ class Base(Module, AutoCSR):
 	"""
 
 	def _make_csr(self, name, csrclass, csrlen, description, num=None):
-		""" Add a CSR for a pin `f"{name_{num}"` with CSR type
+		""" Add a CSR for a pin `f"{name}_{num}"` with CSR type
 		`csrclass`. This will automatically handle the `i_` and
 		`o_` prefix in the keyword arguments.
+
+        This function is used to automate the creation of memory mapped
+        IO pins for all the converters on the device.
+
+        `csrclass` must be CSRStorage (Read-Write) or CSRStatus (Read only).
+        `csrlen` is the length in bits of the MMIO register. LiteX automatically
+        takes care of byte alignment, etc. so the length can be any positive
+        number.
+
+        Description is optional but recommended for debugging.
 		"""
 
 		if name not in self.csrdict.keys():
@@ -191,6 +208,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["o_test_clock"] = platform.request("test_clock")
 		self.kwargs["o_set_low"] = platform.request("differntial_output_low")
 
+        """ Dump all MMIO pins to a JSON file with their exact bit widths. """
 		with open("csr_bitwidth.json", mode='w') as f:
 			import json
 			json.dump(self.csrdict, f)
@@ -236,10 +254,18 @@ class UpsilonSoC(SoCCore):
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
 		rst = platform.request("cpu_reset")
 		self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
-		# These source files need to be sorted so that modules
-		# that rely on another module come later. For instance,
-		# `control_loop` depends on `control_loop_math`, so
-		# control_loop_math.v comes before control_loop.v
+        """
+		These source files need to be sorted so that modules
+		that rely on another module come later. For instance,
+		`control_loop` depends on `control_loop_math`, so
+		control_loop_math.v comes before control_loop.v
+
+        If you want to add a new verilog file to the design, look at the
+        modules that it refers to and place it the files with those modules.
+
+        Since Yosys doesn't support modern Verilog, only put preprocessed
+        (if applicable) files here.
+        """
 		platform.add_source("rtl/spi/spi_switch_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_no_write_preprocessed.v")
@@ -296,8 +322,6 @@ class UpsilonSoC(SoCCore):
 			pads	   = platform.request("eth"))
 		self.add_ethernet(phy=self.ethphy, dynamic_ip=True)
 
-		# Add the DAC and ADC pins as GPIO. They will be used directly
-		# by Zephyr.
 		platform.add_extension(io)
 		self.submodules.base = Base(ClockSignal(), self.sdram, platform)
 
