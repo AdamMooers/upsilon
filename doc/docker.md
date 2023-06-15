@@ -2,9 +2,11 @@ Upsilon docker development environment setup.
 
 # Setup steps
 
+Change directory to `build`.
+
 ## Installing OpenFPGALoader
 
-Then install [openFPGALoader][1]. This utility entered the Ubuntu repositories
+Install [openFPGALoader][1]. This utility entered the Ubuntu repositories
 in 23.04. Install and compile it if you do not have it. Install the udev rule
 so that admin access is not required to load FPGA bitstreams.
 
@@ -55,11 +57,12 @@ Run `make images` to create all docker images.
 
 For `NAME` in `hardware`, `opensbi`, `buildroot`:
 
-1. Run `make $NAME-container` to build the container.
-2. Run `make $NAME-copy` to copy Upsilon's code into the container.
-3. Run `make $NAME-execute` to build the data.
-4. Run `make $NAME-get` to retrieve the build artefacts.
-5. (Optionally) run `make $NAME-clean` to delete the container.
+1. Run `make $NAME-container` to build the container. You usually only need
+   to do this once.
+2. If the container already exists, do `docker container start upsilon-$NAME`.
+3. Run `make $NAME-copy` to copy Upsilon's code into the container.
+4. Run `make $NAME-execute` to build the data.
+5. Run `make $NAME-get` to retrieve the build artefacts.
 
 If you do not delete the container you can run
 
@@ -83,3 +86,17 @@ launch the TFTP server. Keep this terminal open.
 Run `litex_term /dev/ttyUSB1`. You should get messages in the window with
 the TFTP server that the FPGA has connected to the server. Eventually you
 will get a login prompt: you have sucessfully loaded Upsilon onto your FPGA.
+
+## SSH Access
+
+Add the following to your SSH config:
+
+	Host upsilon
+		HostName 192.168.1.50
+		StrictHostKeyChecking no
+		UserKnownHostsFile /dev/null
+		User root
+		LogLevel QUIET
+
+When the FPGA is connected you can access it with `ssh upsilon` (password
+`upsilon`).
