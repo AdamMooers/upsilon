@@ -5,8 +5,7 @@
 # source distribution.
 
 .PHONY: images f4pga buildroot litex clone help attach hardware-image \
-	buildroot-image litex-f4pga-image \
-	upsilon-hardware.tar.gz upsilon-opensbi.tar.gz upsilon-buildroot.tar.gz
+	buildroot-image upsilon-hardware.tar.gz upsilon-opensbi.tar.gz upsilon-buildroot.tar.gz
 
 ###### Images
 
@@ -19,9 +18,9 @@ images: hardware-image buildroot-image opensbi-image
 ### Hardware container
 
 hardware-image:
-	docker build -f Dockerfile.litex_f4pga -t "upsilon-litex-f4pga-env" .
+	docker build -f Dockerfile.hardware -t "upsilon-hardware-env" .
 hardware-container:
-	docker run -d --name upsilon-hardware upsilon-litex-f4pga-env /bin/sh -c 'while true; do sleep 2; done'
+	docker run -d --name upsilon-hardware upsilon-hardware-env /bin/sh -c 'while true; do sleep 2; done'
 hardware-copy: upsilon-hardware.tar.gz
 	# XXX: this always fails if there are very high UIDs, but the
 	# file is copied successfully.

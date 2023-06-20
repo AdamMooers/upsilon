@@ -1,0 +1,42 @@
+# Copyright 2023 (C) Peter McGoron
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon 
+# source distribution.
+
+FROM debian:bookworm
+
+ENV FPGA_FAM=xc7
+ENV F4PGA_INSTALL_DIR=/home/user/conda
+
+RUN apt-get update \
+    && apt-get -y upgrade \
+    && apt-get install -y git wget python3 xz-utils bash verilator \
+       m4 device-tree-compiler make gcc-riscv64-unknown-elf \
+    && adduser --quiet --disabled-password user
+
+USER user:user
+WORKDIR /home/user
+
+# F4PGA
+COPY --chown=user:user install_f4pga_defs.sh /home/user
+RUN chmod +x install_f4pga_defs.sh \
+    && ./install_f4pga_defs.sh \
+    && echo 'source ~/conda/xc7/conda/etc/profile.d/conda.sh' >> /home/user/.bashrc \
+    && echo 'conda activate xc7' >> /home/user/.bashrc \
+    && rm install_f4pga_defs.sh
+
+COPY --chown=user:user f4pga.tar.gz /home/user
+RUN tar -xvf f4pga.tar.gz \
+    && rm f4pga.tar.gz \
+    && cd f4pga/f4pga \ 
+    && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; pip install . ninja meson'
+
+#LITEX
+COPY --chown=user:user litex/litex_setup.py /home/user
+RUN mkdir /home/user/litex \
+    && chmod +x litex_setup.py \
+    && cd litex/ \
+    && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; ../litex_setup.py --init --install --user --tag=2023.04' \
+    && rm ../litex_setup.py
+
