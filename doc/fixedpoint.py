@@ -1,3 +1,9 @@
+# Copyright (C) Peter McGoron
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon 
+# source distribution.
+
 # Functions for converting to and from fixed point in Python.
 from math import log10, floor
 from decimal import *
