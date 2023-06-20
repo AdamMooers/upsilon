@@ -208,7 +208,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["o_test_clock"] = platform.request("test_clock")
 		self.kwargs["o_set_low"] = platform.request("differntial_output_low")
 
-        """ Dump all MMIO pins to a JSON file with their exact bit widths. """
+		""" Dump all MMIO pins to a JSON file with their exact bit widths. """
 		with open("csr_bitwidth.json", mode='w') as f:
 			import json
 			json.dump(self.csrdict, f)
@@ -254,18 +254,18 @@ class UpsilonSoC(SoCCore):
 		platform = board_spec.Platform(variant=variant, toolchain="f4pga")
 		rst = platform.request("cpu_reset")
 		self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
-        """
+		"""
 		These source files need to be sorted so that modules
 		that rely on another module come later. For instance,
 		`control_loop` depends on `control_loop_math`, so
 		control_loop_math.v comes before control_loop.v
 
-        If you want to add a new verilog file to the design, look at the
-        modules that it refers to and place it the files with those modules.
+		If you want to add a new verilog file to the design, look at the
+		modules that it refers to and place it the files with those modules.
 
-        Since Yosys doesn't support modern Verilog, only put preprocessed
-        (if applicable) files here.
-        """
+		Since Yosys doesn't support modern Verilog, only put preprocessed
+		(if applicable) files here.
+		"""
 		platform.add_source("rtl/spi/spi_switch_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_preprocessed.v")
 		platform.add_source("rtl/spi/spi_master_no_write_preprocessed.v")

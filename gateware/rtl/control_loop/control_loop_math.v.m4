@@ -1,10 +1,10 @@
+m4_changequote(`⟨', `⟩')
+m4_changecom(⟨/*⟩, ⟨*/⟩)
 /* Copyright 2023 (C) Peter McGoron
  * This file is a part of Upsilon, a free and open source software project.
  * For license terms, refer to the files in `doc/copying` in the Upsilon
  * source distribution.
  */
-m4_changequote(`⟨', `⟩')
-m4_changecom(⟨/*⟩, ⟨*/⟩)
 /*************** Precision **************
  * The control loop is designed around these values, but generally
  * does not hardcode them.
