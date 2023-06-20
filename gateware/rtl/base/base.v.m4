@@ -236,8 +236,8 @@ m4_define(ADC_PORTS_CONTROL_LOOP, (ADC_PORTS + 1))
 	parameter ADC_TYPE2_WID = 16,
 	parameter ADC_TYPE3_WID = 24,
 	parameter ADC_WID_SIZ = 5,
-	parameter ADC_CYCLE_HALF_WAIT = 5,
-	parameter ADC_CYCLE_HALF_WAIT_SIZ = 3,
+	parameter ADC_CYCLE_HALF_WAIT = 60,
+	parameter ADC_CYCLE_HALF_WAIT_SIZ = 7,
 	parameter ADC_POLARITY = 1,
 	parameter ADC_PHASE = 0,
 	/* The ADC takes maximum 527 ns to capture a value.
@@ -312,14 +312,15 @@ m4_dac_switch(DAC_PORTS, 7);
 
 initial test_clock <= 0;
 
+`define MAKE_TEST_CLOCK
 `ifdef MAKE_TEST_CLOCK
-reg [3-1:0] counter = 0;
+reg [8-1:0] counter = 0;
 always @ (posedge clk) begin
 	if (!rst_L) begin
 		counter <= 0;
 		test_clock <= 0;
 	end else begin
-		if (counter == 3) begin
+		if (counter == ADC_CYCLE_HALF_WAIT) begin
 			counter <= 0;
 			test_clock <= !test_clock;
 		end else begin
