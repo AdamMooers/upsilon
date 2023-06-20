@@ -194,7 +194,7 @@ information, you can look at
 
 This isn't used for this project but it really should.
 
-# LiteX
+# LiteX and F4PGA
 
 LiteX is a System on a Chip builder written in Python. It easily integrates
 Verilog modules and large system components (CPU, RAM, Ethernet) into
@@ -206,6 +206,14 @@ by modifying the `Base` and the `UpsilonSoC` class.
 
 All the code that you need to understand in `soc.py` is heavily documented.
 (If it's not, that means I don't understand it.)
+
+F4PGA is an open source synthesis suite. LiteX handles F4PGA for you (most of
+the time).
+
+You should use the Dockerfiles included with upsilon. They are simple and are
+pinned to the latest known stable version that can build Upsilon. If you really
+want to install LiteX and F4PGA to your system, just follow the commands in
+the docker files.
 
 # Workarounds and Hacks
 

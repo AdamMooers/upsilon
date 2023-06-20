@@ -1,5 +1,10 @@
 Upsilon docker development environment setup.
 
+# Dockerfile style guide
+
+Dockerfiles should be simple. The Dockerfiles should be readable to a
+beginner.
+
 # Setup steps
 
 Change directory to `build`.
