@@ -25,5 +25,5 @@ arty.dts: csr.json
 arty.dtb: arty.dts
 	dtc -O dtb -o arty.dtb arty.dts
 
-pin_io.c: csr.json generate_csr_locations.py
-	python3 generate_csr_locations.py > pin_io.c
+mmio.py: csr2mp.py csr.json csr_bitwidth.json
+	python3 csr2mp.py > mmio.py
