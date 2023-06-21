@@ -6,7 +6,7 @@ source distribution.
 
 __________________________________________________________________________
 
-The Hardware Maintenance Manu is an overview of the hardware (non-software)
+The Hardware Maintenance Manual is an overview of the hardware (non-software)
 parts of Upsilon.
 
 # Crash Course in FPGAs
@@ -119,6 +119,28 @@ See also [Dan Gisselquist][1]'s rules for FPGA development.
 * Keep all Verilog as generic as possible.
 * Always initialize registers.
 * Rerun tests after every change to the module.
+
+## Conventions
+
+### Wires
+
+* When specfying widths, include the total bit width and subtract 1 from it,
+  even in cases where the bit width is constant. For example, to declare an
+  8-bit register, write `reg [8-1:0] r1`.
+* If a wire is active low, append `_L` to the end of the name.
+
+### Parameters
+
+* Parameters are always in all caps.
+* Parameters ending in `_WID` are bit widths that do not have an associated
+  number (eg DAC widths, input register sizes).
+* Parameters ending in `_SIZ` are the amount of bits required to store a
+  certain number. These parameters can be calculated using `floor(log2(number) + 1)`.
+  For example,
+    * `255` has a `SIZ` of 8 (8 bits are required to store 255).
+    * `256` has a `SIZ` of 9
+    * `254`, `253`, etc. have a `SIZ` of 8
+    * `127` has a `SIZ` of 7
 
 ## Design Testing Process
 

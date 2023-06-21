@@ -86,12 +86,6 @@ Plug in your FPGA into the USB slot. Then run
 Install py3tftp (`pip3 install --user py3tftp`). Then run `make tftp` to
 launch the TFTP server. Keep this terminal open.
 
-## Launch FPGA Shell
-
-Run `litex_term /dev/ttyUSB1`. You should get messages in the window with
-the TFTP server that the FPGA has connected to the server. Eventually you
-will get a login prompt: you have sucessfully loaded Upsilon onto your FPGA.
-
 ## SSH Access
 
 Add the following to your SSH config:
@@ -105,3 +99,14 @@ Add the following to your SSH config:
 
 When the FPGA is connected you can access it with `ssh upsilon` (password
 `upsilon`).
+
+Wait about a minute for Linux to boot.
+
+## Launch FPGA Shell (Optional)
+
+If you cannot access the FPGA through SSH, you can launch a shell through
+UART.
+
+Run `litex_term /dev/ttyUSB1`. You should get messages in the window with
+the TFTP server that the FPGA has connected to the server. Eventually you
+will get a login prompt: you have sucessfully loaded Upsilon onto your FPGA.

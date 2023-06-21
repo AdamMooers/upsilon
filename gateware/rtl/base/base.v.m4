@@ -3,19 +3,24 @@ m4_changecom(⟨/*⟩, ⟨*/⟩)
 m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
 m4_include(../control_loop/control_loop_cmds.m4)
 /*
-# Copyright 2023 (C) Peter McGoron
-#
-# This file is a part of Upsilon, a free and open source software project.
-# For license terms, refer to the files in `doc/copying` in the Upsilon
-# source distribution.
-*/
+Copyright 2023 (C) Peter McGoron
 
-/* Since yosys only allows for standard Verilog (no system verilog),
- * arrays (which would make everything much cleaner) cannot be used.
- * A preprocessor is used instead, and M4 is used because it is much
- * cleaner than the Verilog preprocessor (which is bad).
- * TODO: individual RST pins
- */
+This file is a part of Upsilon, a free and open source software project.
+For license terms, refer to the files in `doc/copying` in the Upsilon
+source distribution.
+_____________________________________________________________________
+
+This is the module that collects all Verilog and exports a single interface
+that is connected to the CPU by LiteX.
+
+In this future, this module should be written into soc.py
+
+Since yosys only allows for standard Verilog (no system verilog),
+arrays (which would make everything much cleaner) cannot be used.
+A preprocessor is used instead, and M4 is used because it is much
+cleaner than the Verilog preprocessor (which is bad).
+TODO: individual RST pins
+*/
 
 /*********************************************************/
 /********************** M4 macros ************************/
@@ -208,12 +213,12 @@ module base #(
 	parameter DAC_PORTS = 1,
 m4_define(DAC_PORTS_CONTROL_LOOP, (DAC_PORTS + 1))
 
-	parameter DAC_NUM = 8,
-	parameter DAC_WID = 24,
-	parameter DAC_DATA_WID = 20,
-	parameter DAC_WID_SIZ = 5,
-	parameter DAC_POLARITY = 0,
-	parameter DAC_PHASE = 1,
+	parameter DAC_NUM = 8, // Number of DACs
+	parameter DAC_WID = 24, // Bit width of DAC command
+	parameter DAC_DATA_WID = 20, //  Bit with of DAC register
+	parameter DAC_WID_SIZ = 5, // number of bits required to store DAC_DATA_WID
+	parameter DAC_POLARITY = 0, // DAC SCK polarity
+	parameter DAC_PHASE = 1, // DAC SCK phase
 	parameter DAC_CYCLE_HALF_WAIT = 10,
 	parameter DAC_CYCLE_HALF_WAIT_SIZ = 4,
 	parameter DAC_SS_WAIT = 5,
@@ -236,14 +241,14 @@ m4_define(ADC_PORTS_CONTROL_LOOP, (ADC_PORTS + 1))
 	parameter ADC_TYPE2_WID = 16,
 	parameter ADC_TYPE3_WID = 24,
 	parameter ADC_WID_SIZ = 5,
-	parameter ADC_CYCLE_HALF_WAIT = 60,
-	parameter ADC_CYCLE_HALF_WAIT_SIZ = 7,
+	parameter ADC_CYCLE_HALF_WAIT = 5,
+	parameter ADC_CYCLE_HALF_WAIT_SIZ = 3,
 	parameter ADC_POLARITY = 1,
 	parameter ADC_PHASE = 0,
 	/* The ADC takes maximum 527 ns to capture a value.
 	 * The clock ticks at 10 ns. Change for different clocks!
 	 */
-	parameter ADC_CONV_WAIT = 53,
+	parameter ADC_CONV_WAIT = 60,
 	parameter ADC_CONV_WAIT_SIZ = 6,
 
 	parameter CL_CONSTS_WHOLE = 21,
