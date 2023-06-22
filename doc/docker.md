@@ -94,8 +94,11 @@ Add the following to your SSH config:
 		HostName 192.168.1.50
 		StrictHostKeyChecking no
 		UserKnownHostsFile /dev/null
+		IdentityFile upsilon_key
 		User root
 		LogLevel QUIET
+
+Then copy the file `build/upsilon_key` to `$HOME/.ssh`.
 
 When the FPGA is connected you can access it with `ssh upsilon` (password
 `upsilon`).

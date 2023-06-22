@@ -15,7 +15,7 @@ rtl_codegen:
 csr.json build/digilent_arty/digilent_arty.bit: soc.py
 	TFTP_SERVER_PORT=6969 python3 soc.py
 clean:
-	rm -rf build csr.json overlay.config overlay.dts pin_io.h arty.dts arty.dtb
+	rm -rf build csr.json arty.dts arty.dtb mmio.py
 	cd rtl && make clean
 test:
 	cd rtl && make test
