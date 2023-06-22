@@ -8,7 +8,7 @@
 
 DEVICETREE_GEN_DIR=.
 
-all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb pin_io.c
+all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
 
 rtl_codegen:
 	cd rtl && make
