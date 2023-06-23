@@ -57,6 +57,9 @@ from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
 """
+Keep this diagram up to date! This is the wiring diagram from the ADC to
+the named Verilog pins.
+
 Refer to `A7-constraints.xdc` for pin names.
 DAC: SS MOSI MISO SCK
   0:  1    2    3   4 (PMOD A top, right to left)

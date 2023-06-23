@@ -110,10 +110,13 @@ buildroot-clean:
 	-docker container stop upsilon-buildroot
 	-docker container rm upsilon-buildroot
 
-###### TFTP
+###### Execute
 
 tftp:
 	cd ../boot && py3tftp --host 192.168.1.100 -p 6969 -v
+
+copy:
+	scp ../boot/mmio.py ../linux/comm.py upsilon:~/
 
 ###### External projects
 

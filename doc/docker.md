@@ -116,3 +116,9 @@ UART.
 Run `litex_term /dev/ttyUSB1`. You should get messages in the window with
 the TFTP server that the FPGA has connected to the server. Eventually you
 will get a login prompt: you have sucessfully loaded Upsilon onto your FPGA.
+
+## Copy Library
+
+Run `make copy` to copy the Micropython Upsilon library to the FPGA. After
+this the modules `comm` and `mmio` are available when running scripts in
+`/root`.

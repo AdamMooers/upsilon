@@ -11,11 +11,43 @@
 #
 # TODO: Devicetree?
 
+import argparse
 import json
 import sys
 
-class CSRGenerator:
+class MMIORegister:
+    def __init__(self, name, read_only=False, number=1, exntype=None):
+        """
+        Describes a MMIO register.
+        :param name: The name of the MMIO register. This name must be the
+            same as the pin name used in ``csr.json``, except for any
+            numerical suffix.
+        :param read_only: True if the register is read only. Defaults to
+            ``False``.
+        :param number: The number of MMIO registers with the same name
+            and number suffixes. The number suffixes must go from 0
+            to ``number - 1`` with no gaps.
+        """
+        self.name = name
+        self.read_only = read_only
+        self.number = number
+        self.exntype = exntype
+
+def mmio_factory(dac_num, exntype):
+    def f(name, read_only=False):
+        return MMIORegister(name, read_only, numer=dac_num, exntype=exntype)
+    return f
+    
+
+class MicroPythonCSRGenerator:
     def __init__(self, csrjson, bitwidthjson, registers, outf):
+        """
+        This class generates a MicroPython wrapper for MMIO registers.
+
+        :param csrjson: Filename of a LiteX "csr.json" file.
+        :param bitwidthjson: Filename of an Upsilon "bitwidthjson" file.
+        :param registers: A list of
+        """
         self.registers = registers
         self.csrs = json.load(open(csrjson))
         self.bws = json.load(open(bitwidthjson))
@@ -70,13 +102,17 @@ class CSRGenerator:
             assert len(acc) == 2
             self.print(f'{indent}return {acc[0]} | ({acc[1]} << 32)\n')
 
-    def print_fun(self, optype, name, regnum, pfun):
+    def print_fun(self, optype, reg, pfun):
         """Print out a read/write function for an MMIO register.
-        * {optype} is set to "read" or "write" (the string).
-        * {name} is set to the name of the MMIO register, without number suffix.
-        * {regnum} is set to the amount of that type oF MMIO register exists.
-        * {pfun} is set to {self.print_write_register} or {self.print_read_register}
+
+        :param optype: is set to "read" or "write" (the string).
+        :param reg: is the dictionary containing the register info.
+        :param pfun: is set to {self.print_write_register} or {self.print_read_register}
         """
+        name = reg['name']
+        regnum = reg['total']
+        exntype = reg['exntype]'
+
         self.print(f'def {optype}_{name}(')
 
         printed_argument = False
@@ -101,26 +137,42 @@ class CSRGenerator:
                 self.print(f'num == {i}:\n')
                 pfun('\t\t', 'val', name, i)
             self.print(f'\telse:\n')
-            self.print(f'\t\traise Exception("invalid {name}", regnum)\n')
+            self.print(f'\t\traise {exntype}(regnum)\n')
         self.print('\n')
 
     def print_file(self):
         self.print('import machine\n')
+        self.print('class InvalidDACException(Exception):\n\tpass\n')
+        self.print('class InvalidADCException(Exception):\n\tpass\n')
         for reg in self.registers:
-            self.print_fun('read', reg['name'], reg['total'], self.print_read_register)
+            self.print_fun('read', reg, self.print_read_register)
             if not reg['read_only']:
-                self.print_fun('write', reg['name'], reg['total'], self.print_write_register)
+                self.print_fun('write', reg, self.print_write_register)
 
 if __name__ == "__main__":
    dac_num = 8
    adc_num = 8
+   dac_reg = mmio_factory(dac_num, "InvalidDACException")
+   adc_reg = mmio_factory(adc_num, "InvalidADCException")
 
    registers = [
-        {"read_only": False, "name": "dac_sel", "total": dac_num},
-        {"read_only": True, "name": "dac_finished", "total": dac_num},
-        {"read_only": False, "name": "dac_arm", "total": dac_num},
-        {"read_only": True, "name": "dac_recv_buf", "total": dac_num},
-        {"read_only": False, "name": "dac_send_buf", "total": dac_num},
+       dac_reg("dac_sel"),
+       dac_reg("dac_finished", read_only=True),
+       dac_reg("dac_arm"),
+       dac_reg("dac_recv_buf", read_only=True),
+       dac_reg("dac_send_buf"),
+
+       adc_reg("adc_finished", read_only=True),
+       adc_reg("adc_arm"),
+       adc_reg("adc_recv_buf", read_only=True),
+       adc_reg("adc_sel"),
+
+       MMIORegister("cl_in_loop", read_only=True),
+       MMIORegister("cl_cmd"),
+       MMIORegister("cl_word_in"),
+       MMIORegister("cl_start_cmd"),
+       MMIORegister("cl_finish_cmd", read_only=True),
+
 #        {"read_only": False, "name": "wf_arm", "total": dac_num},
 #        {"read_only": False, "name": "wf_halt_on_finish", "total": dac_num},
 #        {"read_only": True, "name": "wf_finished", "total": dac_num},
@@ -129,17 +181,5 @@ if __name__ == "__main__":
 #        {"read_only": False, "name": "wf_refresh_start", "total": dac_num},
 #        {"read_only": True, "name": "wf_refresh_finished", "total": dac_num},
 #        {"read_only": False, "name": "wf_start_addr", "total": dac_num},
-
-        {"read_only": True, "name": "adc_finished", "total": adc_num},
-        {"read_only": False, "name": "adc_arm", "total": adc_num},
-        {"read_only": True, "name": "adc_recv_buf", "total": adc_num},
-        {"read_only": False, "name": "adc_sel", "total": adc_num},
-
-        {"read_only": True, "name": "cl_in_loop", "total": 1},
-        {"read_only": False, "name": "cl_cmd", "total": 1},
-        {"read_only": False, "name": "cl_word_in", "total": 1},
-        {"read_only": False, "name": "cl_word_out", "total": 1},
-        {"read_only": False, "name": "cl_start_cmd", "total": 1},
-        {"read_only": True, "name": "cl_finish_cmd", "total": 1},
     ]
-   CSRGenerator("csr.json", "csr_bitwidth.json", registers, sys.stdout).print_file()
+   MicroPythonCSRGenerator("csr.json", "csr_bitwidth.json", registers, sys.stdout).print_file()
