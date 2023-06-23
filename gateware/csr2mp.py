@@ -119,8 +119,8 @@ if __name__ == "__main__":
         {"read_only": False, "name": "dac_sel", "total": dac_num},
         {"read_only": True, "name": "dac_finished", "total": dac_num},
         {"read_only": False, "name": "dac_arm", "total": dac_num},
-        {"read_only": True, "name": "from_dac", "total": dac_num},
-        {"read_only": False, "name": "to_dac", "total": dac_num},
+        {"read_only": True, "name": "dac_recv_buf", "total": dac_num},
+        {"read_only": False, "name": "dac_send_buf", "total": dac_num},
 #        {"read_only": False, "name": "wf_arm", "total": dac_num},
 #        {"read_only": False, "name": "wf_halt_on_finish", "total": dac_num},
 #        {"read_only": True, "name": "wf_finished", "total": dac_num},
@@ -132,9 +132,9 @@ if __name__ == "__main__":
 
         {"read_only": True, "name": "adc_finished", "total": adc_num},
         {"read_only": False, "name": "adc_arm", "total": adc_num},
-        {"read_only": True, "name": "from_adc", "total": adc_num},
-
+        {"read_only": True, "name": "adc_recv_buf", "total": adc_num},
         {"read_only": False, "name": "adc_sel", "total": adc_num},
+
         {"read_only": True, "name": "cl_in_loop", "total": 1},
         {"read_only": False, "name": "cl_cmd", "total": 1},
         {"read_only": False, "name": "cl_word_in", "total": 1},

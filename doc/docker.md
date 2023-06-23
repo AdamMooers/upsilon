@@ -75,16 +75,19 @@ If you do not delete the container you can run
 
 when you need to rebuild. If you need shell access, run `make $NAME-shell`.
 
+## Launch TFTP Server
+
+Install py3tftp (`pip3 install --user py3tftp`). Then run `make tftp` to
+launch the TFTP server. Keep this terminal open.
+
 ## Flash FPGA
 
 Plug in your FPGA into the USB slot. Then run
 
 	openFPGALoader -c digilent upsilon/boot/digilent_arty.bit
 
-## Launch TFTP Server
-
-Install py3tftp (`pip3 install --user py3tftp`). Then run `make tftp` to
-launch the TFTP server. Keep this terminal open.
+In a second you should see messages in the TFTP terminal. This means your
+controller is sucessfully connected to your computer.
 
 ## SSH Access
 

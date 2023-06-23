@@ -35,8 +35,8 @@ m4_define(m4_dac_wires, ⟨
 	input [$1-1:0] dac_sel_$2,
 	output dac_finished_$2,
 	input dac_arm_$2,
-	output [DAC_WID-1:0] from_dac_$2,
-	input [DAC_WID-1:0] to_dac_$2
+	output [DAC_WID-1:0] dac_recv_buf_$2,
+	input [DAC_WID-1:0] dac_send_buf_$2
 
 /*
 	input wf_arm_$2,
@@ -61,7 +61,7 @@ m4_define(m4_adc_wires, ⟨
 	input [$3-1:0] adc_sel_$2,
 	output adc_finished_$2,
 	input adc_arm_$2,
-	output [$1-1:0] from_adc_$2
+	output [$1-1:0] adc_recv_buf_$2
 ⟩)
 
 /* This is used in the body of the module. It declares the interconnect
@@ -109,8 +109,8 @@ m4_define(m4_dac_switch, ⟨
 		.ss_L(ss_L_port_$2[0]),
 		.finished(dac_finished_$2),
 		.arm(dac_arm_$2),
-		.from_slave(from_dac_$2),
-		.to_slave(to_dac_$2)
+		.from_slave(dac_recv_buf_$2),
+		.to_slave(dac_send_buf_$2)
 	)
 
 /*
@@ -192,7 +192,7 @@ m4_define(m4_adc_switch, ⟨
 		.ss_L(adc_conv_L_port_$2[0]),
 		.finished(adc_finished_$2),
 		.arm(adc_arm_$2),
-		.from_slave(from_adc_$2)
+		.from_slave(adc_recv_buf_$2)
 	);
 
 /* 2nd option for each ADC is the non-converting option.
@@ -296,7 +296,7 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	input [CL_DATA_WID-1:0] cl_word_in,
 	output reg [CL_DATA_WID-1:0] cl_word_out,
 	input cl_start_cmd,
-	output reg cl_finish_cmd
+	output cl_finish_cmd
 
 	,output reg test_clock
 );

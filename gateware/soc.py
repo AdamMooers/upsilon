@@ -165,8 +165,8 @@ class Base(Module, AutoCSR):
 			self._make_csr("dac_sel", CSRStorage, 3, f"Select DAC {i} Output", num=i)
 			self._make_csr("dac_finished", CSRStatus, 1, f"DAC {i} Transmission Finished Flag", num=i)
 			self._make_csr("dac_arm", CSRStorage, 1, f"DAC {i} Arm Flag", num=i)
-			self._make_csr("from_dac", CSRStatus, 24, f"DAC {i} Received Data", num=i)
-			self._make_csr("to_dac", CSRStorage, 24, f"DAC {i} Data to Send", num=i)
+			self._make_csr("dac_recv_buf", CSRStatus, 24, f"DAC {i} Received Data", num=i)
+			self._make_csr("dac_send_buf", CSRStorage, 24, f"DAC {i} Data to Send", num=i)
 #			self._make_csr("wf_arm", CSRStorage, 1, f"Waveform {i} Arm Flag", num=i)
 #			self._make_csr("wf_halt_on_finish", CSRStorage, 1, f"Waveform {i} Halt on Finish Flag", num=i)
 #			self._make_csr("wf_finished", CSRStatus, 1, f"Waveform {i} Finished Flag", num=i)
@@ -187,7 +187,7 @@ class Base(Module, AutoCSR):
 
 			self._make_csr("adc_finished", CSRStatus, 1, f"ADC {i} Finished Flag", num=i)
 			self._make_csr("adc_arm", CSRStorage, 1, f"ADC {i} Arm Flag", num=i)
-			self._make_csr("from_adc", CSRStatus, 32, f"ADC {i} Received Data", num=i)
+			self._make_csr("adc_recv_buf", CSRStatus, 32, f"ADC {i} Received Data", num=i)
 
 		self._make_csr("cl_in_loop", CSRStatus, 1, "Control Loop Loop Enabled Flag")
 		self._make_csr("cl_cmd", CSRStorage, 8, "Control Loop Command Input")
