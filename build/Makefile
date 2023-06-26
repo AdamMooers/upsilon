@@ -5,6 +5,7 @@
 # source distribution.
 
 .PHONY: images f4pga buildroot litex clone help attach hardware-image \
+	install-software openFPGALoader pytftp \
 	buildroot-image upsilon-hardware.tar.gz upsilon-opensbi.tar.gz upsilon-buildroot.tar.gz
 
 ###### Images
@@ -12,6 +13,15 @@
 images: hardware-image buildroot-image opensbi-image
 
 
+###### Install Software
+
+install-software: openFPGALoader
+
+openFPGALoader:
+	git clone https://github.com/trabucayre/openFPGALoader
+	mkdir openFPGALoader/build
+	cd openFPGALoader/build && cmake ..
+	cd openFPGALoader/build && cmake --build .
 
 ###### Containers
 
@@ -38,6 +48,8 @@ hardware-get:
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/build/digilent_arty/gateware/digilent_arty.bit ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/arty.dtb ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr_bitwidth.json ../boot/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware
@@ -112,6 +124,9 @@ buildroot-clean:
 
 ###### Execute
 
+OPENFPGALOADER=./openFPGALoader/build/openFPGALoader
+flash:
+	${OPENFPGALOADER} -c digilent ../boot/digilent_arty.bit
 tftp:
 	cd ../boot && py3tftp --host 192.168.1.100 -p 6969 -v
 

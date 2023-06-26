@@ -11,6 +11,7 @@
 #
 # TODO: Devicetree?
 
+import collections
 import argparse
 import json
 import sys
@@ -19,9 +20,9 @@ class MMIORegister:
     def __init__(self, name, read_only=False, number=1, exntype=None):
         """
         Describes a MMIO register.
-        :param name: The name of the MMIO register. This name must be the
-            same as the pin name used in ``csr.json``, except for any
-            numerical suffix.
+        :param name: The name of the MMIO register, excluding the prefix
+          defining its module (i.e. ``base_``) and excluding its
+          numerical suffix.
         :param read_only: True if the register is read only. Defaults to
             ``False``.
         :param number: The number of MMIO registers with the same name
@@ -33,121 +34,181 @@ class MMIORegister:
         self.number = number
         self.exntype = exntype
 
-def mmio_factory(dac_num, exntype):
-    def f(name, read_only=False):
-        return MMIORegister(name, read_only, numer=dac_num, exntype=exntype)
-    return f
-    
+        # These are filled in by the CSR file.
+        self.size = None
 
-class MicroPythonCSRGenerator:
-    def __init__(self, csrjson, bitwidthjson, registers, outf):
+def mmio_factory(num, exntype):
+    """
+    Return a function that simplifies the creation of instances of
+    :py:class:`MMIORegister` with the same number and exception type.
+
+    :param num: Number of registers with the same name (minus suffix).
+    :param exntype: MicroPython exception type.
+    :return: A function ``f(name, read_only=False)``. Each argument is
+      the same as the one in the initializer of py:class:`MMIORegister`.
+    """
+    def f(name, read_only=False):
+        return MMIORegister(name, read_only, number=num, exntype=exntype)
+    return f
+
+class CSRHandler:
+    """
+    Class that wraps the CSR file and fills in registers with information
+    from those files.
+    """
+    def __init__(self, csrjson, bitwidthjson, registers):
         """
-        This class generates a MicroPython wrapper for MMIO registers.
+        Reads in the CSR files.
 
         :param csrjson: Filename of a LiteX "csr.json" file.
         :param bitwidthjson: Filename of an Upsilon "bitwidthjson" file.
-        :param registers: A list of
+        :param registers: A list of :py:class:`MMIORegister`s.
+        :param outf: Output file.
         """
         self.registers = registers
         self.csrs = json.load(open(csrjson))
         self.bws = json.load(open(bitwidthjson))
-        self.file = outf
 
-    def get_reg(self, name, num=None):
-        """ Get the base address of the register. """
-        if num is None:
-            regname = f"base_{name}"
+    def update_reg(self, reg):
+        """
+        Fill in size information from bitwidth json file.
+
+        :param reg: The register.
+        :raises Exception: When the bit width exceeds 64.
+        """
+        b = self.bws[reg.name]
+        if b <= 8:
+            reg.size = 8
+        elif b <= 16:
+            reg.size = 16
+        elif b <= 32:
+            reg.size = 32
+        elif b <= 64:
+            reg.size = 64
         else:
-            regname = f"base_{name}_{num}"
+            raise Exception(f"unsupported width {b} in {reg.name}")
+
+    def get_reg_addr(self, reg, num=None):
+        """
+        Get address of register.
+
+        :param reg: The register.
+        :param num: Select which register number. Registers without
+          numerical suffixes require ``None``.
+        :return: The address.
+        """
+        if num is None:
+            regname = f"base_{reg.name}"
+        else:
+            regname = f"base_{reg.name}_{num}"
         return self.csrs["csr_registers"][regname]["addr"]
 
-    def get_accessor(self, name, num=None):
-        """ Return a list of Micropython machine.mem accesses that can
-        be used to read/write to a MMIO register.
+class InterfaceGenerator:
+    """
+    Interface for file generation. Implement the unimplemented functions
+    to generate a CSR interface for another language.
+    """
 
-        Since the Micropython API only supports accesses up to the
-        natural word size of the processor, multiple accesses must be made
-        for 64 bit registers.
+    def __init__(self, csr, outf):
         """
-        b = self.bws[name]
-        if b <= 8:
-            return [f'machine.mem8[{self.get_reg(name,num)}]']
-        elif b <= 16:
-            return [f'machine.mem16[{self.get_reg(name,num)}]']
-        elif b <= 32:
-            return [f'machine.mem32[{self.get_reg(name,num)}]']
-        elif b <= 64:
-            return [f'machine.mem32[{self.get_reg(name,num)}]',
-                    f'machine.mem32[{self.get_reg(name,num) + 4}]']
-        else:
-            raise Exception('unsupported width', b)
+        :param CSRHandler csr: 
+        :param FileIO outf:
+        """
+        self.outf = outf
+        self.csr = csr
 
     def print(self, *args):
-        print(*args, end='', file=self.file)
-
-    def print_write_register(self, indent, varname, name, num):
-        acc = self.get_accessor(name,num)
-        if len(acc) == 1:
-            self.print(f'{indent}{acc[0]} = {varname}\n')
-        else:
-            assert len(acc) == 2
-            self.print(f'{indent}{acc[0]} = {varname} & 0xFFFFFFFF\n')
-            self.print(f'{indent}{acc[1]} = {varname} >> 32\n')
-
-    def print_read_register(self, indent, varname, name, num):
-        acc = self.get_accessor(name,num)
-        if len(acc) == 1:
-            self.print(f'{indent}return {acc[0]}\n')
-        else:
-            assert len(acc) == 2
-            self.print(f'{indent}return {acc[0]} | ({acc[1]} << 32)\n')
-
-    def print_fun(self, optype, reg, pfun):
-        """Print out a read/write function for an MMIO register.
-
-        :param optype: is set to "read" or "write" (the string).
-        :param reg: is the dictionary containing the register info.
-        :param pfun: is set to {self.print_write_register} or {self.print_read_register}
         """
-        name = reg['name']
-        regnum = reg['total']
-        exntype = reg['exntype]'
+        Print to the file specified in the initializer and without
+        newlines.
+        """
+        print(*args, end='', file=self.outf)
 
-        self.print(f'def {optype}_{name}(')
+    def fun(self, reg, optype):
+        """ Print function for reads/writes to register. """
+        pass
+    def header(self):
+        """ Print header of file. """
+        pass
+
+    def print_file(self):
+        self.print(self.header())
+        for r in self.csr.registers:
+            self.print(self.fun(r, "read"))
+            if not r.read_only:
+                self.print(self.fun(r, "write"))
+
+class MicropythonGenerator(InterfaceGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def get_accessor(self, reg, num):
+        addr = self.csr.get_reg_addr(reg, num)
+        if reg.size in [8, 16, 32]:
+            return [f"machine.mem{reg.size}[{addr}]"]
+        return [f"machine.mem32[{addr}]", f"machine.mem32[{addr + 4}]"]
+
+    def print_write_register(self, indent, varname, reg, num):
+        acc = self.get_accessor(reg, num)
+        if len(acc) == 1:
+            return f'{indent}{acc[0]} = {varname}\n'
+        else:
+            assert len(acc) == 2
+            return f'{indent}{acc[0]} = {varname} & 0xFFFFFFFF\n' + \
+                   f'{indent}{acc[1]} = {varname} >> 32\n'
+
+    def print_read_register(self, indent, varname, reg, num):
+        acc = self.get_accessor(reg, num)
+        if len(acc) == 1:
+            return f'{indent}return {acc[0]}\n'
+        else:
+            assert len(acc) == 2
+            return f'{indent}return {acc[0]} | ({acc[1]} << 32)\n'
+
+    def fun(self, reg, optype):
+        rs = ""
+        def a(s):
+            nonlocal rs
+            rs = rs + s
+        a(f'def {optype}_{reg.name}(')
 
         printed_argument = False
         if optype == 'write':
-            self.print('val')
+            a('val')
             printed_argument = True
-
-        if regnum != 1:
-            if printed_argument:
-                self.print(', ')
-            self.print('num')
-        self.print('):\n')
-
-        if regnum == 1:
-            pfun('\t', 'val', name, None)
+            pfun = self.print_write_register
         else:
-            for i in range(0,regnum):
-                if i == 0:
-                    self.print(f'\tif ')
-                else:
-                    self.print(f'\telif ')
-                self.print(f'num == {i}:\n')
-                pfun('\t\t', 'val', name, i)
-            self.print(f'\telse:\n')
-            self.print(f'\t\traise {exntype}(regnum)\n')
-        self.print('\n')
+            pfun = self.print_read_register
 
-    def print_file(self):
-        self.print('import machine\n')
-        self.print('class InvalidDACException(Exception):\n\tpass\n')
-        self.print('class InvalidADCException(Exception):\n\tpass\n')
-        for reg in self.registers:
-            self.print_fun('read', reg, self.print_read_register)
-            if not reg['read_only']:
-                self.print_fun('write', reg, self.print_write_register)
+        if reg.number != 1:
+            if printed_argument:
+                a(', ')
+            a('num')
+        a('):\n')
+
+        if reg.number == 1:
+            a(pfun('\t', 'val', reg, None))
+        else:
+            for i in range(0,reg.number):
+                if i == 0:
+                    a(f'\tif ')
+                else:
+                    a(f'\telif ')
+                a(f'num == {i}:\n')
+                a(pfun('\t\t', 'val', reg, i))
+            a(f'\telse:\n')
+            a(f'\t\traise {r.exntype}(regnum)\n')
+        a('\n')
+
+        return rs
+
+    def header(self):
+        return """import machine
+class InvalidDACException(Exception):
+    pass
+class InvalidADCException(Exception):
+    pass
+"""
 
 if __name__ == "__main__":
    dac_num = 8
@@ -172,14 +233,8 @@ if __name__ == "__main__":
        MMIORegister("cl_word_in"),
        MMIORegister("cl_start_cmd"),
        MMIORegister("cl_finish_cmd", read_only=True),
-
-#        {"read_only": False, "name": "wf_arm", "total": dac_num},
-#        {"read_only": False, "name": "wf_halt_on_finish", "total": dac_num},
-#        {"read_only": True, "name": "wf_finished", "total": dac_num},
-#        {"read_only": True, "name": "wf_running", "total": dac_num},
-#        {"read_only": False, "name": "wf_time_to_wait", "total": dac_num},
-#        {"read_only": False, "name": "wf_refresh_start", "total": dac_num},
-#        {"read_only": True, "name": "wf_refresh_finished", "total": dac_num},
-#        {"read_only": False, "name": "wf_start_addr", "total": dac_num},
-    ]
-   MicroPythonCSRGenerator("csr.json", "csr_bitwidth.json", registers, sys.stdout).print_file()
+   ]
+   csrh = CSRHandler(sys.argv[1], sys.argv[2], registers)
+   for r in registers:
+       csrh.update_reg(r)
+   MicropythonGenerator(csrh, sys.stdout).print_file()

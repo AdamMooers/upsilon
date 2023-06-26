@@ -11,17 +11,15 @@ Change directory to `build`.
 
 ## Installing OpenFPGALoader
 
-Install [openFPGALoader][1]. This utility entered the Ubuntu repositories
-in 23.04. Install and compile it if you do not have it. Install the udev rule
-so that admin access is not required to load FPGA bitstreams.
+Install [openFPGALoader][1]. If this program is not in your repositories,
+run `make openFPGALoader` to fetch and install the program.
 
 [1]: https://trabucayre.github.io/openFPGALoader/index.html
 
 ## Setup Rootless Docker
 
 Docker allows you to run programs in containers, which are isolated
-environments. Upsilon development (at the Maglab) uses Docker for
-reproducibility: the environment can be set up automatically, and re-setup
+environments. Build environments can be set up automatically, and re-setup
 whenever needed.
 
 If you have issues with docker, try adding to `~/.config/docker/daemon.json`
@@ -33,7 +31,7 @@ If you have issues with docker, try adding to `~/.config/docker/daemon.json`
 
 ## Download and Install Python3
 
-Install `python3-venv` (or `python3-virtualenv`) and `python3-pip`.
+Install `python3` and `python3-pip`.
 
 ## Clone External Repositories
 
@@ -46,7 +44,7 @@ Plug in your router/switch to an ethernet port on your computer. If your
 computer is usually wired to the network, you will need another ethernet
 port (a PCI card is ideal, but a USB-Ethernet port works).
 
-Set the ethernet port to static ip `192.168.1.100/24`, netmask 255.255.255.0,
+Set the ethernet port to static ip `192.168.1.100/24`, netmask `255.255.255.0`,
 gateway `192.168.1.1`. Make sure this is not the default route. Make sure
 to adjust your firewall to allow traffic on the 192.168.1.0/24 range.
 
@@ -82,9 +80,9 @@ launch the TFTP server. Keep this terminal open.
 
 ## Flash FPGA
 
-Plug in your FPGA into the USB slot. Then run
-
-	openFPGALoader -c digilent upsilon/boot/digilent_arty.bit
+Plug in your FPGA into the USB slot. If you have installed openFPGALoader
+by your package manager, run `make OPENFPGALOADER=openfpgaloader flash`.
+If you installed it using `make openFPGALoader`, then just run `make flash`.
 
 In a second you should see messages in the TFTP terminal. This means your
 controller is sucessfully connected to your computer.
@@ -113,9 +111,12 @@ Wait about a minute for Linux to boot.
 If you cannot access the FPGA through SSH, you can launch a shell through
 UART.
 
+You will need to install [LiteX](https://github.com/enjoy-digital/litex).
+Download and run `litex_setup.py`.
+
 Run `litex_term /dev/ttyUSB1`. You should get messages in the window with
 the TFTP server that the FPGA has connected to the server. Eventually you
-will get a login prompt: you have sucessfully loaded Upsilon onto your FPGA.
+will get a login prompt (username `root` password `upsilon`).
 
 ## Copy Library
 
