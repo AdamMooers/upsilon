@@ -63,7 +63,9 @@ m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 	input [M4_DATA_WID-1:0] word_in,
 	output reg [M4_DATA_WID-1:0] word_out,
 	input start_cmd,
-	output reg finish_cmd
+	output reg finish_cmd,
+
+	output [DAC_DATA_WID-1:0] z_report
 );
 
 /************ ADC and DAC modules ***************/
@@ -156,6 +158,7 @@ reg [DELAY_WID-1:0] dely_buffer = 0;
 reg running = 0;
 
 reg signed [DAC_DATA_WID-1:0] stored_dac_val = 0;
+assign z_report = stored_dac_val;
 reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
 reg [CYCLE_COUNT_WID-1:0] counting_timer = 0;
 reg [M4_CONSTS_WID-1:0] adjval_prev = 0;

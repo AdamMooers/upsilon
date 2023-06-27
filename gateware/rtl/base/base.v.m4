@@ -296,9 +296,9 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	input [CL_DATA_WID-1:0] cl_word_in,
 	output reg [CL_DATA_WID-1:0] cl_word_out,
 	input cl_start_cmd,
-	output cl_finish_cmd
+	output cl_finish_cmd,
 
-	,output reg test_clock
+	output [DAC_DATA_WID-1:0] cl_z_report
 );
 
 assign set_low = 0;
@@ -314,8 +314,6 @@ m4_dac_switch(DAC_PORTS, 4);
 m4_dac_switch(DAC_PORTS, 5);
 m4_dac_switch(DAC_PORTS, 6);
 m4_dac_switch(DAC_PORTS, 7);
-
-initial test_clock <= 0;
 
 `define MAKE_TEST_CLOCK
 `ifdef MAKE_TEST_CLOCK
@@ -333,8 +331,6 @@ always @ (posedge clk) begin
 		end
 	end
 end
-`else
-assign test_clock = 0;
 `endif
 
 m4_adc_switch(ADC_TYPE1_WID, 0, ADC_PORTS_CONTROL_LOOP);
@@ -385,7 +381,8 @@ control_loop #(
 	.word_in(cl_word_in),
 	.word_out(cl_word_out),
 	.start_cmd(cl_start_cmd),
-	.finish_cmd(cl_finish_cmd)
+	.finish_cmd(cl_finish_cmd),
+	.z_report(cl_z_report)
 );
 
 endmodule

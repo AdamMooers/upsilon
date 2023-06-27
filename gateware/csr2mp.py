@@ -154,8 +154,9 @@ class MicropythonGenerator(InterfaceGenerator):
             return f'{indent}{acc[0]} = {varname}\n'
         else:
             assert len(acc) == 2
-            return f'{indent}{acc[0]} = {varname} & 0xFFFFFFFF\n' + \
-                   f'{indent}{acc[1]} = {varname} >> 32\n'
+            # Little Endian. See linux kernel, include/linux/litex.h
+            return f'{indent}{acc[1]} = {varname} & 0xFFFFFFFF\n' + \
+                   f'{indent}{acc[0]} = {varname} >> 32\n'
 
     def print_read_register(self, indent, varname, reg, num):
         acc = self.get_accessor(reg, num)
@@ -231,8 +232,10 @@ if __name__ == "__main__":
        MMIORegister("cl_in_loop", read_only=True),
        MMIORegister("cl_cmd"),
        MMIORegister("cl_word_in"),
+       MMIORegister("cl_word_out", read_only=True),
        MMIORegister("cl_start_cmd"),
        MMIORegister("cl_finish_cmd", read_only=True),
+       MMIORegister("cl_z_report", read_only=True),
    ]
    csrh = CSRHandler(sys.argv[1], sys.argv[2], registers)
    for r in registers:

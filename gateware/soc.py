@@ -198,6 +198,7 @@ class Base(Module, AutoCSR):
 		self._make_csr("cl_word_out", CSRStatus, 64, "Control Loop Data Output")
 		self._make_csr("cl_start_cmd", CSRStorage, 1, "Control Loop Command Start Flag")
 		self._make_csr("cl_finish_cmd", CSRStatus, 1, "Control Loop Command Finished Flag")
+		self._make_csr("cl_z_report", CSRStatus, 1, "Control Loop Z Setting")
 
 		self.kwargs["i_clk"] = clk
 		self.kwargs["i_rst_L"] = ~platform.request("module_reset")
@@ -208,7 +209,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["o_adc_conv"] = platform.request("adc_conv")
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
-		self.kwargs["o_test_clock"] = platform.request("test_clock")
+#		self.kwargs["o_test_clock"] = platform.request("test_clock")
 		self.kwargs["o_set_low"] = platform.request("differntial_output_low")
 
 		""" Dump all MMIO pins to a JSON file with their exact bit widths. """
