@@ -27,7 +27,9 @@ module spi_switch #(
 );
 
 /* Avoid using for loops, they might not synthesize correctly.
-   Do things the old, dumb way instead.
+ * Do things the old, dumb way instead.
+ *
+ * TODO: Instead of bit vector, use regular numbers
  */
 
 `define do_select(n)            \

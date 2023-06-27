@@ -37,7 +37,7 @@ static void init(int argc, char **argv) {
 using V = int64_t;
 
 constexpr V per100 = 0b010101011110011000;
-constexpr V adc_to_dac = 0b0101110111000000000000000000000000000000000;
+constexpr V adc_to_dac = 0b0110010000000000000000000000000000000000000;
 
 static void calculate() {
 	/* Multiplication adds an extra CONSTS_FRAC bits to the end,

@@ -39,8 +39,10 @@ def sign_extend(value, bits):
 ###################
 
 # Start a SSH connection to the server.
+print('connecting')
 client = SSHClient('192.168.1.50', user='root', pkey='~/.ssh/upsilon_key')
 # Upload the script.
+print('connected')
 client.scp_send('../linux/noise_test.py', '/root/noise_test.py')
 # Run the script.
 out = client.run_command('micropython noise_test.py')

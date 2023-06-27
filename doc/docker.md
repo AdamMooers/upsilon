@@ -7,12 +7,17 @@ beginner.
 
 # Setup steps
 
-Change directory to `build`.
+Do all of the following in the `build` folder.
 
 ## Installing OpenFPGALoader
 
 Install [openFPGALoader][1]. If this program is not in your repositories,
-run `make openFPGALoader` to fetch and install the program.
+run `make openFPGALoader` to fetch and build the program. This will install
+openFPGALoader locally.
+
+Even if you install openFPGALoader locally, there are some files (udev rules)
+that must be installed with administrative privleges. Check the documentation
+for openFPGALoader.
 
 [1]: https://trabucayre.github.io/openFPGALoader/index.html
 
