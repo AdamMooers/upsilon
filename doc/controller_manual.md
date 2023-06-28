@@ -7,9 +7,7 @@ source distribution.
 __________________________________________________________________________
 
 This manual describes the controller software programming. This guide does not
-describe client programming (programs that run on the client and interface with
-the controller). It does not describe Verilog: see `verilog_manual.md` for
-that.
+describe Verilog: see `verilog_manual.md` for that.
 
 # Preqreuisites
 

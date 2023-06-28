@@ -3,7 +3,6 @@
  * For license terms, refer to the files in `doc/copying` in the Upsilon
  * source distribution.
  */
-`include "control_loop_cmds.vh"
 
 module control_loop_sim_top #(
 	parameter ADC_WID = 18,
@@ -16,6 +15,7 @@ module control_loop_sim_top #(
 	parameter DAC_DATA_WID = 20,
 	parameter DAC_WID = 24,
 	parameter DAC_WID_SIZ = 5,
+	parameter CYCLE_COUNT_WID = 18,
 
 	parameter CONSTS_WHOLE = 21,
 	parameter CONSTS_FRAC = 43,
@@ -35,11 +35,18 @@ module control_loop_sim_top #(
 	input fulfilled,
 	output adc_err,
 
-	input [`CONSTS_WID-1:0] word_into_loop,
-	output [`CONSTS_WID-1:0] word_outof_loop,
-	input start_cmd,
-	output finish_cmd,
-	input [`CONTROL_LOOP_CMD_WIDTH-1:0] cmd
+	input assert_change,
+	output change_made,
+
+	input run_loop_in,
+	input [ADC_WID-1:0] setpt_in,
+	input [`CONSTS_WID-1:0] P_in,
+	input [`CONSTS_WID-1:0] I_in,
+	input [DELAY_WID-1:0] delay_in,
+
+	output [CYCLE_COUNT_WID-1:0] cycle_count,
+	output [DAC_DATA_WID-1:0] z_pos,
+	output [ADC_WID-1:0] z_measured
 );
 
 /* Emulate a control loop environment with simulator controlled
@@ -101,6 +108,7 @@ control_loop #(
 	/* Keeping cycle half wait and conv wait the same
 	 * since it doesn't matter for this simulation */
 
+	.CYCLE_COUNT_WID(CYCLE_COUNT_WID),
 	.CONSTS_WHOLE(CONSTS_WHOLE),
 	.CONSTS_FRAC(CONSTS_FRAC),
 	.CONSTS_SIZ(CONSTS_SIZ),
@@ -124,11 +132,18 @@ control_loop #(
 	.adc_conv_L(adc_ss_L),
 	.adc_sck(adc_sck),
 
-	.word_in(word_into_loop),
-	.word_out(word_outof_loop),
-	.start_cmd(start_cmd),
-	.finish_cmd(finish_cmd),
-	.cmd(cmd)
+	.assert_change(assert_change),
+	.change_made(change_made),
+
+	.run_loop_in(run_loop_in),
+	.setpt_in(setpt_in),
+	.P_in(P_in),
+	.I_in(I_in),
+	.delay_in(delay_in),
+
+	.cycle_count(cycle_count),
+	.z_pos(z_pos),
+	.z_measured(z_measured)
 );
 
 `ifdef VERILATOR

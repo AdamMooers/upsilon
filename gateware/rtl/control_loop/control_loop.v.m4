@@ -27,7 +27,6 @@ module control_loop
 	parameter CONSTS_SIZ = 7,
 m4_define(M4_CONSTS_WID, (CONSTS_WHOLE + CONSTS_FRAC))
 	parameter DELAY_WID = 16,
-m4_define(M4_DATA_WID, M4_CONSTS_WID)
 	parameter READ_DAC_DELAY = 5,
 	parameter CYCLE_COUNT_WID = 18,
 	parameter DAC_WID = 24,
@@ -47,7 +46,6 @@ m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 ) (
 	input clk,
 	input rst_L,
-	output in_loop,
 
 	output dac_mosi,
 	input dac_miso,
@@ -58,14 +56,20 @@ m4_define(M4_E_WID, (DAC_DATA_WID + 1))
 	output adc_conv_L,
 	output adc_sck,
 
-	/* Hacky ad-hoc read-write interface. */
-	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cmd,
-	input [M4_DATA_WID-1:0] word_in,
-	output reg [M4_DATA_WID-1:0] word_out,
-	input start_cmd,
-	output reg finish_cmd,
+	output in_loop,
 
-	output [DAC_DATA_WID-1:0] z_report
+	input assert_change,
+	output reg change_made,
+
+	input run_loop_in,
+	input [ADC_WID-1:0] setpt_in,
+	input [M4_CONSTS_WID-1:0] P_in,
+	input [M4_CONSTS_WID-1:0] I_in,
+	input [DELAY_WID-1:0] delay_in,
+
+	output [CYCLE_COUNT_WID-1:0] cycle_count,
+	output [DAC_DATA_WID-1:0] z_pos,
+	output [ADC_WID-1:0] z_measured
 );
 
 /************ ADC and DAC modules ***************/
@@ -104,6 +108,7 @@ spi_master_ss #(
 reg adc_arm;
 reg adc_finished;
 wire [ADC_WID-1:0] measured_value;
+assign z_measured = measured_value;
 wire adc_ready_to_arm_unused;
 
 localparam [3-1:0] DAC_REGISTER = 3'b001;
@@ -133,33 +138,30 @@ spi_master_ss_no_write #(
  * Parameters can be adjusted on the fly by the user. The modifications
  * cannot happen during a calculation, but calculations occur in a matter
  * of milliseconds. Instead, modifications are checked and applied at the
- * start of each iteration (CYCLE_START). Before this, the new values
- * have to be buffered.
+ * start of each iteration (CYCLE_START).
  */
 
 /* Setpoint: what should the ADC read */
 reg signed [ADC_WID-1:0] setpt = 0;
-reg signed [ADC_WID-1:0] setpt_buffer = 0;
 
 /* Integral parameter */
 reg signed [M4_CONSTS_WID-1:0] cl_I_reg = 0;
-reg signed [M4_CONSTS_WID-1:0] cl_I_reg_buffer = 0;
 
 /* Proportional parameter */
 reg signed [M4_CONSTS_WID-1:0] cl_p_reg = 0;
-reg signed [M4_CONSTS_WID-1:0] cl_p_reg_buffer = 0;
 
 /* Delay parameter (to make the loop run slower) */
 reg [DELAY_WID-1:0] dely = 0;
-reg [DELAY_WID-1:0] dely_buffer = 0;
 
 /************ Loop Control and Internal Parameters *************/
 
 reg running = 0;
 
 reg signed [DAC_DATA_WID-1:0] stored_dac_val = 0;
-assign z_report = stored_dac_val;
+assign z_pos = stored_dac_val;
+
 reg [CYCLE_COUNT_WID-1:0] last_timer = 0;
+assign cycle_count = last_timer;
 reg [CYCLE_COUNT_WID-1:0] counting_timer = 0;
 reg [M4_CONSTS_WID-1:0] adjval_prev = 0;
 
@@ -214,12 +216,6 @@ control_loop_math #(
  * ┃       ↓
  * ┗━━━━━━━┛
  ****** Outline
- * There are two systems: the read-write interface and the loop.
- * The read-write interface allows another module (i.e. the CPU)
- * to access and change constants. When a constant is changed the
- * loop must reset the values that are preserved between loops
- * (previous adjustment and previous delay).
- *
  * When the loop starts it must find the current value from the
  * DAC and write to it. The value from the DAC is then adjusted
  * with the output of the control loop. Afterwards it does not
@@ -253,125 +249,48 @@ always @ (posedge clk) begin
 	end
 end
 
-/**** Read-Write control interface.
- * `write_control` ensures that writes to the dirty bit do not happen when
- * the main loop is clearing the dirty bit.
- */
-
-wire write_control = state == WAIT_ON_DAC || !running;
-reg dirty_bit = 0;
-
-always @ (posedge clk) begin
-	if (!rst_L) begin
-		dirty_bit <= 0;
-		finish_cmd <= 0;
-		word_out <= 0;
-	end else if (start_cmd && !finish_cmd) begin
-		case (cmd)
-		M4_CONTROL_LOOP_NOOP:
-			finish_cmd <= 1;
-		M4_CONTROL_LOOP_NOOP | M4_CONTROL_LOOP_WRITE_BIT:
-			finish_cmd <= 1;
-		M4_CONTROL_LOOP_STATUS: begin
-			word_out[M4_DATA_WID-1:1] <= 0;
-			word_out[0] <= running;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_STATUS | M4_CONTROL_LOOP_WRITE_BIT:
-			if (write_control) begin
-				running <= word_in[0];
-				finish_cmd <= 1;
-				dirty_bit <= 1;
-			end
-		M4_CONTROL_LOOP_SETPT: begin
-			word_out[M4_DATA_WID-1:ADC_WID] <= 0;
-			word_out[ADC_WID-1:0] <= setpt;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_SETPT | M4_CONTROL_LOOP_WRITE_BIT:
-			if (write_control) begin
-				setpt_buffer <= word_in[ADC_WID-1:0];
-				finish_cmd <= 1;
-				dirty_bit <= 1;
-			end
-		M4_CONTROL_LOOP_P: begin
-			word_out <= cl_p_reg;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_P | M4_CONTROL_LOOP_WRITE_BIT: begin
-			if (write_control) begin
-				cl_p_reg_buffer <= word_in;
-				finish_cmd <= 1;
-				dirty_bit <= 1;
-			end
-		end
-		M4_CONTROL_LOOP_I: begin
-			word_out <= cl_I_reg;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_I | M4_CONTROL_LOOP_WRITE_BIT: begin
-			if (write_control) begin
-				cl_I_reg_buffer <= word_in;
-				finish_cmd <= 1;
-				dirty_bit <= 1;
-			end
-		end
-		M4_CONTROL_LOOP_DELAY: begin
-			word_out[M4_DATA_WID-1:DELAY_WID] <= 0;
-			word_out[DELAY_WID-1:0] <= dely;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_DELAY | M4_CONTROL_LOOP_WRITE_BIT: begin
-			if (write_control) begin
-				dely_buffer <= word_in[DELAY_WID-1:0];
-				finish_cmd <= 1;
-				dirty_bit <= 1;
-			end
-		end
-		M4_CONTROL_LOOP_ERR: begin
-			word_out[M4_DATA_WID-1:M4_E_WID] <= 0;
-			word_out[M4_E_WID-1:0] <= err_prev;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_Z: begin
-			word_out[M4_DATA_WID-1:DAC_DATA_WID] <= 0;
-			word_out[DAC_DATA_WID-1:0] <= stored_dac_val;
-			finish_cmd <= 1;
-		end
-		M4_CONTROL_LOOP_CYCLES: begin
-			word_out[M4_DATA_WID-1:CYCLE_COUNT_WID] <= 0;
-			word_out[CYCLE_COUNT_WID-1:0] <= last_timer;
-			finish_cmd <= 0;
-		end
-		endcase
-	end else if (!start_cmd) begin
-		finish_cmd <= 0;
-	end
-end
-
 assign in_loop = state != INIT_READ_FROM_DAC || running;
 
+/* Reset the change acknowledge interface after the master
+ * stops its transfer.
+ *
+ * The module only writes to change_made in the main always block
+ * when state == CYCLE_START, so make sure that this does not
+ * compete with CYCLE_START.
+ */
+always @ (posedge clk) begin
+	if (state != CYCLE_START && !assert_change && change_made)
+		change_made <= 0;
+end
+
+task reset_loop();
+	to_dac <= 0;
+	dac_arm <= 0;
+	state <= INIT_READ_FROM_DAC;
+	timer <= 0;
+	stored_dac_val <= 0;
+	setpt <= 0;
+	dely <= 0;
+	cl_I_reg <= 0;
+	adjval_prev <= 0;
+	err_prev <= 0;
+
+	adc_arm <= 0;
+	arm_math <= 0;
+endtask
+
 always @ (posedge clk) begin
 	if (!rst_L) begin
-		to_dac <= 0;
-		dac_arm <= 0;
-		state <= INIT_READ_FROM_DAC;
-		timer <= 0;
-		stored_dac_val <= 0;
-		setpt <= 0;
-		dely <= 0;
-		cl_I_reg <= 0;
-		adjval_prev <= 0;
-		err_prev <= 0;
-
-		adc_arm <= 0;
-		arm_math <= 0;
+		reset_loop();
 	end else case (state)
 	INIT_READ_FROM_DAC: begin
-		if (running) begin
+		if (run_loop_in) begin
+			running <= 1;
 			to_dac <= {1'b1, DAC_REGISTER, 20'b0};
 			dac_arm <= 1;
 			state <= WAIT_FOR_DAC_READ;
+		end else begin
+			reset_loop();
 		end
 	end
 	WAIT_FOR_DAC_READ: begin
@@ -396,21 +315,21 @@ always @ (posedge clk) begin
 		end
 	end
 	CYCLE_START: begin
-		if (!running) begin
-			state <= INIT_READ_FROM_DAC;
+		if (!run_loop_in) begin
+			reset_loop();
 		end else if (timer < dely) begin
 			timer <= timer + 1;
 		end else begin
 			/* On change of constants, previous values are invalidated. */
-			if (dirty_bit) begin
-				setpt <= setpt_buffer;
-				dely <= dely_buffer;
-				cl_I_reg <= cl_I_reg_buffer;
-				cl_p_reg <= cl_p_reg_buffer;
+			if (assert_change && !change_made) begin
+				change_made <= 1;
+
+				setpt <= setpt_in;
+				dely <= delay_in;
+				cl_I_reg <= I_in;
+				cl_p_reg <= P_in;
 				adjval_prev <= 0;
 				err_prev <= 0;
-
-				dirty_bit <= 0;
 			end
 
 			state <= WAIT_ON_ADC;

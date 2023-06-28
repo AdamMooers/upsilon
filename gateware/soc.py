@@ -56,6 +56,8 @@ from litedram.modules import MT41K128M16
 from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
+import mmio_descr
+
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
 the named Verilog pins.
@@ -128,28 +130,26 @@ class Base(Module, AutoCSR):
 	keyword arguments to pass all the arguments.
 	"""
 
-	def _make_csr(self, name, csrclass, csrlen, description, num=None):
-		""" Add a CSR for a pin `f"{name}_{num}"` with CSR type
-		`csrclass`. This will automatically handle the `i_` and
-		`o_` prefix in the keyword arguments.
+	def _make_csr(self, reg, num=None):
+		""" Add a CSR for a pin `f"{name}_{num}".`
 
-        This function is used to automate the creation of memory mapped
-        IO pins for all the converters on the device.
-
-        `csrclass` must be CSRStorage (Read-Write) or CSRStatus (Read only).
-        `csrlen` is the length in bits of the MMIO register. LiteX automatically
-        takes care of byte alignment, etc. so the length can be any positive
-        number.
-
-        Description is optional but recommended for debugging.
+        :param name: Name of the MMIO register without prefixes or numerical
+          suffix.
+        :param num: Numerical suffix of this MMIO register. This is the only
+          parameter that should change when adding multiple CSRs of the same
+          name.
 		"""
 
-		if name not in self.csrdict.keys():
-			self.csrdict[name] = csrlen
+        name = reg.name
 		if num is not None:
 			name = f"{name}_{num}"
 
-		csr = csrclass(csrlen, name=name, description=description)
+        if self.ro == "read-only":
+            csrclass = CSRStatus
+        else:
+            csrclass = CSRStorage
+
+		csr = csrclass(reg.blen, name=name, description=None)
 		setattr(self, name, csr)
 
 		if csrclass is CSRStorage:
@@ -161,44 +161,13 @@ class Base(Module, AutoCSR):
 
 	def __init__(self, clk, sdram, platform):
 		self.kwargs = {}
-		self.csrdict = {}
 
-		for i in range(0,8):
-			self._make_csr("adc_sel", CSRStorage, 3, f"Select ADC {i} Output", num=i)
-			self._make_csr("dac_sel", CSRStorage, 3, f"Select DAC {i} Output", num=i)
-			self._make_csr("dac_finished", CSRStatus, 1, f"DAC {i} Transmission Finished Flag", num=i)
-			self._make_csr("dac_arm", CSRStorage, 1, f"DAC {i} Arm Flag", num=i)
-			self._make_csr("dac_recv_buf", CSRStatus, 24, f"DAC {i} Received Data", num=i)
-			self._make_csr("dac_send_buf", CSRStorage, 24, f"DAC {i} Data to Send", num=i)
-#			self._make_csr("wf_arm", CSRStorage, 1, f"Waveform {i} Arm Flag", num=i)
-#			self._make_csr("wf_halt_on_finish", CSRStorage, 1, f"Waveform {i} Halt on Finish Flag", num=i)
-#			self._make_csr("wf_finished", CSRStatus, 1, f"Waveform {i} Finished Flag", num=i)
-#			self._make_csr("wf_running", CSRStatus, 1, f"Waveform {i} Running Flag", num=i)
-#			self._make_csr("wf_time_to_wait", CSRStorage, 16, f"Waveform {i} Wait Time", num=i)
-#			self._make_csr("wf_refresh_start", CSRStorage, 1, f"Waveform {i} Data Refresh Start Flag", num=i)
-#			self._make_csr("wf_refresh_finished", CSRStatus, 1, f"Waveform {i} Data Refresh Finished Flag", num=i)
-#			self._make_csr("wf_start_addr", CSRStorage, 32, f"Waveform {i} Data Addr", num=i)
-#
-#			port = sdram.crossbar.get_port()
-#			setattr(self, f"wf_sdram_{i}", LiteDRAMDMAReader(port))
-#			cur_sdram = getattr(self, f"wf_sdram_{i}")
-#
-#			self.kwargs[f"o_wf_ram_dma_addr_{i}"] = cur_sdram.sink.address
-#			self.kwargs[f"i_wf_ram_word_{i}"] = cur_sdram.source.data
-#			self.kwargs[f"o_wf_ram_read_{i}"] = cur_sdram.sink.valid
-#			self.kwargs[f"i_wf_ram_valid_{i}"] = cur_sdram.source.valid
-
-			self._make_csr("adc_finished", CSRStatus, 1, f"ADC {i} Finished Flag", num=i)
-			self._make_csr("adc_arm", CSRStorage, 1, f"ADC {i} Arm Flag", num=i)
-			self._make_csr("adc_recv_buf", CSRStatus, 32, f"ADC {i} Received Data", num=i)
-
-		self._make_csr("cl_in_loop", CSRStatus, 1, "Control Loop Loop Enabled Flag")
-		self._make_csr("cl_cmd", CSRStorage, 8, "Control Loop Command Input")
-		self._make_csr("cl_word_in", CSRStorage, 64, "Control Loop Data Input")
-		self._make_csr("cl_word_out", CSRStatus, 64, "Control Loop Data Output")
-		self._make_csr("cl_start_cmd", CSRStorage, 1, "Control Loop Command Start Flag")
-		self._make_csr("cl_finish_cmd", CSRStatus, 1, "Control Loop Command Finished Flag")
-		self._make_csr("cl_z_report", CSRStatus, 1, "Control Loop Z Setting")
+        for reg in mmio_descr.registers:
+            if reg.num > 1:
+                for i in range(0,reg.num):
+                    self._make_csr(reg,i)
+            else:
+                self._make_csr(reg)
 
 		self.kwargs["i_clk"] = clk
 		self.kwargs["i_rst_L"] = ~platform.request("module_reset")
@@ -209,13 +178,7 @@ class Base(Module, AutoCSR):
 		self.kwargs["o_adc_conv"] = platform.request("adc_conv")
 		self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
 		self.kwargs["o_adc_sck"] = platform.request("adc_sck")
-#		self.kwargs["o_test_clock"] = platform.request("test_clock")
 		self.kwargs["o_set_low"] = platform.request("differntial_output_low")
-
-		""" Dump all MMIO pins to a JSON file with their exact bit widths. """
-		with open("csr_bitwidth.json", mode='w') as f:
-			import json
-			json.dump(self.csrdict, f)
 
 		self.specials += Instance("base", **self.kwargs)
 

@@ -11,7 +11,6 @@ platform-runcmd = echo LiteX/VexRiscv
 
 PLATFORM_RISCV_XLEN = 32
 PLATFORM_RISCV_ABI = ilp32
-#PLATFORM_RISCV_ISA = rv32ima ## XXX: Broken on new binutils
 PLATFORM_RISCV_ISA = rv32ima_zicsr_zifencei
 PLATFORM_RISCV_CODE_MODEL = medany
 platform-objs-y += platform.o

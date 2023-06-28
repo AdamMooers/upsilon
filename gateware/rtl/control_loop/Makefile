@@ -38,7 +38,7 @@ obj_dir/Vcontrol_loop_sim_top.mk: control_loop_sim.cpp ${COMMON} \
                           ../spi/spi_master_ss.v \
                           ../spi/spi_slave_no_write.v \
                           control_loop_sim_top.v control_loop_sim_top.v \
-                          control_loop_cmds.vh control_loop.v \
+                          control_loop.v \
                           ${control_loop_math_verilog}
 	verilator --cc --exe -Wall --trace --trace-fst \
 		--top-module control_loop_sim_top \
@@ -48,19 +48,13 @@ obj_dir/Vcontrol_loop_sim_top.mk: control_loop_sim.cpp ${COMMON} \
 		control_loop_sim_top.v control_loop.v control_loop_sim.cpp \
 		${COMMON_CPP} adc_sim.v dac_sim.v ../spi/spi_master_ss.v \
 		../spi/spi_slave_no_read.v ../spi/spi_slave.v
-obj_dir/Vcontrol_loop_sim_top: obj_dir/Vcontrol_loop_sim_top.mk control_loop_cmds.h
+obj_dir/Vcontrol_loop_sim_top: obj_dir/Vcontrol_loop_sim_top.mk
 	cd obj_dir && make -f Vcontrol_loop_sim_top.mk
 
 ####### Codegen ########
 
 include ../common.makefile
-CODEGEN_FILES=control_loop_cmds.h boothmul_preprocessed.v control_loop_math.v control_loop.v control_loop_cmds.vh
+CODEGEN_FILES=boothmul_preprocessed.v control_loop_math.v control_loop.v
 codegen: ${CODEGEN_FILES}
-control_loop_cmds.vh: control_loop_cmds.m4
-	m4 -P control_loop_cmds.vh.m4  > control_loop_cmds.vh
-control_loop_cmds.h: control_loop_cmds.m4
-	echo '#pragma once' > control_loop_cmds.h
-	m4 -P control_loop_cmds.h.m4 >> control_loop_cmds.h
-
 clean:
 	rm -rf obj_dir *.fst ${CODEGEN_FILES}

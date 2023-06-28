@@ -1,7 +1,6 @@
 m4_changequote(`⟨', `⟩')
 m4_changecom(⟨/*⟩, ⟨*/⟩)
 m4_define(generate_macro, ⟨m4_define(M4_$1, $2)⟩)
-m4_include(../control_loop/control_loop_cmds.m4)
 /*
 Copyright 2023 (C) Peter McGoron
 
@@ -291,14 +290,18 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	m4_adc_wires(ADC_TYPE3_WID, 6, ADC_PORTS),
 	m4_adc_wires(ADC_TYPE3_WID, 7, ADC_PORTS),
 
-	output cl_in_loop,
-	input [M4_CONTROL_LOOP_CMD_WIDTH-1:0] cl_cmd,
-	input [CL_DATA_WID-1:0] cl_word_in,
-	output reg [CL_DATA_WID-1:0] cl_word_out,
-	input cl_start_cmd,
-	output cl_finish_cmd,
+	input cl_assert_change,
+	output cl_change_made,
 
-	output [DAC_DATA_WID-1:0] cl_z_report
+	input cl_run_loop_in,
+	input [ADC_TYPE1_WID-1:0] cl_setpt_in,
+	input [CL_DATA_WID-1:0] cl_P_in,
+	input [CL_DATA_WID-1:0] cl_I_in,
+	input [CL_DELAY_WID-1:0] cl_delay_in,
+
+	output [CYCLE_COUNT_WID-1:0] cl_cycle_count,
+	output [DAC_DATA_WID-1:0] cl_z_pos,
+	output [ADC_WID-1:0] cl_z_measured
 );
 
 assign set_low = 0;
@@ -377,12 +380,16 @@ control_loop #(
 	.adc_miso(adc_sdo_port_0[2]),
 	.adc_conv_L(adc_conv_L_port_0[2]),
 	.adc_sck(adc_sck_port_0[2]),
-	.cmd(cl_cmd),
-	.word_in(cl_word_in),
-	.word_out(cl_word_out),
-	.start_cmd(cl_start_cmd),
-	.finish_cmd(cl_finish_cmd),
-	.z_report(cl_z_report)
+	.assert_change(cl_assert_change),
+	.change_made(cl_change_made),
+	.run_loop_in(cl_run_loop_in),
+	.setpt_in(cl_setpt_in),
+	.P_in(cl_P_in),
+	.I_in(cl_I_in),
+	.delay_in(cl_delay_in),
+	.cycle_count(cl_cycle_count),
+	.z_pos(cl_z_pos),
+	.z_measured(cl_z_measured)
 );
 
 endmodule

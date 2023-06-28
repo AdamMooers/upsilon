@@ -14,7 +14,6 @@
 
 #include <verilated.h>
 #include "control_loop_math_implementation.h"
-#include "control_loop_cmds.h"
 #include "Vcontrol_loop_sim_top.h"
 using ModType = Vcontrol_loop_sim_top;
 
@@ -41,32 +40,27 @@ static void init(int argc, char **argv) {
 	mod->rst_L = 1;
 }
 
-static void set_value(V val, unsigned name) {
-	mod->cmd = CONTROL_LOOP_WRITE_BIT | name;
-	mod->word_into_loop = val;
-	mod->start_cmd = 1;
-
-	do { run_clock(); } while (!mod->finish_cmd);
-	mod->start_cmd = 0;
-	run_clock();
-}
-
 int main(int argc, char **argv) {
 	printf("sim top\n");
 	init(argc, argv);
 	Transfer func = Transfer{150, 0, 2, 1.1, 10, -1};
 
-	set_value(0b11010111000010100011110101110000101000111, CONTROL_LOOP_P);
 	/* Constant values must be sized to 64 bits, or else the compiler
 	 * will think they are 32 bit and silently mess things up
 	 */
-	set_value((V)6 << CONSTS_FRAC, CONTROL_LOOP_I);
-	set_value(20, CONTROL_LOOP_DELAY);
-	set_value(10000, CONTROL_LOOP_SETPT);
-	set_value(1, CONTROL_LOOP_STATUS);
+	mod->P_in = 0b11010111000010100011110101110000101000111;
+	mod->I_in = (V)6 << CONSTS_FRAC;
+	mod->delay_in = 20;
+	mod->setpt_in = 10000;
+	mod->assert_change = 1;
+	mod->run_loop_in = 1;
 	mod->curset = 0;
 
 	for (int tick = 0; tick < 1000;) {
+		if (mod->change_made) {
+			mod->assert_change = 0;
+		}
+
 		run_clock();
 		if (mod->request && !mod->fulfilled) {
 			/* Verilator values are not sign-extended to the
@@ -80,10 +74,6 @@ int main(int argc, char **argv) {
 		} else if (mod->fulfilled && !mod->request) {
 			mod->fulfilled = 0;
 			tick++;
-		}
-
-		if (mod->finish_cmd) {
-			mod->start_cmd = 0;
 		}
 	}
 

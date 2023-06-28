@@ -17,5 +17,8 @@ Read `doc/copying/docker.md` to set up the Docker build environment.
 * `doc/`: Documentation.
 * `doc/copying`: Licenses.
 * `gateware/`: FPGA source.
+* `gateware/rtl`: Verilog sources.
+* `gateware/rtl/control_loop`: Control loop code.
+* `gateware/rtl/spi`: SPI code.
 * `linux/`: Software that runs on the controller.
 * `opensbi/`: OpenSBI configuration files and source fragments.
