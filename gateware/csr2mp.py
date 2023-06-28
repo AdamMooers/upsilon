@@ -15,59 +15,23 @@ import collections
 import argparse
 import json
 import sys
-
-class MMIORegister:
-    def __init__(self, name, read_only=False, number=1, exntype=None):
-        """
-        Describes a MMIO register.
-        :param name: The name of the MMIO register, excluding the prefix
-          defining its module (i.e. ``base_``) and excluding its
-          numerical suffix.
-        :param read_only: True if the register is read only. Defaults to
-            ``False``.
-        :param number: The number of MMIO registers with the same name
-            and number suffixes. The number suffixes must go from 0
-            to ``number - 1`` with no gaps.
-        """
-        self.name = name
-        self.read_only = read_only
-        self.number = number
-        self.exntype = exntype
-
-        # These are filled in by the CSR file.
-        self.size = None
-
-def mmio_factory(num, exntype):
-    """
-    Return a function that simplifies the creation of instances of
-    :py:class:`MMIORegister` with the same number and exception type.
-
-    :param num: Number of registers with the same name (minus suffix).
-    :param exntype: MicroPython exception type.
-    :return: A function ``f(name, read_only=False)``. Each argument is
-      the same as the one in the initializer of py:class:`MMIORegister`.
-    """
-    def f(name, read_only=False):
-        return MMIORegister(name, read_only, number=num, exntype=exntype)
-    return f
+import mmio_descr
 
 class CSRHandler:
     """
     Class that wraps the CSR file and fills in registers with information
     from those files.
     """
-    def __init__(self, csrjson, bitwidthjson, registers):
+    def __init__(self, csrjson, registers):
         """
         Reads in the CSR files.
 
         :param csrjson: Filename of a LiteX "csr.json" file.
-        :param bitwidthjson: Filename of an Upsilon "bitwidthjson" file.
-        :param registers: A list of :py:class:`MMIORegister`s.
+        :param registers: A list of ``mmio_descr`` ``Descr``s.
         :param outf: Output file.
         """
         self.registers = registers
         self.csrs = json.load(open(csrjson))
-        self.bws = json.load(open(bitwidthjson))
 
     def update_reg(self, reg):
         """
@@ -76,17 +40,19 @@ class CSRHandler:
         :param reg: The register.
         :raises Exception: When the bit width exceeds 64.
         """
-        b = self.bws[reg.name]
+        regsize = None
+        b = reg.blen
         if b <= 8:
-            reg.size = 8
+            regsize = 8
         elif b <= 16:
-            reg.size = 16
+            regsize = 16
         elif b <= 32:
-            reg.size = 32
+            regsize = 32
         elif b <= 64:
-            reg.size = 64
+            regsize = 64
         else:
             raise Exception(f"unsupported width {b} in {reg.name}")
+        setattr(reg, "regsize", regsize)
 
     def get_reg_addr(self, reg, num=None):
         """
@@ -135,7 +101,7 @@ class InterfaceGenerator:
         self.print(self.header())
         for r in self.csr.registers:
             self.print(self.fun(r, "read"))
-            if not r.read_only:
+            if not r.rwperm != "read-only":
                 self.print(self.fun(r, "write"))
 
 class MicropythonGenerator(InterfaceGenerator):
@@ -144,9 +110,9 @@ class MicropythonGenerator(InterfaceGenerator):
 
     def get_accessor(self, reg, num):
         addr = self.csr.get_reg_addr(reg, num)
-        if reg.size in [8, 16, 32]:
-            return [f"machine.mem{reg.size}[{addr}]"]
-        return [f"machine.mem32[{addr}]", f"machine.mem32[{addr + 4}]"]
+        if reg.regsize in [8, 16, 32]:
+            return [f"machine.mem{reg.regsize}[{addr}]"]
+        return [f"machine.mem32[{addr + 4}]", f"machine.mem32[{addr}]"]
 
     def print_write_register(self, indent, varname, reg, num):
         acc = self.get_accessor(reg, num)
@@ -181,16 +147,16 @@ class MicropythonGenerator(InterfaceGenerator):
         else:
             pfun = self.print_read_register
 
-        if reg.number != 1:
+        if reg.num != 1:
             if printed_argument:
                 a(', ')
             a('num')
         a('):\n')
 
-        if reg.number == 1:
+        if reg.num == 1:
             a(pfun('\t', 'val', reg, None))
         else:
-            for i in range(0,reg.number):
+            for i in range(0,reg.num):
                 if i == 0:
                     a(f'\tif ')
                 else:
@@ -198,46 +164,16 @@ class MicropythonGenerator(InterfaceGenerator):
                 a(f'num == {i}:\n')
                 a(pfun('\t\t', 'val', reg, i))
             a(f'\telse:\n')
-            a(f'\t\traise {r.exntype}(regnum)\n')
+            a(f'\t\traise Exception(regnum)\n')
         a('\n')
 
         return rs
 
     def header(self):
-        return """import machine
-class InvalidDACException(Exception):
-    pass
-class InvalidADCException(Exception):
-    pass
-"""
+        return "import machine\n"
 
 if __name__ == "__main__":
-   dac_num = 8
-   adc_num = 8
-   dac_reg = mmio_factory(dac_num, "InvalidDACException")
-   adc_reg = mmio_factory(adc_num, "InvalidADCException")
-
-   registers = [
-       dac_reg("dac_sel"),
-       dac_reg("dac_finished", read_only=True),
-       dac_reg("dac_arm"),
-       dac_reg("dac_recv_buf", read_only=True),
-       dac_reg("dac_send_buf"),
-
-       adc_reg("adc_finished", read_only=True),
-       adc_reg("adc_arm"),
-       adc_reg("adc_recv_buf", read_only=True),
-       adc_reg("adc_sel"),
-
-       MMIORegister("cl_in_loop", read_only=True),
-       MMIORegister("cl_cmd"),
-       MMIORegister("cl_word_in"),
-       MMIORegister("cl_word_out", read_only=True),
-       MMIORegister("cl_start_cmd"),
-       MMIORegister("cl_finish_cmd", read_only=True),
-       MMIORegister("cl_z_report", read_only=True),
-   ]
-   csrh = CSRHandler(sys.argv[1], sys.argv[2], registers)
-   for r in registers:
+   csrh = CSRHandler(sys.argv[1], mmio_descr.registers)
+   for r in mmio_descr.registers:
        csrh.update_reg(r)
    MicropythonGenerator(csrh, sys.stdout).print_file()

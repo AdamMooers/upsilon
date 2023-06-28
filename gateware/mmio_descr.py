@@ -11,15 +11,15 @@ class Descr:
         """
         self.name = name
         self.blen = blen
-        self.doc = textwrap.deindent(descr)
+        self.doc = textwrap.dedent(descr)
         self.num =num
-        self.read_only = read_only == "read-only"
+        self.rwperm = rwperm
 
     @classmethod
     def from_dict(cls, jsdict, name):
         return cls(name, jsdict[name]["len"], jsdict[name]["ro"], jsdict[name]["num"], jsdict[name]["doc"])
     def store_to_dict(self, d):
-        d[self.name = {
+        d[self.name] = {
                 "len": self.blen,
                 "doc": self.doc,
                 "num": self.num,
@@ -27,7 +27,7 @@ class Descr:
                 }
 
 registers = [
-        Descr("adc_sel", 3, "read-write", """\
+        Descr("adc_sel", 3, "read-write", 8, """\
                 Select which on-FPGA SPI master controls the ADC.
 
                 Valid settings:
@@ -36,7 +36,7 @@ registers = [
                 * ``0b10``: ADC is controlled by MMIO registers, but conversion is
                    disabled. This is used to flush output from an out-of-sync ADC.
                 * ``0b100``: ADC 0 only. ADC is controlled by control loop."""),
-        Descr("adc_finished", "read-only", """\
+        Descr("adc_finished", 1, "read-only", 8, """\
                 Signals that an ADC master has finished an SPI cycle.
 
                 Values:
@@ -47,9 +47,8 @@ registers = [
 
                 This flag is on only when ``adc_arm`` is high. The flag does not
                 mean that data has been received successfully, only that the master
-                has finished it's SPI transfer.
-                """),
-        Descr("adc_arm", "read-write", """\
+                has finished it's SPI transfer."""),
+        Descr("adc_arm", 1, "read-write", 8, """\
                 Start a DAC master SPI transfer.
 
                 If ``adc_arm`` is raised from and the master is currently not in a SPI
@@ -84,7 +83,7 @@ registers = [
 
                 If ``adc_sel`` is not set to 0 then the transfer will proceed
                 as normal, but no data will be received from the ADC."""),
-        Descr("adc_recv_buf", "read-only", """\
+        Descr("adc_recv_buf", 18, "read-only", 8, """\
                 ADC Master receive buffer.
 
                 This buffer is stable if there is no ADC transfer caused by ``adc_arm``
@@ -94,14 +93,14 @@ registers = [
                 registers. SPI transfers by other masters will not affect this register.
                 buffer."""),
 
-        Descr("dac_sel", 2, "read-write", """\
+        Descr("dac_sel", 2, "read-write", 8, """\
                 Select which on-FPGA SPI master controls the DAC.
 
                 Valid settings:
 
                 * ``0``: DAC is controlled by MMIO registers.
                 * ``0b10``: DAC 0 only. DAC is controlled by control loop."""),
-        Descr("dac_finished", 1, "read-only", """\
+        Descr("dac_finished", 1, "read-only", 8, """\
                 Signals that the DAC master has finished transmitting data.
 
                 Values:
@@ -113,7 +112,7 @@ registers = [
                 This flag is on only when ``dac_arm`` is high. The flag does not
                 mean that data has been received or transmitted successfully, only that
                 the master has finished it's SPI transfer."""),
-        Descr("dac_arm", 1, "read-write", """\
+        Descr("dac_arm", 1, "read-write", 8, """\
                 Start a DAC master SPI transfer.
 
                 If ``dac_arm`` is raised from and the master is currently not in a SPI
@@ -138,7 +137,7 @@ registers = [
 
                 If ``dac_sel`` is set to another master then the transfer will proceed
                 as normal, but no data will be sent to or received from the DAC."""),
-        Descr("dac_recv_buf", 24, "read-only", """\
+        Descr("dac_recv_buf", 24, "read-only", 8, """\
                 DAC master receive buffer.
 
                 This buffer is stable if there is no DAC transfer caused by ``dac_arm``
@@ -147,7 +146,7 @@ registers = [
                 This register only changes if an SPI transfer is triggered by the MMIO
                 registers. SPI transfers by other masters will not affect this register.
                 buffer."""),
-        Descr("dac_send_buf, 24, "read-write", """\
+        Descr("dac_send_buf", 24, "read-write", 8, """\
                 DAC master send buffer.
 
                 Fill this buffer with a 24 bit Analog Devices DAC command. Updating
@@ -158,7 +157,7 @@ registers = [
                 Modifying this buffer during a transfer does not disrupt an in-process
                 transfer."""),
 
-        Descr("cl_assert_change", 1, "read-write", """\
+        Descr("cl_assert_change", 1, "read-write", 1, """\
                 Flush parameter changes to control loop.
 
                 When this bit is raised from low to high, this signals the control
@@ -168,21 +167,23 @@ registers = [
 
                 When this bit is raised from high to low before ``cl_change_made``
                 is asserted by the control loop, nothing happens."""),
-        Descr("cl_change_made", 1, "read-only", """\
+        Descr("cl_change_made", 1, "read-only", 1, """\
                 Signal from the control loop that the parameters have been applied.
 
                 This signal goes high only while ``cl_assert_change`` is high. No
                 change will be applied afterwards while both are high."""),
 
-        Descr("cl_in_loop_in", 1, "read-only", """\
+        Descr("cl_in_loop", 1, "read-only", 1, """\
                 This bit is high if the control loop is running."""),
-        Descr("cl_setpt_in", 18, "read-write", """\
+        Descr("cl_run_loop_in", 1, "read-write", 1, """\
+                Set this bit high to start the control loop."""),
+        Descr("cl_setpt_in", 18, "read-write", 1, """\
                 Setpoint of the control loop.
 
                 This is a twos-complement number in ADC units.
 
                 This is a parameter: see ``cl_assert_change``."""),
-        Descr("cl_P_in", 64, "read-write", """\
+        Descr("cl_P_in", 64, "read-write", 1, """\
                 Proportional parameter of the control loop.
 
                 This is a twos-complement fixed point number with 21 whole
@@ -190,7 +191,7 @@ registers = [
                 in DAC units.
 
                 This is a parameter: see ``cl_assert_change``."""),
-        Descr("cl_I_in", 64, "read-write", """\
+        Descr("cl_I_in", 64, "read-write", 1, """\
                 Integral parameter of the control loop.
 
                 This is a twos-complement fixed point number with 21 whole
@@ -198,7 +199,7 @@ registers = [
                 in DAC units.
 
                 This is a parameter: see ``cl_assert_change``."""),
-        Descr("cl_delay_in", 16, "read-write", """\
+        Descr("cl_delay_in", 16, "read-write", 1, """\
                 Delay parameter of the loop.
 
                 This is an unsigned number denoting the number of cycles
@@ -206,15 +207,15 @@ registers = [
 
                 This is a parameter: see ``cl_assert_change``."""),
 
-        Descr("cl_cycle_count", 18, "read-only", """\
+        Descr("cl_cycle_count", 18, "read-only", 1, """\
                 Delay parameter of the loop.
 
                 This is an unsigned number denoting the number of cycles
                 the loop should wait between loop executions."""),
-        Descr("cl_z_pos", 20, "read-only", """\
+        Descr("cl_z_pos", 20, "read-only", 1, """\
                 Control loop DAC Z position.
                 """),
-        Descr("cl_z_measured", 18, "read-only", """\
+        Descr("cl_z_measured", 18, "read-only", 1, """\
                 Control loop ADC Z position.
                 """),
         ]

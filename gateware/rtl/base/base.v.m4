@@ -292,6 +292,7 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 
 	input cl_assert_change,
 	output cl_change_made,
+	output cl_in_loop,
 
 	input cl_run_loop_in,
 	input [ADC_TYPE1_WID-1:0] cl_setpt_in,
@@ -299,9 +300,9 @@ m4_define(CL_DATA_WID, CL_CONSTS_WID)
 	input [CL_DATA_WID-1:0] cl_I_in,
 	input [CL_DELAY_WID-1:0] cl_delay_in,
 
-	output [CYCLE_COUNT_WID-1:0] cl_cycle_count,
+	output [CL_CYCLE_COUNT_WID-1:0] cl_cycle_count,
 	output [DAC_DATA_WID-1:0] cl_z_pos,
-	output [ADC_WID-1:0] cl_z_measured
+	output [ADC_TYPE1_WID-1:0] cl_z_measured
 );
 
 assign set_low = 0;
