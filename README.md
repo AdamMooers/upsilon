@@ -5,7 +5,7 @@ Linux. Read `doc/copying/README.md` for license information.
 
 ## Quickstart
 
-Read `doc/copying/docker.md` to set up the Docker build environment.
+Read `doc/docker.md` to set up the Docker build environment.
 
 ## Project Organization
 
