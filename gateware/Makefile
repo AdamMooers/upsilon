@@ -25,5 +25,5 @@ arty.dts: csr.json
 arty.dtb: arty.dts
 	dtc -O dtb -o arty.dtb arty.dts
 
-mmio.py: csr2mp.py csr.json csr_bitwidth.json
-	python3 csr2mp.py csr.json csr_bitwidth.json > mmio.py
+mmio.py: csr2mp.py csr.json
+	python3 csr2mp.py csr.json > mmio.py
