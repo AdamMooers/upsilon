@@ -12,7 +12,7 @@ class Descr:
         self.name = name
         self.blen = blen
         self.doc = textwrap.dedent(descr)
-        self.num =num
+        self.num = num
         self.rwperm = rwperm
 
     @classmethod
