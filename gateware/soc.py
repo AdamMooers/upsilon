@@ -268,8 +268,8 @@ class UpsilonSoC(SoCCore):
                 csr_address_width=14,
                 csr_paging=0x800,
                 csr_ordering="big",
-                local_ip='192.168.1.50',
-                remote_ip='192.168.1.100',
+                local_ip='192.168.2.50',
+                remote_ip='192.168.2.100',
                 timer_uptime = True)
         # This initializes the connection to the physical DRAM interface.
         self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
