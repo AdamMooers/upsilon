@@ -34,7 +34,7 @@ def connect_execute(f, *arg):
     from pssh.clients import SSHClient # require parallel-ssh
 
     print('connecting')
-    client = SSHClient('192.168.1.50', user='root', pkey='~/.ssh/upsilon_key')
+    client = SSHClient('192.168.2.50', user='root', pkey='~/.ssh/upsilon_key')
     # Upload the script.
     print('connected')
     client.scp_send(f'../linux/{f}', '/root/')

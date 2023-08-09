@@ -127,7 +127,7 @@ OPENFPGALOADER=./openFPGALoader/build/openFPGALoader
 flash:
 	${OPENFPGALOADER} -c digilent ../boot/digilent_arty.bit
 tftp:
-	cd ../boot && py3tftp --host 192.168.1.100 -p 6969 -v
+	cd ../boot && py3tftp --host 192.168.2.100 -p 6969 -v
 
 copy:
 	scp ../boot/mmio.py ../linux/comm.py upsilon:~/
