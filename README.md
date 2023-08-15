@@ -1,11 +1,11 @@
 # upsilon
 
 Upsilon is a 100% free and open source STM/AFM controller for FPGAs running
-Linux. Read `doc/copying/README.md` for license information.
+Linux. Read [doc/copying/README.md](doc/copying/README.md) for license information.
 
 ## Quickstart
 
-Read `doc/docker.md` to set up the Docker build environment.
+Read the docker [doc/docker.md](doc/docker.md) to set up the Docker build environment.
 
 ## Project Organization
 
