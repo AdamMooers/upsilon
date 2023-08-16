@@ -121,7 +121,7 @@ controller is sucessfully connected to your computer.
 Add the following to your SSH config:
 
 	Host upsilon
-		HostName 192.168.1.50
+		HostName 192.168.2.50
 		StrictHostKeyChecking no
 		UserKnownHostsFile /dev/null
 		IdentityFile upsilon_key
