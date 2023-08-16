@@ -109,8 +109,9 @@ launch the TFTP server. Keep this terminal open.
 ## Flash FPGA
 
 Plug in your FPGA into the USB slot. If you have installed openFPGALoader
-by your package manager, run `make OPENFPGALOADER=openfpgaloader flash`.
-If you installed it using `make openFPGALoader`, then just run `make flash`.
+by your package manager, run `make flash`. If you compiled openFPGALoader using
+`make openFPGALoader`, the makefile will automatically use this instance. Otherwise,
+it will attempt to use the openFPGALoader version installed through the package manager.
 
 In a second you should see messages in the TFTP terminal. This means your
 controller is sucessfully connected to your computer.
