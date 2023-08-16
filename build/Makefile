@@ -141,7 +141,7 @@ f4pga:
 		git clone https://github.com/chipsalliance/f4pga; \
 	fi
 	cd f4pga && git checkout main && git pull && \
-		git checkout -B upsilon_stable 835a40534f9efd70770d74f56f25fef6cfc6ebc6 \
+		git checkout -B upsilon_stable 835a40534f9efd70770d74f56f25fef6cfc6ebc6
 	tar -czvf f4pga.tar.gz f4pga
 
 buildroot:
