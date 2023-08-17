@@ -122,6 +122,7 @@ buildroot-clean:
 	-docker container rm upsilon-buildroot
 
 ###### Execute
+
 flash:
 	if [ -d 'openFPGALoader' ]; then \
 		OPENFPGALOADER=./openFPGALoader/build/openFPGALoader; \
@@ -163,11 +164,14 @@ litex:
 	cd litex && git checkout master && git pull && \
 		git checkout -B upsilon_stable c6ccb626e88168045edacced3743f6bd98746742
 
+# This archiving commands rename the directory which only works with GNU tar
+
 upsilon-hardware.tar.gz:
 	tar -czvf upsilon-hardware.tar.gz ../gateware/ --transform 's|gateware|upsilon/gateware|'
+
 upsilon-buildroot.tar.gz:
 	tar -czvf upsilon-buildroot.tar.gz ../buildroot/ --transform 's|buildroot|upsilon/buildroot|'
-# This script only works for GNU tar. It renames the extraction directory.
+
 upsilon-opensbi.tar.gz:
 	tar -czvf upsilon-opensbi.tar.gz ../opensbi/ --transform 's|opensbi|opensbi/platform|'
 
