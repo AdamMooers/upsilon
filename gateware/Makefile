@@ -12,8 +12,10 @@ all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
 
 rtl_codegen:
 	cd rtl && make
+
 csr.json build/digilent_arty/digilent_arty.bit: soc.py
 	TFTP_SERVER_PORT=6969 python3 soc.py
+
 clean:
 	rm -rf build csr.json arty.dts arty.dtb mmio.py
 	cd rtl && make clean
@@ -22,6 +24,7 @@ test:
 
 arty.dts: csr.json
 	litex_json2dts_linux csr.json > arty.dts
+
 arty.dtb: arty.dts
 	dtc -O dtb -o arty.dtb arty.dts
 
