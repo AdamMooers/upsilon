@@ -123,14 +123,19 @@ buildroot-clean:
 
 ###### Execute
 
-OPENFPGALOADER=./openFPGALoader/build/openFPGALoader
 flash:
-	${OPENFPGALOADER} -c digilent ../boot/digilent_arty.bit
+	if [ -d 'openFPGALoader' ]; then \
+		OPENFPGALOADER=./openFPGALoader/build/openFPGALoader; \
+	else \
+		OPENFPGALOADER=openFPGALoader; \
+	fi; \
+	$$OPENFPGALOADER -c digilent ../boot/digilent_arty.bit
+
 tftp:
-	cd ../boot && py3tftp --host 192.168.1.100 -p 6969 -v
+	cd ../boot && py3tftp --host 192.168.2.100 -p 6969 -v
 
 copy:
-	scp ../boot/mmio.py ../linux/comm.py upsilon:~/
+	scp -O ../boot/mmio.py ../linux/comm.py upsilon:~/
 
 ###### External projects
 
@@ -141,7 +146,7 @@ f4pga:
 		git clone https://github.com/chipsalliance/f4pga; \
 	fi
 	cd f4pga && git checkout main && git pull && \
-		git checkout -B upsilon_stable 835a40534f9efd70770d74f56f25fef6cfc6ebc6 \
+		git checkout -B upsilon_stable 835a40534f9efd70770d74f56f25fef6cfc6ebc6
 	tar -czvf f4pga.tar.gz f4pga
 
 buildroot:
@@ -159,11 +164,14 @@ litex:
 	cd litex && git checkout master && git pull && \
 		git checkout -B upsilon_stable c6ccb626e88168045edacced3743f6bd98746742
 
+# This archiving commands rename the directory which only works with GNU tar
+
 upsilon-hardware.tar.gz:
 	tar -czvf upsilon-hardware.tar.gz ../gateware/ --transform 's|gateware|upsilon/gateware|'
+
 upsilon-buildroot.tar.gz:
 	tar -czvf upsilon-buildroot.tar.gz ../buildroot/ --transform 's|buildroot|upsilon/buildroot|'
-# This script only works for GNU tar. It renames the extraction directory.
+
 upsilon-opensbi.tar.gz:
 	tar -czvf upsilon-opensbi.tar.gz ../opensbi/ --transform 's|opensbi|opensbi/platform|'
 
