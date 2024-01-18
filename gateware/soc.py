@@ -217,7 +217,7 @@ class _CRG(Module):
 
 class UpsilonSoC(SoCCore):
     def add_ip(self, ip_str, ip_name):
-        for seg_num, ip_byte in enumerate(local_ip.split('.'),start=1):
+        for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
     def __init__(self,
