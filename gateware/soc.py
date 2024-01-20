@@ -48,6 +48,7 @@ from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.integration.builder import Builder
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.soc.integration.soc_core import SoCCore
+from litex.soc.integration.soc import SoCRegion
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
 
@@ -220,7 +221,7 @@ class UpsilonSoC(SoCCore):
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
     def add_bram(self, region_name):
-        self.bus.add_region(region_name, SoCRegion(0x2000, cached=False))
+        self.bus.add_region(region_name, SoCRegion(size=0x2000, cached=False))
 
     def __init__(self,
                  variant="a7-100",
@@ -314,7 +315,7 @@ class UpsilonSoC(SoCCore):
 
 def main():
     """ Add modifications to SoC variables here """
-    soc =UpsilonSoC()
+    soc =UpsilonSoC(variant="a7-35")
     builder = Builder(soc, csr_json="csr.json", compile_software=True)
     builder.build()
 
