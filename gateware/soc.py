@@ -219,13 +219,14 @@ class UpsilonSoC(SoCCore):
     def add_ip(self, ip_str, ip_name):
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
+    def add_bram(self, region_name):
+        self.bus.add_region(region_name, SoCRegion(0x2000, cached=False))
 
     def __init__(self,
                  variant="a7-100",
                  local_ip="192.168.2.50",
                  remote_ip="192.168.2.100",
                  tftp_port=6969):
-
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
@@ -257,6 +258,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/control_loop/control_loop.v")
 #       platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
 #       platform.add_source("rtl/waveform/waveform_preprocessed.v")
+        platform.add_source("rtl/bram/bram_preprocessed.v")
         platform.add_source("rtl/base/base.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
@@ -303,6 +305,8 @@ class UpsilonSoC(SoCCore):
         self.add_ip(local_ip, "LOCALIP")
         self.add_ip(remote_ip, "REMOTEIP")
         self.add_constant("TFTP_SERVER_PORT", tftp_port)
+
+        self.add_bram("BRAM0")
 
         # Add pins
         platform.add_extension(io)

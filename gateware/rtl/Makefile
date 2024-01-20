@@ -15,6 +15,8 @@ make_control_loop:
 	cd control_loop && make codegen
 make_waveform:
 	cd waveform && make codegen
+make_bram:
+	cd bram && make bram
 clean:
 	cd base && make clean
 	cd spi && make clean
