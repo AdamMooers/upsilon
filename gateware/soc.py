@@ -216,6 +216,9 @@ class _CRG(Module):
             self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
 class UpsilonSoC(SoCCore):
+    def add_bram(self, region_name):
+        self.bus.add_region(region_name, SoCRegion(0x2000, cached=False))
+        
     def __init__(self, variant):
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
@@ -247,6 +250,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/control_loop/control_loop.v")
 #       platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
 #       platform.add_source("rtl/waveform/waveform_preprocessed.v")
+        platform.add_source("rtl/bram/bram_preprocessed.v")
         platform.add_source("rtl/base/base.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
@@ -288,6 +292,8 @@ class UpsilonSoC(SoCCore):
             clock_pads = platform.request("eth_clocks"),
             pads       = platform.request("eth"))
         self.add_ethernet(phy=self.ethphy, dynamic_ip=True)
+
+        self.add_bram("BRAM0")
 
         platform.add_extension(io)
         self.submodules.base = Base(ClockSignal(), self.sdram, platform)
