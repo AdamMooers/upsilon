@@ -51,6 +51,7 @@ from litex.soc.integration.soc_core import SoCCore
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
+from litex.soc.interconnect.wishbone import Interface
 
 from litedram.phy import s7ddrphy
 from litedram.modules import MT41K128M16
@@ -183,6 +184,25 @@ class Base(Module, AutoCSR):
 
         self.specials += Instance("base", **self.kwargs)
 
+class BRAM(Module):
+    def __init__(self, clk):
+        self.bus = Interface(data_width=32, address_width=32, addressing="byte")
+        self.comb += [
+                self.bus.cti.eq(0),
+                self.bus.bte.eq(0),
+        ]
+        self.specials += Instance("bram",
+                i_clk = clk,
+                i_wb_cyc = self.bus.cyc,
+                i_wb_stb = self.bus.stb,
+                i_wb_we = self.bus.we,
+                i_wb_sel = self.bus.sel,
+                i_wb_addr = self.bus.adr,
+                i_wb_dat_w = self.bus.dat_w,
+                o_wb_ack = self.bus.ack,
+                o_wb_dat_r = self.bus.dat_r,
+        )
+
 # Clock and Reset Generator
 # I don't know how this works, I only know that it does.
 class _CRG(Module):
@@ -222,6 +242,8 @@ class UpsilonSoC(SoCCore):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
     def add_bram(self, region_name):
         self.bus.add_region(region_name, SoCRegion(size=0x2000, cached=False))
+        # TODO: special name
+        self.submodules.bram0 = BRAM(ClockSignal())
 
     def __init__(self,
                  variant="a7-100",
@@ -259,7 +281,8 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/control_loop/control_loop.v")
 #       platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
 #       platform.add_source("rtl/waveform/waveform_preprocessed.v")
-        platform.add_source("rtl/bram/bram_preprocessed.v")
+#       when SoC cannot find a source file, it will fail with a confusing error message
+        platform.add_source("rtl/bram/bram.v")
         platform.add_source("rtl/base/base.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
@@ -307,7 +330,7 @@ class UpsilonSoC(SoCCore):
         self.add_ip(remote_ip, "REMOTEIP")
         self.add_constant("TFTP_SERVER_PORT", tftp_port)
 
-        self.add_bram("BRAM0")
+        self.add_bram("bram0")
 
         # Add pins
         platform.add_extension(io)

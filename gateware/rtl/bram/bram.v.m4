@@ -6,12 +6,9 @@ m4_changecom(⟨/*⟩, ⟨*/⟩)
  * For license terms, refer to the files in `doc/copying` in the Upsilon
  * source distribution.
  *
- * BRAM to Wishbone interface.
+ * This BRAM can only handle aligned accesses.
  */
-module bram_interface #(
-	/* This is the last INDEX of the word array, which is indexed in
-	 * words, not octets. */
-	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
+module bram #(
 	/* Width of the memory bus */
 	parameter BUS_WID = 32,
 	/* Width of a request. */
@@ -26,37 +23,45 @@ module bram_interface #(
 	input wb_we,
 	input [4-1:0] wb_sel,
 	input [BUS_WID-1:0] wb_addr,
-	input [BUS_WID-1:0] wb_data_i,
+	input [BUS_WID-1:0] wb_dat_w,
 	output reg wb_ack,
-	output wb_stall,
-	output reg [BUS_WID-1:0] wb_data_o,
+	output reg [BUS_WID-1:0] wb_dat_r,
 );
 
-assign wb_stall = wb_ack;
+/* When the size of the memory is a power of 2, the mask is the
+ * last addressable index in the array.
+ *
+ * Since this buffer stores words, this is divided by 4 (32 bits).
+ * When accessing a single byte, the address
+ * 0b......Xab
+ * is shifted to the right by two bits, throwing away "ab". This indexes
+ * the 32 bit word that contains the address. This applies to halfwords
+ * and words as long as the accesses are aligned.
+ */
+reg [WORD_WID-1:0] buffer [(ADDR_MASK >> 2):0];
 
-reg [BUS_WID-1:0] buffer [WORD_AMNT:0];
+/* Current index into the buffer. */
+wire [13-1:0] ind = (wb_addr & ADDR_MASK) >> 2;
 
 m4_define(⟨bufwrite⟩,  ⟨begin
-	buffer[mem_addr & ADDR_MASK] <=
-		(buffer[wb_addr & ADDR_MASK] & $1)
-		| wb_data_i[$2];
+	buffer[ind] <= (buffer[ind] & $1) | wb_dat_w[$2];
 end⟩)
 
 always @ (posedge clk) if (wb_cyc && wb_stb && !wb_ack)
 	if (!wb_we) begin
-		wb_data_o <= buffer[wb_addr & ADDR_MASK];
+		wb_dat_r <= buffer[ind];
 		wb_ack <= 1;
 	end else begin
 		wb_ack <= 1;
 		case (wb_sel)
-		4'b1111: buffer[wb_addr & ADDR_MASK] <= wb_data_o;
+		4'b1111: buffer[ind] <= wb_dat_w;
+		4'b0011: bufwrite(32'hFFFF0000, 15:0)
+		4'b1100: bufwrite(32'h0000FFFF, 31:16)
 		4'b0001: bufwrite(32'hFFFFFF00, 7:0)
 		4'b0010: bufwrite(32'hFFFF00FF, 15:8)
-		4'b0011: bufwrite(32'hFFFF0000, 15:0)
 		4'b0100: bufwrite(32'hFF00FFFF, 23:16)
 		4'b1000: bufwrite(32'h00FFFFFF, 31:24)
-		4'b1100: bufwrite(32'h0000FFFF, 31:16)
-		default: mem_ready <= 1;
+		default: ;
 		endcase
 	end
 else if (!wb_stb) begin
