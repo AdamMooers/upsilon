@@ -47,7 +47,7 @@ import litex_boards.platforms.digilent_arty as board_spec
 from litex.soc.integration.builder import Builder
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.soc.integration.soc_core import SoCCore
-from litex.soc.integration.soc import SoCRegion, SoCBusHandler
+from litex.soc.integration.soc import SoCRegion, SoCBusHandler, SoCIORegion
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
 from litex.soc.interconnect.wishbone import Interface
@@ -242,7 +242,7 @@ class ControlLoopParameters(Module, AutoCSR):
         self.zpos = CSRStatus(32, description='Measured Z position')
 
         self.bus = Interface(data_width = 32, address_width = 32, addressing="word")
-        self.region = SoCRegion(size=minbits(0x14), cached=False)
+        self.region = SoCIORegion(size=minbits(0x14), cached=False)
         self.comb += [
                 self.bus.cti.eq(0),
                 self.bus.bte.eq(0),
@@ -281,7 +281,9 @@ class BRAM(Module):
           by the BRAM.
         """
         self.bus = Interface(data_width=32, address_width=32, addressing="byte")
-        self.region = SoCRegion(size=addr_mask+1, cached=False)
+
+        # Non-IO (i.e. MMIO) regions need to be cached
+        self.region = SoCRegion(size=addr_mask+1, cached=True)
 
         self.comb += [
                 self.bus.cti.eq(0),
@@ -302,9 +304,9 @@ class BRAM(Module):
 
 class PicoRV32(Module, AutoCSR):
     def __init__(self, bramwid=0x1000):
-        self.submodules.params = ControlLoopParameters()
-        self.submodules.bram = bram = BRAM(bramwid-1)
-        self.submodules.bram_iface = PreemptiveInterface(2, bram)
+        self.submodules.params = params = ControlLoopParameters()
+        self.submodules.bram = self.bram = bram = BRAM(bramwid-1)
+        self.submodules.bram_iface = self.bram_iface = bram_iface = PreemptiveInterface(2, bram)
 
         self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
 
@@ -320,12 +322,12 @@ class PicoRV32(Module, AutoCSR):
             interconnect="shared",
             interconnect_register=True,
             reserved_regions={
-                "picorv32_null_region": SoCRegion(origin=0,size=0xFFFF, mode="ro", cached=False, decode=False)
+                "picorv32_null_region": SoCRegion(origin=0,size=0xFFFF, mode="ro", cached=True, decode=False)
             },
         )
 
-        ic.add_slave("picorv32_params", self.submodules.params, self.submodules.params.region)
-        ic.add_slave("picorv32_bram", self.submodules.bram_iface, self.submodules.bram.region)
+        ic.add_slave("picorv32_params", params.bus, params.region)
+        ic.add_slave("picorv32_bram", bram_iface.buses[1], bram.region)
         ic.add_master("picorv32_master", self.masterbus)
 
         self.specials += Instance("picorv32_wb",
@@ -398,7 +400,7 @@ class UpsilonSoC(SoCCore):
 
     def add_picorv32(self):
         self.submodules.picorv32 = pr = PicoRV32()
-        self.bus.add_region("picorv32_master_bram", pr.submodules.bram.region)
+        self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0], pr.bram.region)
 
     def __init__(self,
                  variant="a7-100",
