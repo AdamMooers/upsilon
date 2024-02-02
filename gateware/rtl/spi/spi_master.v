@@ -1,12 +1,7 @@
-/* Copyright 2023 (C) Peter McGoron
- * This file is a part of Upsilon, a free and open source software project.
- * For license terms, refer to the files in `doc/copying` in the Upsilon
- * source distribution.
- */
-/* (c) Peter McGoron 2022 v0.3
- * This Source Code Form is subject to the terms of the Mozilla Public
- * License, v.2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+/* (c) Peter McGoron 2022-2024 v0.4
+ *
+ * This code is disjunctively dual-licensed under the MPL v2.0, or the
+ * CERN-OHL-W v2.
  */
 
 /* CYCLE_HALF_WAIT should take into account the setup time of the slave
@@ -14,17 +9,9 @@
  * the input).
  */
 
-module
-`ifdef SPI_MASTER_NO_READ
-spi_master_no_read
-`else
-`ifdef SPI_MASTER_NO_WRITE
-spi_master_no_write
-`else
-spi_master
-`endif
-`endif
-#(
+module spi_master #(
+	parameter ENABLE_MISO = 1, // Enable MISO and from_slave port
+	parameter ENABLE_MOSI = 1, // Enable MOSI and to_slave port
 	parameter WID = 24, // Width of bits per transaction.
 	parameter WID_LEN = 5, // Length in bits required to store WID
 	parameter CYCLE_HALF_WAIT = 1, // Half of the wait time of a cycle minus 1.
@@ -32,25 +19,22 @@ spi_master
 	parameter TIMER_LEN = 3, // Length in bits required to store CYCLE_HALF_WAIT
 	parameter POLARITY = 0, // 0 = sck idle low, 1 = sck idle high
 	parameter PHASE = 0 // 0 = rising-read falling-write, 1 = rising-write falling-read.
-)
-(
+) (
 	input clk,
 	input rst_L,
-`ifndef SPI_MASTER_NO_READ
+
 	output reg [WID-1:0] from_slave,
 	input miso,
-`endif
-`ifndef SPI_MASTER_NO_WRITE
+
 	input [WID-1:0] to_slave,
 	output reg mosi,
-`endif
+
 	output reg sck_wire,
 	output reg finished,
 	output reg ready_to_arm,
 	input arm
 );
 
-`ifndef SPI_MASTER_NO_READ
 /* MISO is almost always an external wire, so buffer it.
  * This might not be necessary, since the master and slave do not respond
  * immediately to changes in the wires, but this is just to be safe.
@@ -61,11 +45,10 @@ spi_master
 reg miso_hot = 0;
 reg read_miso = 0;
 
-always @ (posedge clk) begin
+always @ (posedge clk) if (ENABLE_MISO == 1) begin
 	read_miso <= miso_hot;
 	miso_hot <= miso;
 end
-`endif
 
 parameter WAIT_ON_ARM = 0;
 parameter ON_CYCLE = 1;
@@ -76,9 +59,7 @@ reg [1:0] state = WAIT_ON_ARM;
 reg [WID_LEN-1:0] bit_counter = 0;
 reg [TIMER_LEN-1:0] timer = 0;
 
-`ifndef SPI_MASTER_NO_WRITE
 reg [WID-1:0] send_buf = 0;
-`endif
 
 reg sck = 0;
 assign sck_wire = sck;
@@ -89,25 +70,23 @@ task idle_state();
 	end else begin
 		sck <= 1;
 	end
-`ifndef SPI_MASTER_NO_WRITE
-	mosi <= 0;
-`endif
+	if (ENABLE_MOSI == 1) mosi <= 0;
 	timer <= 0;
 	bit_counter <= 0;
 endtask
 
 task read_data();
-`ifndef SPI_MASTER_NO_READ
-	from_slave <= from_slave << 1;
-	from_slave[0] <= read_miso;
-`endif
+	if (ENABLE_MISO == 1) begin
+		from_slave <= from_slave << 1;
+		from_slave[0] <= read_miso;
+	end
 endtask
 
 task write_data();
-`ifndef SPI_MASTER_NO_WRITE
-	mosi <= send_buf[WID-1];
-	send_buf <= send_buf << 1;
-`endif
+	if (ENABLE_MOSI == 1) begin
+		mosi <= send_buf[WID-1];
+		send_buf <= send_buf << 1;
+	end
 endtask
 
 task setup_bits();
@@ -118,15 +97,15 @@ task setup_bits();
 	 * For mode 01 and mode 10, the first action is a WRITE.
 	 */
 	if (POLARITY == PHASE) begin
-`ifndef SPI_MASTER_NO_WRITE
-		mosi <= to_slave[WID-1];
-		send_buf <= to_slave << 1;
-`endif
+		if (ENABLE_MOSI == 1) begin
+			mosi <= to_slave[WID-1];
+			send_buf <= to_slave << 1;
+		end
 		state <= CYCLE_WAIT;
 	end else begin
-`ifndef SPI_MASTER_NO_WRITE
-		send_buf <= to_slave;
-`endif
+		if (ENABLE_MISO == 1) begin
+			send_buf <= to_slave;
+		end
 		state <= ON_CYCLE;
 	end
 endtask
@@ -149,12 +128,8 @@ always @ (posedge clk) begin
 		finished <= 0;
 		state <= WAIT_ON_ARM;
 		ready_to_arm <= 1;
-`ifndef SPI_MASTER_NO_READ
-		from_slave <= 0;
-`endif
-`ifndef SPI_MASTER_NO_WRITE
-		send_buf <= 0;
-`endif
+		if (ENABLE_MISO == 1) from_slave <= 0;
+		if (ENABLE_MOSI == 1) send_buf <= 0;
 	end else case (state)
 	WAIT_ON_ARM: begin
 `ifdef SIMULATION
@@ -230,4 +205,3 @@ always @ (posedge clk) begin
 end
 
 endmodule
-`undefineall

@@ -33,7 +33,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##########################################################################
-# Copyright 2023 (C) Peter McGoron
+# Copyright 2023-2024 (C) Peter McGoron
 #
 # This file is a part of Upsilon, a free and open source software project.
 # For license terms, refer to the files in `doc/copying` in the Upsilon
@@ -58,7 +58,11 @@ from litedram.modules import MT41K128M16
 from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
-import mmio_descr
+from math import log2, floor
+
+def minbits(n):
+    """ Return the amount of bits necessary to store n. """
+    return floor(log2(n) + 1)
 
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
@@ -101,98 +105,192 @@ io = [
     ("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
 
-# TODO: Assign widths to ADCs here using parameters
+class PreemptiveInterface(Module, AutoCSR):
+    """ A preemptive interface is a manually controlled Wishbone interface
+    that stands between multiple masters (potentially interconnects) and a
+    single slave. A master controls which master (or interconnect) has access
+    to the slave. This is to avoid bus contention by having multiple buses. """
 
-class Base(Module, AutoCSR):
-    """ The subclass AutoCSR will automatically make CSRs related
-    to this class when those CSRs are attributes (i.e. accessed by
-    `self.csr_name`) of instances of this class. (CSRs are MMIO,
-    they are NOT RISC-V CSRs!)
-
-    Since there are a lot of input and output wires, the CSRs are
-    assigned using `setattr()`.
-
-    CSRs are for input wires (`CSRStorage`) or output wires
-    (`CSRStatus`).  The first argument to the CSR constructor is
-    the amount of bits the CSR takes. The `name` keyword argument
-    is required since the constructor needs the name of the attribute.
-    The `description` keyword is used for documentation.
-
-    In LiteX, modules in separate Verilog files are instantiated as
-        self.specials += Instance(
-            "module_name",
-            PARAMETER_NAME=value,
-            i_input = input_port,
-            o_output = output_port,
-            ...
-        )
-
-    Since the "base" module has a bunch of repeated input and output
-    pins that have to be connected to CSRs, the LiteX wrapper uses
-    keyword arguments to pass all the arguments.
-    """
-
-    def _make_csr(self, reg, num=None):
-        """ Add a CSR for a pin `f"{name}_{num}".`
-
-        :param name: Name of the MMIO register without prefixes or numerical
-          suffix.
-        :param num: Numerical suffix of this MMIO register. This is the only
-          parameter that should change when adding multiple CSRs of the same
-          name.
+    def __init__(self, masters_len, slave):
+        """
+        :param masters_len: The amount of buses accessing this slave. This number
+          must be greater than one.
+        :param slave: The slave device. This object must have an Interface object
+          accessable as ``bus``.
         """
 
-        name = reg.name
-        if num is not None:
-            name = f"{name}_{num}"
+        assert masters_len > 1
+        self.buses = []
+        self.master_select = CSRStorage(masters_len, name='master_select', description='RW bitstring of which master interconnect to connect to')
+        self.slave = slave
 
-        if reg.rwperm == "read-only":
-            csrclass = CSRStatus
-        else:
-            csrclass = CSRStorage
+        for i in range(masters_len):
+            # Add the slave interface each master interconnect sees.
+            self.buses.append(Interface(data_width=32, address_width=32, addressing="byte")
+            self.comb += [
+                self.buses[i].cti.eq(0),
+                self.buses[i].bte.eq(0),
+            ]
 
-        csr = csrclass(reg.blen, name=name, description=None)
-        setattr(self, name, csr)
+        """
+        Construct a combinatorial case statement. In verilog, the if
+        statment would look like
 
-        if csrclass is CSRStorage:
-            self.kwargs[f'i_{name}'] = csr.storage
-        elif csrclass is CSRStatus:
-            self.kwargs[f'o_{name}'] = csr.status
-        else:
-            raise Exception(f"Unknown class {csrclass}")
+            always @ (*) case (master_select)
+                1: begin
+                    // Bus assignments...
+                end
+                2: begin
+                    // Bus assignments...
+                end
+                // more cases:
+                default:
+                    // assign everything to master 0
+                end
 
-    def __init__(self, clk, sdram, platform):
-        self.kwargs = {}
+        The If statement in Migen (Python HDL) is an object with a method
+        called "ElseIf" and "Else", that return objects with the specified
+        case attached. Instead of directly writing an If statement into
+        the combinatorial block, the If statement is constructed in a
+        for loop.
 
-        for reg in mmio_descr.registers:
-            if reg.num > 1:
-                for i in range(0,reg.num):
-                    self._make_csr(reg,i)
-            else:
-                self._make_csr(reg)
+        The "assign_for_case" function constructs the body of the If
+        statement. It assigns all output ports to avoid latches.
+        """
 
-        self.kwargs["i_clk"] = clk
-        self.kwargs["i_rst_L"] = ~platform.request("module_reset")
-        self.kwargs["i_dac_miso"] = platform.request("dac_miso")
-        self.kwargs["o_dac_mosi"] = platform.request("dac_mosi")
-        self.kwargs["o_dac_sck"] = platform.request("dac_sck")
-        self.kwargs["o_dac_ss_L"] = platform.request("dac_ss_L")
-        self.kwargs["o_adc_conv"] = platform.request("adc_conv")
-        self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
-        self.kwargs["o_adc_sck"] = platform.request("adc_sck")
-        self.kwargs["o_set_low"] = platform.request("differntial_output_low")
+        def assign_for_case(i):
+            asn = [
+                self.slave.bus.cyc.eq(self.buses[i].cyc),
+                self.slave.bus.stb.eq(self.buses[i].stb),
+                self.slave.bus.we.eq(self.buses[i].we),
+                self.slave.bus.sel.eq(self.buses[i].sel),
+                self.slave.bus.addr.eq(self.buses[i].addr),
+                self.slave.bus.dat_w.eq(self.buses[i].dat_w),
+                self.slave.bus.ack.eq(self.buses[i].ack),
+                self.slave.bus.dat_r.eq(self.buses[i].dat_r),
+            ]
 
-        self.specials += Instance("base", **self.kwargs)
+            for j in range(masters_len):
+                if j == i:
+                    continue
+                asn += [
+                    self.buses[i].ack.eq(0),
+                    self.buses[i].ack.eq(0),
+                ]
+
+            return asn
+
+        cases = {"default": assign_for_case(0)}
+        for i in range(1, masters_len):
+            cases[i] = assign_for_case(i)
+
+        self.comb += Case(self.master_select, cases)
+
+class SPIMaster(Module):
+    def __init__(self, rst, miso, mosi, sck, ss,
+        polarity = 0,
+        phase = 0,
+        ss_wait = 1,
+        enable_miso = 1,
+        enable_mosi = 1,
+        spi_wid = 24,
+        spi_cycle_half_wait = 1,
+        ):
+
+        self.bus = Interface(data_width = 32, address_width=32, addressing="word")
+        self.comb += [
+            self.bus.cti.eq(0),
+            self.bus.bte.eq(0),
+        ]
+
+        self.specials += Instance("spi_master_ss_wb",
+            SS_WAIT = ss_wait,
+            SS_WAIT_TIMER_LEN = minwid(ss_wait),
+            CYCLE_HALF_WAIT = spi_cycle_half_wait,
+            TIMER_LEN = minwid(spi_cycle_half_wait),
+            WID = spi_wid,
+            WID_LEN = minwid(spi_wid),
+            ENABLE_MISO = enable_miso,
+            ENABLE_MOSI = enable_mosi,
+            POLARITY = polarity,
+            PHASE = phase,
+
+            i_clk = ClockSignal(),
+            i_rst_L = rst,
+            i_miso = miso,
+            o_mosi = mosi,
+            o_sck_wire = sck,
+            o_ss_L = ss,
+
+            i_wb_cyc = self.bus.cyc,
+            i_wb_stb = self.bus.stb,
+            i_wb_we = self.bus.we,
+            i_wb_sel = self.bus.sel,
+            i_wb_addr = self.bus.adr,
+            i_wb_dat_w = self.bus.dat_w,
+            o_wb_ack = self.bus.ack,
+            o_wb_dat_r = self.bus.dat_r,
+        )
+
+# TODO: Generalize CSR stuff
+class ControlLoopParameters(Module, AutoCSR):
+    def __init__(self):
+        self.cl_I = CSRStorage(32, description='Integral parameter')
+        self.cl_P = CSRStorage(32, description='Proportional parameter')
+        self.deltaT = CSRStorage(32, description='Wait parameter')
+        self.setpt = CSRStorage(32, description='Setpoint')
+        self.zset = CSRStatus(32, description='Set Z position')
+        self.zpos = CSRStatus(32, description='Measured Z position')
+
+        self.bus = Interface(data_width = 32, address_width = 32, addressing="word")
+        self.region = SoCRegion(size=minbits(0x14), cached=False)
+        self.comb += [
+                self.bus.cti.eq(0),
+                self.bus.bte.eq(0),
+        ]
+        self.sync += [
+                If(self.bus.cyc && self.bus.stb && !self.bus.ack,
+                    Case(self.bus.adr[0:4], {
+                        0x0: self.bus.dat_r.eq(self.cl_I),
+                        0x4: self.bus.dat_r.eq(self.cl_P),
+                        0x8: self.bus.dat_r.eq(self.deltaT),
+                        0xC: self.bus.dat_r.eq(self.setpt),
+                        0x10: If(self.bus.we,
+                                self.bus.zset.eq(self.bus.dat_w)
+                            ).Else(
+                                self.bus.dat_r.eq(self.bus.zset)
+                            ),
+                        0x14: If(self.bus.we,
+                                self.bus.zpos.eq(self.bus.dat_w),
+                            ).Else(
+                                self.bus.dat_r.eq(self.bus.zpos)
+                            ),
+                    }),
+                    self.bus.ack.eq(1),
+                ).Else(
+                    self.bus.ack.eq(0),
+                )
+        ]
 
 class BRAM(Module):
-    def __init__(self, clk):
+    """ A BRAM (block ram) is a memory store that is completely separate from
+    the system RAM. They are much smaller.
+    """
+    def __init__(self, addr_mask):
+        """
+        :param addr_mask: Mask which defines the amount of bytes accessable
+          by the BRAM.
+        """
         self.bus = Interface(data_width=32, address_width=32, addressing="byte")
+        self.region = SoCRegion(size=addr_mask+1, cached=False)
+
         self.comb += [
                 self.bus.cti.eq(0),
                 self.bus.bte.eq(0),
         ]
         self.specials += Instance("bram",
-                i_clk = clk,
+                ADDR_MASK = addr_mask,
+                i_clk = ClockSignal(),
                 i_wb_cyc = self.bus.cyc,
                 i_wb_stb = self.bus.stb,
                 i_wb_we = self.bus.we,
@@ -201,6 +299,64 @@ class BRAM(Module):
                 i_wb_dat_w = self.bus.dat_w,
                 o_wb_ack = self.bus.ack,
                 o_wb_dat_r = self.bus.dat_r,
+        )
+
+class PicoRV32(Module, AutoCSR):
+    def __init__(self, bramwid=0x1000):
+        self.submodules.params = ControlLoopParameters()
+        self.submodules.bram = BRAM(bramwid-1)
+        self.submodules.bram_iface = PreemptiveInterface(2, self.submodules.bram)
+
+        self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
+
+        self.resetpin = CSRStorage(1, name="picorv32_reset", description="PicoRV32 reset")
+        self.trap = CSRStatus(1, name="picorv32_trap", description="Trap bit")
+
+        ic = SoCBusHandler(
+            standard="wishbone",
+            data_width=32,
+            address_width=32,
+            timeout=1e6,
+            bursting=False,
+            interconnect="shared",
+            interconnect_register=True,
+            reserved_regions={
+                "picorv32_null_region": SoCRegion(origin=0,size=0xFFFF, mode="ro", cached=False, decode=False)
+            },
+        )
+
+        ic.add_slave("picorv32_params", self.submodules.params, self.submodules.params.region)
+        ic.add_slave("picorv32_bram", self.submodules.bram_iface, self.submodules.bram.region)
+        ic.add_master("picorv32_master", self.masterbus)
+
+        self.specials += Instance("picorv32_wb",
+            o_trap = self.trap.status,
+
+            i_wb_rst_i = self.resetpin.storage,
+            i_wb_clk_i = ClockSignal(),
+            o_wbm_adr_o = self.masterbus.adr,
+            o_wbm_dat_o = self.masterbus.dat_r,
+            i_wbm_dat_i = self.masterbus.dat_w,
+            o_wbm_we_o = self.masterbus.we,
+            o_wbm_sel_o = self.masterbus.sel,
+            o_wbm_stb_o = self.masterbus.stb,
+            i_wbm_ack_i = self.masterbus.ack,
+            o_wbm_cyc_o = self.masterbus.cyc,
+
+            o_pcpi_valid = Signal(),
+            o_pcpi_insn = Signal(32),
+            o_pcpi_rs1 = Signal(32),
+            o_pcpi_rs2 = Signal(32),
+            i_pcpi_wr = 0,
+            i_pcpi_wait = 0,
+            i_pcpi_rd = 0,
+            i_pcpi_ready = 0,
+
+            i_irq = 0,
+            o_eoi = Signal(32),
+
+            o_trace_valid = Signal(),
+            o_trace_data = Signal(36),
         )
 
 # Clock and Reset Generator
@@ -240,10 +396,10 @@ class UpsilonSoC(SoCCore):
     def add_ip(self, ip_str, ip_name):
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
-    def add_bram(self, region_name):
-        self.bus.add_region(region_name, SoCRegion(size=0x2000, cached=False))
-        # TODO: special name
-        self.submodules.bram0 = BRAM(ClockSignal())
+
+    def add_picorv32(self):
+        self.submodules.picorv32 = pr = PicoRV32()
+        self.bus.add_region("picorv32_master_bram", pr.submodules.bram.region)
 
     def __init__(self,
                  variant="a7-100",
@@ -267,23 +423,11 @@ class UpsilonSoC(SoCCore):
         Since Yosys doesn't support modern Verilog, only put preprocessed
         (if applicable) files here.
         """
-        platform.add_source("rtl/spi/spi_switch_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_no_write_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_no_read_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_no_write_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_no_read_preprocessed.v")
-        platform.add_source("rtl/control_loop/sign_extend.v")
-        platform.add_source("rtl/control_loop/intsat.v")
-        platform.add_source("rtl/control_loop/boothmul_preprocessed.v")
-        platform.add_source("rtl/control_loop/control_loop_math.v")
-        platform.add_source("rtl/control_loop/control_loop.v")
-#       platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
-#       platform.add_source("rtl/waveform/waveform_preprocessed.v")
-#       when SoC cannot find a source file, it will fail with a confusing error message
+        platform.add_source("rtl/picorv32/picorv32.v")
+        platform.add_source("rtl/spi/spi_master.v")
+        platform.add_source("rtl/spi/spi_master_ss.v")
+        platform.add_source("rtl/spi/spi_master_ss_wb.v")
         platform.add_source("rtl/bram/bram.v")
-        platform.add_source("rtl/base/base.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -329,8 +473,6 @@ class UpsilonSoC(SoCCore):
         self.add_ip(local_ip, "LOCALIP")
         self.add_ip(remote_ip, "REMOTEIP")
         self.add_constant("TFTP_SERVER_PORT", tftp_port)
-
-        self.add_bram("bram0")
 
         # Add pins
         platform.add_extension(io)
