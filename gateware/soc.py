@@ -44,11 +44,10 @@
 # design, but another eval board will require some porting.
 from migen import *
 import litex_boards.platforms.digilent_arty as board_spec
-from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.integration.builder import Builder
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.soc.integration.soc_core import SoCCore
-from litex.soc.integration.soc import SoCRegion
+from litex.soc.integration.soc import SoCRegion, SoCBusHandler
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
 from litex.soc.interconnect.wishbone import Interface
@@ -126,7 +125,7 @@ class PreemptiveInterface(Module, AutoCSR):
 
         for i in range(masters_len):
             # Add the slave interface each master interconnect sees.
-            self.buses.append(Interface(data_width=32, address_width=32, addressing="byte")
+            self.buses.append(Interface(data_width=32, address_width=32, addressing="byte"))
             self.comb += [
                 self.buses[i].cti.eq(0),
                 self.buses[i].bte.eq(0),
@@ -164,7 +163,7 @@ class PreemptiveInterface(Module, AutoCSR):
                 self.slave.bus.stb.eq(self.buses[i].stb),
                 self.slave.bus.we.eq(self.buses[i].we),
                 self.slave.bus.sel.eq(self.buses[i].sel),
-                self.slave.bus.addr.eq(self.buses[i].addr),
+                self.slave.bus.adr.eq(self.buses[i].adr),
                 self.slave.bus.dat_w.eq(self.buses[i].dat_w),
                 self.slave.bus.ack.eq(self.buses[i].ack),
                 self.slave.bus.dat_r.eq(self.buses[i].dat_r),
@@ -184,7 +183,7 @@ class PreemptiveInterface(Module, AutoCSR):
         for i in range(1, masters_len):
             cases[i] = assign_for_case(i)
 
-        self.comb += Case(self.master_select, cases)
+        self.comb += Case(self.master_select.storage, cases)
 
 class SPIMaster(Module):
     def __init__(self, rst, miso, mosi, sck, ss,
@@ -249,21 +248,21 @@ class ControlLoopParameters(Module, AutoCSR):
                 self.bus.bte.eq(0),
         ]
         self.sync += [
-                If(self.bus.cyc && self.bus.stb && !self.bus.ack,
+                If(self.bus.cyc == 1 and self.bus.stb == 1 and self.bus.ack == 0,
                     Case(self.bus.adr[0:4], {
-                        0x0: self.bus.dat_r.eq(self.cl_I),
-                        0x4: self.bus.dat_r.eq(self.cl_P),
-                        0x8: self.bus.dat_r.eq(self.deltaT),
-                        0xC: self.bus.dat_r.eq(self.setpt),
+                        0x0: self.bus.dat_r.eq(self.cl_I.storage),
+                        0x4: self.bus.dat_r.eq(self.cl_P.storage),
+                        0x8: self.bus.dat_r.eq(self.deltaT.storage),
+                        0xC: self.bus.dat_r.eq(self.setpt.storage),
                         0x10: If(self.bus.we,
-                                self.bus.zset.eq(self.bus.dat_w)
+                                self.zset.status.eq(self.bus.dat_w)
                             ).Else(
-                                self.bus.dat_r.eq(self.bus.zset)
+                                self.bus.dat_r.eq(self.zset.status)
                             ),
                         0x14: If(self.bus.we,
-                                self.bus.zpos.eq(self.bus.dat_w),
+                                self.zpos.status.eq(self.bus.dat_w),
                             ).Else(
-                                self.bus.dat_r.eq(self.bus.zpos)
+                                self.bus.dat_r.eq(self.zpos.status)
                             ),
                     }),
                     self.bus.ack.eq(1),
@@ -289,7 +288,7 @@ class BRAM(Module):
                 self.bus.bte.eq(0),
         ]
         self.specials += Instance("bram",
-                ADDR_MASK = addr_mask,
+                p_ADDR_MASK = addr_mask,
                 i_clk = ClockSignal(),
                 i_wb_cyc = self.bus.cyc,
                 i_wb_stb = self.bus.stb,
@@ -304,8 +303,8 @@ class BRAM(Module):
 class PicoRV32(Module, AutoCSR):
     def __init__(self, bramwid=0x1000):
         self.submodules.params = ControlLoopParameters()
-        self.submodules.bram = BRAM(bramwid-1)
-        self.submodules.bram_iface = PreemptiveInterface(2, self.submodules.bram)
+        self.submodules.bram = bram = BRAM(bramwid-1)
+        self.submodules.bram_iface = PreemptiveInterface(2, bram)
 
         self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
 
@@ -476,7 +475,7 @@ class UpsilonSoC(SoCCore):
 
         # Add pins
         platform.add_extension(io)
-        self.submodules.base = Base(ClockSignal(), self.sdram, platform)
+        self.add_picorv32()
 
 def main():
     """ Add modifications to SoC variables here """
