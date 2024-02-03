@@ -27,7 +27,7 @@ module spi_master_ss_wb
 	input miso,
 	output mosi,
 	output sck_wire,
-	output ss_L
+	output ss_L,
 
 	input wb_cyc,
 	input wb_stb,
@@ -97,7 +97,7 @@ always @ (posedge clk) if (wb_cyc && wb_stb && !wb_ack) begin
 	4'h4: arm <= wb_dat_w[0];
 	4'hC: to_slave <= wb_dat_w;
 	default: ;
-	end
+	endcase
 	wb_ack <= 1;
 end else begin
 	wb_ack <= 0;

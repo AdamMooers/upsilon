@@ -158,25 +158,21 @@ class PreemptiveInterface(Module, AutoCSR):
         """
 
         def assign_for_case(i):
-            asn = [
-                self.slave.bus.cyc.eq(self.buses[i].cyc),
-                self.slave.bus.stb.eq(self.buses[i].stb),
-                self.slave.bus.we.eq(self.buses[i].we),
-                self.slave.bus.sel.eq(self.buses[i].sel),
-                self.slave.bus.adr.eq(self.buses[i].adr),
-                self.slave.bus.dat_w.eq(self.buses[i].dat_w),
-                self.slave.bus.ack.eq(self.buses[i].ack),
-                self.slave.bus.dat_r.eq(self.buses[i].dat_r),
-            ]
+            asn = [ ]
 
             for j in range(masters_len):
-                if j == i:
-                    continue
                 asn += [
-                    self.buses[i].ack.eq(0),
-                    self.buses[i].ack.eq(0),
+                    self.buses[i].cyc.eq(self.slave.bus.cyc if i == j else 0),
+                    self.buses[i].stb.eq(self.slave.bus.stb if i == j else 0),
+                    self.buses[i].we.eq(self.slave.bus.we if i == j else 0),
+                    self.buses[i].sel.eq(self.slave.bus.sel if i == j else 0),
+                    self.buses[i].adr.eq(self.slave.bus.adr if i == j else 0),
+                    self.buses[i].dat_w.eq(self.slave.bus.dat_w if i == j else 0),
+                    self.buses[i].ack.eq(self.slave.bus.ack if i == j else 0),
+                    self.buses[i].dat_r.eq(self.slave.bus.dat_r if i == j else 0),
+                    self.buses[i].cti.eq(0),
+                    self.buses[i].bte.eq(0),
                 ]
-
             return asn
 
         cases = {"default": assign_for_case(0)}
@@ -401,6 +397,7 @@ class UpsilonSoC(SoCCore):
     def add_picorv32(self):
         self.submodules.picorv32 = pr = PicoRV32()
         self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0], pr.bram.region)
+        pr.finalize()
 
     def __init__(self,
                  variant="a7-100",
