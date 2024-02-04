@@ -447,16 +447,16 @@ class UpsilonSoC(SoCCore):
         Since Yosys doesn't support modern Verilog, only put preprocessed
         (if applicable) files here.
         """
-        platform.add_source("rtl/picorv32/picorv32.v")
-        platform.add_source("rtl/spi/spi_master.v")
-        platform.add_source("rtl/spi/spi_master_ss.v")
-        platform.add_source("rtl/spi/spi_master_ss_wb.v")
-        platform.add_source("rtl/bram/bram.v")
+        #platform.add_source("rtl/picorv32/picorv32.v")
+        #platform.add_source("rtl/spi/spi_master.v")
+        #platform.add_source("rtl/spi/spi_master_ss.v")
+        #platform.add_source("rtl/spi/spi_master_ss_wb.v")
+        #platform.add_source("rtl/bram/bram.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
                 clk_freq=sys_clk_freq,
-                toolchain="symbiflow", 
+                toolchain="f4pga", 
                 platform = platform,
                 bus_standard = "wishbone",
                 ident = f"Arty-{variant} F4PGA LiteX VexRiscV Zephyr - Upsilon",
@@ -500,7 +500,7 @@ class UpsilonSoC(SoCCore):
 
         # Add pins
         platform.add_extension(io)
-        self.add_picorv32()
+        #self.add_picorv32()
 
 def main():
     """ Add modifications to SoC variables here """
