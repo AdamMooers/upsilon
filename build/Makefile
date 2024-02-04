@@ -47,8 +47,9 @@ hardware-shell:
 hardware-get:
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/build/digilent_arty/gateware/digilent_arty.bit ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/arty.dtb ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
+#	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/picorv32.json ../boot/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware

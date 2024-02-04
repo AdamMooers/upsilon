@@ -193,6 +193,7 @@ class SPIMaster(Module):
         ):
 
         self.bus = Interface(data_width = 32, address_width=32, addressing="word")
+        self.region = SoCIORegion(size=0x10, cached=False)
         self.comb += [
             self.bus.cti.eq(0),
             self.bus.bte.eq(0),
@@ -238,7 +239,7 @@ class ControlLoopParameters(Module, AutoCSR):
         self.zpos = CSRStatus(32, description='Measured Z position')
 
         self.bus = Interface(data_width = 32, address_width = 32, addressing="word")
-        self.region = SoCIORegion(size=minbits(0x14), cached=False)
+        self.region = SoCRegion(size=minbits(0x14), cached=False)
         self.comb += [
                 self.bus.cti.eq(0),
                 self.bus.bte.eq(0),
@@ -271,15 +272,17 @@ class BRAM(Module):
     """ A BRAM (block ram) is a memory store that is completely separate from
     the system RAM. They are much smaller.
     """
-    def __init__(self, addr_mask):
+    def __init__(self, addr_mask, origin=None):
         """
         :param addr_mask: Mask which defines the amount of bytes accessable
           by the BRAM.
+        :param origin: Origin of the BRAM module region. This is seen by the
+          subordinate master, not the usual master.
         """
         self.bus = Interface(data_width=32, address_width=32, addressing="byte")
 
         # Non-IO (i.e. MMIO) regions need to be cached
-        self.region = SoCRegion(size=addr_mask+1, cached=True)
+        self.region = SoCRegion(origin=origin, size=addr_mask+1, cached=True)
 
         self.comb += [
                 self.bus.cti.eq(0),
@@ -301,15 +304,16 @@ class BRAM(Module):
 class PicoRV32(Module, AutoCSR):
     def __init__(self, bramwid=0x1000):
         self.submodules.params = params = ControlLoopParameters()
-        self.submodules.bram = self.bram = bram = BRAM(bramwid-1)
+        self.submodules.bram = self.bram = bram = BRAM(bramwid-1, origin=0x10000)
         self.submodules.bram_iface = self.bram_iface = bram_iface = PreemptiveInterface(2, bram)
 
+        # This is the PicoRV32 master
         self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
 
         self.resetpin = CSRStorage(1, name="picorv32_reset", description="PicoRV32 reset")
         self.trap = CSRStatus(1, name="picorv32_trap", description="Trap bit")
 
-        ic = SoCBusHandler(
+        self.ic = ic = SoCBusHandler(
             standard="wishbone",
             data_width=32,
             address_width=32,
@@ -318,18 +322,25 @@ class PicoRV32(Module, AutoCSR):
             interconnect="shared",
             interconnect_register=True,
             reserved_regions={
-                "picorv32_null_region": SoCRegion(origin=0,size=0xFFFF, mode="ro", cached=True, decode=False)
+                "picorv32_null_region": SoCRegion(origin=0,size=0x10000, mode="ro", cached=True),
+                "picorv32_io": SoCIORegion(origin=0x100000, size=0x100, mode="rw", cached=False),
             },
         )
 
-        ic.add_slave("picorv32_params", params.bus, params.region)
         ic.add_slave("picorv32_bram", bram_iface.buses[1], bram.region)
+        ic.add_slave("picorv32_params", params.bus, params.region)
         ic.add_master("picorv32_master", self.masterbus)
 
+        # NOTE: need to compile to these extact instructions
         self.specials += Instance("picorv32_wb",
+            p_COMPRESSED_ISA = 1,
+            p_ENABLE_MUL = 1,
+            p_PROGADDR_RESET=0x10000,
+            p_PROGADDR_IRQ=0x100010,
+            p_REGS_INIT_ZERO = 1,
             o_trap = self.trap.status,
 
-            i_wb_rst_i = self.resetpin.storage,
+            i_wb_rst_i = ~self.resetpin.storage,
             i_wb_clk_i = ClockSignal(),
             o_wbm_adr_o = self.masterbus.adr,
             o_wbm_dat_o = self.masterbus.dat_r,
@@ -355,6 +366,21 @@ class PicoRV32(Module, AutoCSR):
             o_trace_valid = Signal(),
             o_trace_data = Signal(36),
         )
+
+    def do_finalize(self):
+        self.ic.finalize()
+        jsondata = {}
+
+        for region in self.ic.regions:
+            d = self.ic.regions[region]
+            jsondata[region] = {
+                    "origin": d.origin,
+                    "size": d.size,
+            }
+
+        with open('picorv32.json', 'w') as f:
+            import json
+            json.dump(jsondata, f)
 
 # Clock and Reset Generator
 # I don't know how this works, I only know that it does.
@@ -396,7 +422,8 @@ class UpsilonSoC(SoCCore):
 
     def add_picorv32(self):
         self.submodules.picorv32 = pr = PicoRV32()
-        self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0], pr.bram.region)
+        self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0],
+                SoCRegion(size=pr.bram.region.size, cached=True))
         pr.finalize()
 
     def __init__(self,
