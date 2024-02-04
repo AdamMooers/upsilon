@@ -34,6 +34,7 @@ gateware/rtl/raster/yosys_output
 gateware/csr_bitwidth.json
 boot/*
 !boot/boot.json
+*.tar.gz
 build/buildroot.tar.gz
 build/buildroot/
 build/f4pga/
@@ -46,3 +47,5 @@ build/opensbi.tar.gz
 build/upsilon-opensbi.tar.gz
 build/upsilon-hardware.tar.gz
 build/upsilon-buildroot.tar.gz
+swic/*.bin
+swic/*.elf
