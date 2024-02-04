@@ -239,7 +239,7 @@ class ControlLoopParameters(Module, AutoCSR):
         self.zpos = CSRStatus(32, description='Measured Z position')
 
         self.bus = Interface(data_width = 32, address_width = 32, addressing="word")
-        self.region = SoCRegion(size=minbits(0x14), cached=False)
+        self.region = SoCRegion(size=minbits(0x17), cached=False)
         self.comb += [
                 self.bus.cti.eq(0),
                 self.bus.bte.eq(0),
