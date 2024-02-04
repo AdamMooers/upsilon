@@ -424,7 +424,6 @@ class UpsilonSoC(SoCCore):
         self.submodules.picorv32 = pr = PicoRV32()
         self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0],
                 SoCRegion(size=pr.bram.region.size, cached=True))
-        pr.finalize()
 
     def __init__(self,
                  variant="a7-100",
