@@ -99,7 +99,7 @@ always @ (posedge clk) if (wb_cyc && wb_stb && !wb_ack) begin
 	default: ;
 	endcase
 	wb_ack <= 1;
-end else begin
+end else if (!wb_cyc) begin
 	wb_ack <= 0;
 end
 

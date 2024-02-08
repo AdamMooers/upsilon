@@ -35,17 +35,10 @@ gateware/csr_bitwidth.json
 boot/*
 !boot/boot.json
 *.tar.gz
-build/buildroot.tar.gz
 build/buildroot/
 build/f4pga/
 build/litex/
 build/opensbi/
 build/upsilon/
-build/upsilon.tar.gz
-build/f4pga.tar.gz
-build/opensbi.tar.gz
-build/upsilon-opensbi.tar.gz
-build/upsilon-hardware.tar.gz
-build/upsilon-buildroot.tar.gz
 swic/*.bin
 swic/*.elf

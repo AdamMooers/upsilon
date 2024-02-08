@@ -1,6 +1,3 @@
-m4_changequote(`⟨', `⟩')
-m4_changecom(⟨/*⟩, ⟨*/⟩)
-
 /* Copyright 2024 (C) Peter McGoron
  * This file is a part of Upsilon, a free and open source software project.
  * For license terms, refer to the files in `doc/copying` in the Upsilon
@@ -25,8 +22,11 @@ module bram #(
 	input [BUS_WID-1:0] wb_addr,
 	input [BUS_WID-1:0] wb_dat_w,
 	output reg wb_ack,
-	output reg [BUS_WID-1:0] wb_dat_r,
+	output reg [BUS_WID-1:0] wb_dat_r
 );
+
+initial wb_ack <= 0;
+initial wb_dat_r <= 0;
 
 /* When the size of the memory is a power of 2, the mask is the
  * last addressable index in the array.
@@ -38,33 +38,27 @@ module bram #(
  * the 32 bit word that contains the address. This applies to halfwords
  * and words as long as the accesses are aligned.
  */
+(* ram_style = "block" *)
 reg [WORD_WID-1:0] buffer [(ADDR_MASK >> 2):0];
 
 /* Current index into the buffer. */
 wire [13-1:0] ind = (wb_addr & ADDR_MASK) >> 2;
 
-m4_define(⟨bufwrite⟩,  ⟨begin
-	buffer[ind] <= (buffer[ind] & $1) | wb_dat_w[$2];
-end⟩)
-
-always @ (posedge clk) if (wb_cyc && wb_stb && !wb_ack)
-	if (!wb_we) begin
-		wb_dat_r <= buffer[ind];
-		wb_ack <= 1;
+always @ (posedge clk) if (wb_cyc && wb_stb && !wb_ack) begin
+	wb_ack <= 1;
+	if (wb_we) begin
+		if (wb_sel[0])
+			buffer[ind][7:0] <= wb_dat_w[7:0];
+		if (wb_sel[1])
+			buffer[ind][15:8] <= wb_dat_w[15:8];
+		if (wb_sel[2])
+			buffer[ind][23:16] <= wb_dat_w[23:16];
+		if (wb_sel[3])
+			buffer[ind][31:24] <= wb_dat_w[31:24];
 	end else begin
-		wb_ack <= 1;
-		case (wb_sel)
-		4'b1111: buffer[ind] <= wb_dat_w;
-		4'b0011: bufwrite(32'hFFFF0000, 15:0)
-		4'b1100: bufwrite(32'h0000FFFF, 31:16)
-		4'b0001: bufwrite(32'hFFFFFF00, 7:0)
-		4'b0010: bufwrite(32'hFFFF00FF, 15:8)
-		4'b0100: bufwrite(32'hFF00FFFF, 23:16)
-		4'b1000: bufwrite(32'h00FFFFFF, 31:24)
-		default: ;
-		endcase
+		wb_dat_r <= buffer[ind];
 	end
-else if (!wb_stb) begin
+end else if (!wb_stb) begin
 	wb_ack <= 0;
 end
 

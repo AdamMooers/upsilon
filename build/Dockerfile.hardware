@@ -30,6 +30,7 @@ COPY --chown=user:user f4pga.tar.gz /home/user
 RUN tar -xvf f4pga.tar.gz \
     && rm f4pga.tar.gz \
     && cd f4pga/f4pga \ 
+#    && sed -i 's/-abc9//g' ./wrappers/tcl/xc7.f4pga.tcl \
     && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; pip install . ninja meson'
 
 #LITEX

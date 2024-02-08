@@ -3,22 +3,12 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
-all: make_base make_spi make_control_loop make_bram
+#all: make_bram
 
-test:
-	cd control_loop && make test
-make_base:
-	cd base && make codegen
-make_spi:
-	cd spi && make codegen
-make_control_loop:
-	cd control_loop && make codegen
-make_waveform:
-	cd waveform && make codegen
-make_bram:
-	cd bram && make codegen
-clean:
-	cd base && make clean
-	cd spi && make clean
-	cd control_loop && make clean
-	cd waveform && make clean
+dummy:
+	@echo empty
+
+#make_bram:
+#	cd bram && make codegen
+#clean:
+#	cd bram && make clean
