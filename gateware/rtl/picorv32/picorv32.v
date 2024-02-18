@@ -15,7 +15,7 @@
  *  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  *  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- *  Commit 29102c00a82ffd08f1e0b3c9cbac1c95c17f573b
+ *  Derived from commit 29102c00a82ffd08f1e0b3c9cbac1c95c17f573b
  *
  */
 
@@ -2167,7 +2167,6 @@ module picorv32 #(
 `endif
 endmodule
 
-`ifdef 0
 // This is a simple example implementation of PICORV32_REGS.
 // Use the PICORV32_REGS mechanism if you want to use custom
 // memory resources to implement the processor register file.
@@ -2316,9 +2315,7 @@ module picorv32_pcpi_mul #(
 		end
 	end
 endmodule
-`endif
 
-`ifdef 0
 module picorv32_pcpi_fast_mul #(
 	parameter EXTRA_MUL_FFS = 0,
 	parameter EXTRA_INSN_FFS = 0,
@@ -2421,7 +2418,6 @@ endmodule
  * picorv32_pcpi_div
  ***************************************************************/
 
-`ifdef 0 
 module picorv32_pcpi_div (
 	input clk, resetn,
 
@@ -2514,13 +2510,10 @@ module picorv32_pcpi_div (
 	end
 endmodule
 
-`endif
-
 /***************************************************************
  * picorv32_axi
  ***************************************************************/
 
-`ifdef 0
 module picorv32_axi #(
 	parameter [ 0:0] ENABLE_COUNTERS = 1,
 	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
@@ -2729,13 +2722,11 @@ module picorv32_axi #(
 		.trace_data (trace_data)
 	);
 endmodule
-`endif
 
 /***************************************************************
  * picorv32_axi_adapter
  ***************************************************************/
 
-`ifdef 0
 module picorv32_axi_adapter (
 	input clk, resetn,
 
@@ -2814,7 +2805,6 @@ module picorv32_axi_adapter (
 		end
 	end
 endmodule
-`endif
 
 /***************************************************************
  * picorv32_wb

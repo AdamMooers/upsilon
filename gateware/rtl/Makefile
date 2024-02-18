@@ -3,10 +3,11 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
-#all: make_bram
+all: make_spi
 
-dummy:
-	@echo empty
+make_spi:
+	cd spi && make codegen
+
 
 #make_bram:
 #	cd bram && make codegen
