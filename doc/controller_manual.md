@@ -42,3 +42,10 @@ automatically copied to `boot/mmio.py`).
 `comm` contains higher level wrappers for DAC and ADC pins. This module is
 documented well enough that you should be able to read it and understand
 how to use it.
+
+# FAQ
+
+## SCP Is Not Working
+
+SCP by default uses SFTP, which dropbear does not support. Pass `-O` to all
+SCP invocations to use the legacy SCP protocol.

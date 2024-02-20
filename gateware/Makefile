@@ -8,11 +8,14 @@
 
 DEVICETREE_GEN_DIR=.
 
-all: build/digilent_arty/digilent_arty.bit arty.dtb
+all: build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
 
 csr.json build/digilent_arty/digilent_arty.bit: soc.py
 	cd rtl && make
 	python3 soc.py
+
+mmio.py: csr.json csr2mp.py
+	python3 csr2mp.py csr.json > mmio.py
 
 clean:
 	rm -rf build csr.json arty.dts arty.dtb mmio.py

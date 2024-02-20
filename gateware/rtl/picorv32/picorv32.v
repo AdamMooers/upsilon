@@ -2892,6 +2892,8 @@ module picorv32_wb #(
 	output        trace_valid,
 	output [35:0] trace_data,
 
+	output debug_state,
+
 	output mem_instr
 );
 	wire        mem_valid;
@@ -2989,6 +2991,7 @@ module picorv32_wb #(
 	localparam WBEND = 2'b10;
 
 	reg [1:0] state;
+	assign debug_state = state;
 
 	wire we;
 	assign we = (mem_wstrb[0] | mem_wstrb[1] | mem_wstrb[2] | mem_wstrb[3]);

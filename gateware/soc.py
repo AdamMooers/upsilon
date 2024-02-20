@@ -3,6 +3,9 @@
 # Portions of this file incorporate code licensed under the
 # BSD 2-Clause License.
 #
+# Copyright (c) 2014-2022 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2013-2014 Sebastien Bourdeauducq <sb@m-labs.hk>
+# Copyright (c) 2019 Gabriel L. Somlo <somlo@cmu.edu>
 # Copyright (c) 2015-2019 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2020 Antmicro <www.antmicro.com>
 # Copyright (c) 2022 Victor Suarez Rovere <suarezvictor@gmail.com>
@@ -50,7 +53,7 @@ from litex.soc.integration.soc_core import SoCCore
 from litex.soc.integration.soc import SoCRegion, SoCBusHandler, SoCIORegion
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
-from litex.soc.interconnect.wishbone import Interface
+from litex.soc.interconnect.wishbone import Interface, SRAM, InterconnectShared
 
 from litedram.phy import s7ddrphy
 from litedram.modules import MT41K128M16
@@ -153,24 +156,30 @@ class PreemptiveInterface(Module, AutoCSR):
          the combinatorial block, the If statement is constructed in a
          for loop.
  
-         The "assign_for_case" function constructs the body of the If
-         statement. It assigns all output ports to avoid latches.
+         Avoiding latches:
+         Left hand sign (assignment) is always an input.
          """
  
-         def assign_for_case(i):
+         def assign_for_case(current_case):
              asn = [ ]
  
              for j in range(masters_len):
-                 asn += [
-                     self.buses[i].cyc.eq(self.slave.bus.cyc if i == j else 0),
-                     self.buses[i].stb.eq(self.slave.bus.stb if i == j else 0),
-                     self.buses[i].we.eq(self.slave.bus.we if i == j else 0),
-                     self.buses[i].sel.eq(self.slave.bus.sel if i == j else 0),
-                     self.buses[i].adr.eq(self.slave.bus.adr if i == j else 0),
-                     self.buses[i].dat_w.eq(self.slave.bus.dat_w if i == j else 0),
-                     self.buses[i].ack.eq(self.slave.bus.ack if i == j else 0),
-                     self.buses[i].dat_r.eq(self.slave.bus.dat_r if i == j else 0),
-                 ]
+                 if current_case == j:
+                     asn += [
+                         self.slave.bus.adr.eq(self.buses[j].adr),
+                         self.slave.bus.dat_w.eq(self.buses[j].dat_w),
+                         self.slave.bus.cyc.eq(self.buses[j].cyc),
+                         self.slave.bus.stb.eq(self.buses[j].stb),
+                         self.slave.bus.we.eq(self.buses[j].we),
+                         self.slave.bus.sel.eq(self.buses[j].sel),
+                         self.buses[j].dat_r.eq(self.slave.bus.dat_r),
+                         self.buses[j].ack.eq(self.slave.bus.ack),
+                     ]
+                 else:
+                     asn += [
+                         self.buses[j].dat_r.eq(0),
+                         self.buses[j].ack.eq(self.buses[j].cyc & self.buses[j].stb),
+                     ]
              return asn
  
          cases = {"default": assign_for_case(0)}
@@ -190,7 +199,7 @@ class SPIMaster(Module):
                 spi_cycle_half_wait = 1,
         ):
 
-        self.bus = Interface(data_width = 32, address_width=32, addressing="byte")
+        self.bus = Interface(data_width = 32, address_width=32, addressing="word")
         self.region = SoCRegion(size=0x10, cached=False)
 
         self.comb += [
@@ -262,48 +271,20 @@ class ControlLoopParameters(Module, AutoCSR):
                  )
          ]
  
-class BRAM(Module):
-     """ A BRAM (block ram) is a memory store that is completely separate from
-     the system RAM. They are much smaller.
-     """
-     def __init__(self, addr_mask, origin=None):
-         """
-         :param addr_mask: Mask which defines the amount of bytes accessable
-           by the BRAM.
-         :param origin: Origin of the BRAM module region. This is seen by the
-           subordinate master, not the usual master.
-         """
-         self.bus = Interface(data_width=32, address_width=32, addressing="byte")
- 
-         # Non-IO (i.e. MMIO) regions need to be cached
-         self.region = SoCRegion(origin=origin, size=addr_mask+1, cached=True)
- 
-         self.specials += Instance("bram",
-                 p_ADDR_MASK = addr_mask,
-                 i_clk = ClockSignal(),
-                 i_wb_cyc = self.bus.cyc,
-                 i_wb_stb = self.bus.stb,
-                 i_wb_we = self.bus.we,
-                 i_wb_sel = self.bus.sel,
-                 i_wb_addr = self.bus.adr,
-                 i_wb_dat_w = self.bus.dat_w,
-                 o_wb_ack = self.bus.ack,
-                 o_wb_dat_r = self.bus.dat_r,
-         )
- 
 class PicoRV32(Module, AutoCSR):
      def __init__(self, bramwid=0x1000):
          self.submodules.params = params = ControlLoopParameters()
-         self.submodules.bram = self.bram = bram = BRAM(bramwid-1, origin=0x10000)
-         self.submodules.bram_iface = self.bram_iface = bram_iface = PreemptiveInterface(2, bram)
+         self.submodules.ram = self.ram = SRAM(bramwid)
+         ram_region = SoCRegion(size=bramwid, origin=0x10000, cached=True)
+         self.submodules.ram_iface = self.ram_iface = ram_iface = PreemptiveInterface(2, self.ram)
  
          # This is the PicoRV32 master
          self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
  
-         self.resetpin = CSRStorage(1, name="picorv32_reset", description="PicoRV32 reset")
-         self.trap = CSRStatus(1, name="picorv32_trap", description="Trap bit")
+         self.resetpin = CSRStorage(1, name="enable", description="PicoRV32 enable")
+         self.trap = CSRStatus(1, name="trap", description="Trap bit")
  
-         self.ic = ic = SoCBusHandler(
+         self.bus = bus = SoCBusHandler(
              standard="wishbone",
              data_width=32,
              address_width=32,
@@ -316,10 +297,15 @@ class PicoRV32(Module, AutoCSR):
                  "picorv32_io": SoCIORegion(origin=0x100000, size=0x100, mode="rw", cached=False),
              },
          )
- 
-         ic.add_slave("picorv32_bram", bram_iface.buses[1], bram.region)
-         ic.add_slave("picorv32_params", params.bus, params.region)
-         ic.add_master("picorv32_master", self.masterbus)
+
+         self.ram_stb_cyc = CSRStatus(2)
+         self.ram_adr = CSRStatus(32)
+         self.comb += self.ram_stb_cyc.status.eq(ram_iface.buses[1].stb << 1 | ram_iface.buses[1].cyc)
+         self.comb += self.ram_adr.status.eq(ram_iface.buses[1].adr)
+
+         bus.add_slave("picorv32_ram", ram_iface.buses[1], ram_region)
+         bus.add_slave("picorv32_params", params.bus, params.region)
+         bus.add_master("picorv32_master", self.masterbus)
  
          # NOTE: need to compile to these extact instructions
          self.specials += Instance("picorv32_wb",
@@ -355,14 +341,24 @@ class PicoRV32(Module, AutoCSR):
  
              o_trace_valid = Signal(),
              o_trace_data = Signal(36),
+             o_debug_state = Signal(2),
+         )
+
+         # dumb hack: "self.bus.finalize()" in do_finalize()
+         # should work but doesn't
+         self.submodules.picobus = InterconnectShared(
+                 list(self.bus.masters.values()),
+                 slaves = [(self.bus.regions[n].decoder(self.bus), s) for n, s in self.bus.slaves.items()],
+                 register = self.bus.interconnect_register,
+                 timeout_cycles = self.bus.timeout,
          )
  
      def do_finalize(self):
-         self.ic.finalize()
+         #self.bus.finalize()
          jsondata = {}
  
-         for region in self.ic.regions:
-             d = self.ic.regions[region]
+         for region in self.bus.regions:
+             d = self.bus.regions[region]
              jsondata[region] = {
                      "origin": d.origin,
                      "size": d.size,
@@ -411,13 +407,10 @@ class UpsilonSoC(SoCCore):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
     def add_picorv32(self):
-        self.submodules.picorv32 = pr = PicoRV32()
-        self.bus.add_slave("picorv32_master_bram", pr.bram_iface.buses[0],
-                SoCRegion(origin=None,size=pr.bram.region.size, cached=True))
-
-    def add_bram(self):
-        self.submodules.bram = br = BRAM(0x1FF)
-        self.bus.add_slave("bram", br.bus, br.region)
+        siz = 0x1000
+        self.submodules.picorv32 = pr = PicoRV32(siz)
+        self.bus.add_slave("picorv32_ram", pr.ram_iface.buses[0],
+                SoCRegion(origin=None,size=siz, cached=True))
 
     def __init__(self,
                  variant="a7-100",
@@ -445,7 +438,6 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/spi/spi_master_ss_wb.v")
-        platform.add_source("rtl/bram/bram.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -503,7 +495,6 @@ class UpsilonSoC(SoCCore):
         )
         self.bus.add_slave("spi0", self.spi0.bus, self.spi0.region)
         
-        self.add_bram()
         self.add_picorv32()
 
 def main():
