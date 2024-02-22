@@ -367,7 +367,17 @@ class PicoRV32(Module, AutoCSR):
         self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
 
         self.resetpin = CSRStorage(1, name="enable", description="PicoRV32 enable")
-        self.trap = CSRStatus(1, name="trap", description="Trap bit")
+
+        self.trap = CSRStatus(8, name="trap", description="Trap condition")
+        self.d_adr = CSRStatus(32)
+        self.d_dat_w = CSRStatus(32)
+        self.dbg_insn_addr = CSRStatus(32)
+        self.dbg_insn_opcode = CSRStatus(32)
+
+        self.comb += [
+                self.d_adr.status.eq(self.masterbus.adr),
+                self.d_dat_w.status.eq(self.masterbus.dat_w),
+        ]
 
         # NOTE: need to compile to these extact instructions
         self.specials += Instance("picorv32_wb",
@@ -404,10 +414,13 @@ class PicoRV32(Module, AutoCSR):
             o_trace_valid = Signal(),
             o_trace_data = Signal(36),
             o_debug_state = Signal(2),
+
+            o_dbg_insn_addr = self.dbg_insn_addr.status,
+            o_dbg_insn_opcode = self.dbg_insn_opcode.status,
         )
 
     def do_finalize(self):
-        self.mmap.dump_json(self.name)
+        self.mmap.dump_json(self.name + ".json")
         self.submodules.decoder = self.mmap.bus_submodule(self.masterbus)
 
 # Clock and Reset Generator

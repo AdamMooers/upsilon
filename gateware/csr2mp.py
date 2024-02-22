@@ -22,7 +22,7 @@ with open(sys.argv[1], 'rt') as f:
 print("from micropython import const")
 
 for key in j["csr_registers"]:
-    if key.startswith("picorv32"):
+    if key.startswith("pico0"):
         print(f'{key} = const({j["csr_registers"][key]["addr"]})')
 
-print(f'picorv32_ram = const({j["memories"]["picorv32_ram"]["base"]})')
+print(f'pico0_ram = const({j["memories"]["pico0_ram"]["base"]})')
