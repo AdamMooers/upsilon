@@ -16,12 +16,14 @@ class PreemptiveInterface(LiteXModule):
      single slave. A master controls which master (or interconnect) has access
      to the slave. This is to avoid bus contention by having multiple buses. """
  
-     def __init__(self, masters_len, slave):
+     def __init__(self, masters_len, slave, addressing="word"):
          """
          :param masters_len: The amount of buses accessing this slave. This number
            must be greater than one.
          :param slave: The slave device. This object must have an Interface object
            accessable as ``bus``.
+         :param addressing: Addressing style of the slave. Default is "word". Note
+           that masters may have to convert when selecting self.buses.
          """
  
          assert masters_len > 1
@@ -31,7 +33,7 @@ class PreemptiveInterface(LiteXModule):
  
          for i in range(masters_len):
              # Add the slave interface each master interconnect sees.
-             self.buses.append(Interface(data_width=32, address_width=32, addressing="byte"))
+             self.buses.append(Interface(data_width=32, address_width=32, addressing=addressing))
  
          """
          Construct a combinatorial case statement. In verilog, the case
@@ -109,10 +111,14 @@ class ControlLoopParameters(LiteXModule):
         self.zset = CSRStatus(32, description='Set Z position')
         self.zpos = CSRStatus(32, description='Measured Z position')
  
-        self.bus = Interface(data_width = 32, address_width = 32, addressing="word")
+        self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
         self.width = 0x20
+        self.comb += [
+                self.bus.err.eq(0),
+        ]
+
         self.sync += [
-                If(self.bus.cyc == 1 and self.bus.stb == 1 and self.bus.ack == 0,
+                If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
                     Case(self.bus.adr[0:4], {
                         0x0: self.bus.dat_r.eq(self.cl_I.storage),
                         0x4: self.bus.dat_r.eq(self.cl_P.storage),
@@ -128,26 +134,59 @@ class ControlLoopParameters(LiteXModule):
                             ).Else(
                                 self.bus.dat_r.eq(self.zpos.status)
                             ),
-                        "default": self.bus.dat_r.eq(0xdeadbeef),
+                        "default": self.bus.dat_r.eq(0xdeadc0de),
                     }),
                     self.bus.ack.eq(1),
-                ).Else(
+                ).Elif(self.bus.cyc != 1,
                     self.bus.ack.eq(0),
                 )
         ]
 
-class PicoRV32(LiteXModule, MemoryMap):
+class PicoRV32RegisterRead(LiteXModule):
+    def __init__(self):
+        self.regs = [Signal(32) for i in range(1,32)]
+        self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
+        self.width = 0x80
+
+        cases = {"default": self.bus.dat_r.eq(0xdeaddead)}
+        for i, reg in enumerate(self.regs):
+            cases[i*0x4] = self.bus.dat_r.eq(reg)
+
+        # self.debug_addr = CSRStatus(32)
+        # self.debug_cntr = CSRStatus(16)
+
+        # CYC -> transfer in progress
+        # STB -> data is valid on the input lines
+        self.sync += [
+                If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
+                    Case(self.bus.adr[0:7], cases),
+                    self.bus.ack.eq(1),
+                    #self.debug_addr.status.eq(self.bus.adr),
+                    #self.debug_cntr.status.eq(self.debug_cntr.status + 1),
+                ).Elif(self.bus.cyc != 1,
+                    self.bus.ack.eq(0)
+                )
+        ]
+
+# Parts of this class come from LiteX.
+#
+# Copyright (c) 2016-2019 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2018 Sergiusz Bazanski <q3k@q3k.org>
+# Copyright (c) 2019 Antmicro <www.antmicro.com>
+# Copyright (c) 2019 Tim 'mithro' Ansell <me@mith.ro>
+# Copyright (c) 2018 William D. Jones <thor0505@comcast.net>
+# SPDX-License-Identifier: BSD-2-Clause
+
+class PicoRV32(LiteXModule):
     def add_params(self, origin):
         params = ControlLoopParameters()
         self.add_module("params", params)
-        self.add_region('params', BasicRegion(origin, params.width, params.bus))
+        self.mmap.add_region('params', BasicRegion(origin, params.width, params.bus))
 
-    def __init__(self, name, start_addr=0x10000, irq_addr=0x10010):
-        MemoryMap.__init__(self)
+    def __init__(self, name, start_addr=0x10000, irq_addr=0x10010, stackaddr=0x100FF):
         self.name = name
-
         self.masterbus = Interface(data_width=32, address_width=32, addressing="byte")
-
+        self.mmap = MemoryMap(self.masterbus)
         self.resetpin = CSRStorage(1, name="enable", description="PicoRV32 enable")
 
         self.trap = CSRStatus(8, name="trap", description="Trap condition")
@@ -156,30 +195,64 @@ class PicoRV32(LiteXModule, MemoryMap):
         self.dbg_insn_addr = CSRStatus(32)
         self.dbg_insn_opcode = CSRStatus(32)
 
+        self.debug_reg_read = PicoRV32RegisterRead()
+        reg_args = {}
+        for i in range(1,32):
+            reg_args[f"o_dbg_reg_x{i}"] = self.debug_reg_read.regs[i-1]
+
+        mem_valid = Signal()
+        mem_instr = Signal()
+        mem_ready = Signal()
+        mem_addr  = Signal(32)
+        mem_wdata = Signal(32)
+        mem_wstrb = Signal(4)
+        mem_rdata = Signal(32)
+
         self.comb += [
-                self.d_adr.status.eq(self.masterbus.adr),
-                self.d_dat_w.status.eq(self.masterbus.dat_w),
+            self.masterbus.adr.eq(mem_addr),
+            self.masterbus.dat_w.eq(mem_wdata),
+            self.masterbus.we.eq(mem_wstrb != 0),
+            self.masterbus.sel.eq(mem_wstrb),
+            self.masterbus.cyc.eq(mem_valid),
+            self.masterbus.stb.eq(mem_valid),
+            self.masterbus.cti.eq(0),
+            self.masterbus.bte.eq(0),
+            mem_ready.eq(self.masterbus.ack),
+            mem_rdata.eq(self.masterbus.dat_r),
+        ]
+
+        self.comb += [
+                self.d_adr.status.eq(mem_addr),
+                self.d_dat_w.status.eq(mem_wdata),
         ]
 
         # NOTE: need to compile to these extact instructions
-        self.specials += Instance("picorv32_wb",
+        self.specials += Instance("picorv32",
             p_COMPRESSED_ISA = 1,
             p_ENABLE_MUL = 1,
+            p_REGS_INIT_ZERO = 1,
             p_PROGADDR_RESET=start_addr,
             p_PROGADDR_IRQ  =irq_addr,
-            p_REGS_INIT_ZERO = 1,
+            p_STACKADDR = stackaddr,
             o_trap = self.trap.status,
 
-            i_wb_rst_i = ~self.resetpin.storage,
-            i_wb_clk_i = ClockSignal(),
-            o_wbm_adr_o = self.masterbus.adr,
-            o_wbm_dat_o = self.masterbus.dat_w,
-            i_wbm_dat_i = self.masterbus.dat_r,
-            o_wbm_we_o = self.masterbus.we,
-            o_wbm_sel_o = self.masterbus.sel,
-            o_wbm_stb_o = self.masterbus.stb,
-            i_wbm_ack_i = self.masterbus.ack,
-            o_wbm_cyc_o = self.masterbus.cyc,
+            o_mem_valid = mem_valid,
+            o_mem_instr = mem_instr,
+            i_mem_ready = mem_ready,
+
+            o_mem_addr  = mem_addr,
+            o_mem_wdata = mem_wdata,
+            o_mem_wstrb = mem_wstrb,
+            i_mem_rdata = mem_rdata,
+
+            i_clk = ClockSignal(),
+            i_resetn = self.resetpin.storage,
+
+            o_mem_la_read  = Signal(),
+            o_mem_la_write = Signal(),
+            o_mem_la_addr  = Signal(32),
+            o_mem_la_wdata = Signal(32),
+            o_mem_la_wstrb = Signal(4),
 
             o_pcpi_valid = Signal(),
             o_pcpi_insn = Signal(32),
@@ -195,12 +268,13 @@ class PicoRV32(LiteXModule, MemoryMap):
 
             o_trace_valid = Signal(),
             o_trace_data = Signal(36),
-            o_debug_state = Signal(2),
 
             o_dbg_insn_addr = self.dbg_insn_addr.status,
             o_dbg_insn_opcode = self.dbg_insn_opcode.status,
+
+            **reg_args
         )
 
     def do_finalize(self):
-        self.dump_mmap(self.name + ".json")
-        self.submodules.decoder = self.bus_submodule(self.masterbus)
+        self.mmap.dump_mmap(self.name + ".json")
+        self.mmap.finalize()

@@ -12,6 +12,7 @@ software/build/
 obj_dir
 *.fst.hier
 *.swp
+gateware/config.py
 gateware/rtl/control_loop/control_loop_cmds.h
 gateware/rtl/raster/ram_shim_cmds.h
 gateware/rtl/raster/raster_cmds.h

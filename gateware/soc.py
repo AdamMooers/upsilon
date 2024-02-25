@@ -166,10 +166,12 @@ class UpsilonSoC(SoCCore):
     def add_picorv32(self, name, size=0x1000, origin=0x10000, param_origin=0x100000):
         pico = PicoRV32(name, origin, origin+0x10)
         self.add_module(name, pico)
+        self.bus.add_slave(name + "_dbg_reg", pico.debug_reg_read.bus,
+                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=True))
 
         ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
         ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)
-        pico.add_region("main",
+        pico.mmap.add_region("main",
                 BasicRegion(origin=origin, size=size, bus=ram_iface.buses[1]))
 
         self.bus.add_slave(name + "_ram", ram_iface.buses[0],
@@ -182,6 +184,14 @@ class UpsilonSoC(SoCCore):
                  local_ip="192.168.2.50",
                  remote_ip="192.168.2.100",
                  tftp_port=6969):
+        """
+        :param variant: Arty A7 variant. Accepts "a7-35" or "a7-100".
+        :param local_ip: The IP that the BIOS will use when transmitting.
+        :param remote_ip: The IP that the BIOS will use when retreving
+          the Linux kernel via TFTP.
+        :param tftp_port: Port that the BIOS uses for TFTP.
+        """
+
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
@@ -263,8 +273,8 @@ class UpsilonSoC(SoCCore):
         self.add_picorv32("pico0")
 
 def main():
-    """ Add modifications to SoC variables here """
-    soc =UpsilonSoC(variant="a7-100")
+    from config import config
+    soc =UpsilonSoC(**config)
     builder = Builder(soc, csr_json="csr.json", compile_software=True)
     builder.build()
 

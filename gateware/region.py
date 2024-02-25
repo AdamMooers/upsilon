@@ -5,7 +5,8 @@
 # source distribution.
 
 from migen import *
-from litex.soc.interconnect.wishbone import Decoder
+from litex.soc.interconnect.wishbone import Decoder, Interface
+from litex.gen import LiteXModule
 
 from util import *
 
@@ -60,10 +61,11 @@ class BasicRegion:
     def __str__(self):
         return str(self.to_dict())
 
-class MemoryMap:
+class MemoryMap(LiteXModule):
     """ Stores the memory map of an embedded core. """
-    def __init__(self):
+    def __init__(self, masterbus):
         self.regions = {}
+        self.masterbus = masterbus
 
     def add_region(self, name, region):
         assert name not in self.regions
@@ -74,10 +76,39 @@ class MemoryMap:
             import json
             json.dump({k : self.regions[k].to_dict() for k in self.regions}, f)
 
-    def bus_submodule(self, masterbus):
-        """ Return a module that decodes the masterbus into the
-            slave devices according to their origin and start positions. """
-        slaves = [(self.regions[n].decoder(), self.regions[n].bus)
+    def adapt(self, target_bus):
+        """
+        When a slave is "word" addressed (like SRAM), it accepts an index
+        into a array with 32-bit elements. It DOES NOT accept a byte index.
+        When a byte-addressed master (like the CPU) interacts with a word
+        addressed slave, there must be an adapter in between that converts
+        between the two.
+        
+        PicoRV32 will read the word that contains a byte/halfword and
+        extract the word from it (see code assigning mem_rdata_word).
+        """
+        assert target_bus.addressing in ["byte", "word"]
+        if target_bus.addressing == "byte":
+            return target_bus
+        adapter = Interface(data_width=32, address_width=32, addressing="byte")
+
+        self.comb += [
+                target_bus.adr.eq(adapter.adr >> 2),
+                target_bus.dat_w.eq(adapter.dat_w),
+                target_bus.we.eq(adapter.we),
+                target_bus.sel.eq(adapter.sel),
+                target_bus.cyc.eq(adapter.cyc),
+                target_bus.stb.eq(adapter.stb),
+                target_bus.cti.eq(adapter.cti),
+                target_bus.bte.eq(adapter.bte),
+                adapter.ack.eq(target_bus.ack),
+                adapter.dat_r.eq(target_bus.dat_r),
+        ]
+
+        return adapter
+
+    def do_finalize(self):
+        slaves = [(self.regions[n].decoder(), self.adapt(self.regions[n].bus))
                 for n in self.regions]
-        return Decoder(masterbus, slaves, register=False)
+        self.submodules.decoder = Decoder(self.masterbus, slaves, register=True)
  

@@ -166,6 +166,38 @@ module picorv32 #(
 	output reg [31:0] dbg_insn_addr,
 	output reg [31:0] dbg_insn_opcode,
 
+	output [31:0] dbg_reg_x1,
+	output [31:0] dbg_reg_x2,
+	output [31:0] dbg_reg_x3,
+	output [31:0] dbg_reg_x4,
+	output [31:0] dbg_reg_x5,
+	output [31:0] dbg_reg_x6,
+	output [31:0] dbg_reg_x7,
+	output [31:0] dbg_reg_x8,
+	output [31:0] dbg_reg_x9,
+	output [31:0] dbg_reg_x10,
+	output [31:0] dbg_reg_x11,
+	output [31:0] dbg_reg_x12,
+	output [31:0] dbg_reg_x13,
+	output [31:0] dbg_reg_x14,
+	output [31:0] dbg_reg_x15,
+	output [31:0] dbg_reg_x16,
+	output [31:0] dbg_reg_x17,
+	output [31:0] dbg_reg_x18,
+	output [31:0] dbg_reg_x19,
+	output [31:0] dbg_reg_x20,
+	output [31:0] dbg_reg_x21,
+	output [31:0] dbg_reg_x22,
+	output [31:0] dbg_reg_x23,
+	output [31:0] dbg_reg_x24,
+	output [31:0] dbg_reg_x25,
+	output [31:0] dbg_reg_x26,
+	output [31:0] dbg_reg_x27,
+	output [31:0] dbg_reg_x28,
+	output [31:0] dbg_reg_x29,
+	output [31:0] dbg_reg_x30,
+	output [31:0] dbg_reg_x31,
+
 	// Trace Interface
 	output reg        trace_valid,
 	output reg [35:0] trace_data
@@ -230,40 +262,38 @@ module picorv32 #(
 		begin end
 	endtask
 
-`ifdef DEBUGREGS
-	wire [31:0] dbg_reg_x0  = 0;
-	wire [31:0] dbg_reg_x1  = cpuregs[1];
-	wire [31:0] dbg_reg_x2  = cpuregs[2];
-	wire [31:0] dbg_reg_x3  = cpuregs[3];
-	wire [31:0] dbg_reg_x4  = cpuregs[4];
-	wire [31:0] dbg_reg_x5  = cpuregs[5];
-	wire [31:0] dbg_reg_x6  = cpuregs[6];
-	wire [31:0] dbg_reg_x7  = cpuregs[7];
-	wire [31:0] dbg_reg_x8  = cpuregs[8];
-	wire [31:0] dbg_reg_x9  = cpuregs[9];
-	wire [31:0] dbg_reg_x10 = cpuregs[10];
-	wire [31:0] dbg_reg_x11 = cpuregs[11];
-	wire [31:0] dbg_reg_x12 = cpuregs[12];
-	wire [31:0] dbg_reg_x13 = cpuregs[13];
-	wire [31:0] dbg_reg_x14 = cpuregs[14];
-	wire [31:0] dbg_reg_x15 = cpuregs[15];
-	wire [31:0] dbg_reg_x16 = cpuregs[16];
-	wire [31:0] dbg_reg_x17 = cpuregs[17];
-	wire [31:0] dbg_reg_x18 = cpuregs[18];
-	wire [31:0] dbg_reg_x19 = cpuregs[19];
-	wire [31:0] dbg_reg_x20 = cpuregs[20];
-	wire [31:0] dbg_reg_x21 = cpuregs[21];
-	wire [31:0] dbg_reg_x22 = cpuregs[22];
-	wire [31:0] dbg_reg_x23 = cpuregs[23];
-	wire [31:0] dbg_reg_x24 = cpuregs[24];
-	wire [31:0] dbg_reg_x25 = cpuregs[25];
-	wire [31:0] dbg_reg_x26 = cpuregs[26];
-	wire [31:0] dbg_reg_x27 = cpuregs[27];
-	wire [31:0] dbg_reg_x28 = cpuregs[28];
-	wire [31:0] dbg_reg_x29 = cpuregs[29];
-	wire [31:0] dbg_reg_x30 = cpuregs[30];
-	wire [31:0] dbg_reg_x31 = cpuregs[31];
-`endif
+	// assign dbg_reg_x0  = 0;
+	assign dbg_reg_x1  = cpuregs[1];
+	assign dbg_reg_x2  = cpuregs[2];
+	assign dbg_reg_x3  = cpuregs[3];
+	assign dbg_reg_x4  = cpuregs[4];
+	assign dbg_reg_x5  = cpuregs[5];
+	assign dbg_reg_x6  = cpuregs[6];
+	assign dbg_reg_x7  = cpuregs[7];
+	assign dbg_reg_x8  = cpuregs[8];
+	assign dbg_reg_x9  = cpuregs[9];
+	assign dbg_reg_x10 = cpuregs[10];
+	assign dbg_reg_x11 = cpuregs[11];
+	assign dbg_reg_x12 = cpuregs[12];
+	assign dbg_reg_x13 = cpuregs[13];
+	assign dbg_reg_x14 = cpuregs[14];
+	assign dbg_reg_x15 = cpuregs[15];
+	assign dbg_reg_x16 = cpuregs[16];
+	assign dbg_reg_x17 = cpuregs[17];
+	assign dbg_reg_x18 = cpuregs[18];
+	assign dbg_reg_x19 = cpuregs[19];
+	assign dbg_reg_x20 = cpuregs[20];
+	assign dbg_reg_x21 = cpuregs[21];
+	assign dbg_reg_x22 = cpuregs[22];
+	assign dbg_reg_x23 = cpuregs[23];
+	assign dbg_reg_x24 = cpuregs[24];
+	assign dbg_reg_x25 = cpuregs[25];
+	assign dbg_reg_x26 = cpuregs[26];
+	assign dbg_reg_x27 = cpuregs[27];
+	assign dbg_reg_x28 = cpuregs[28];
+	assign dbg_reg_x29 = cpuregs[29];
+	assign dbg_reg_x30 = cpuregs[30];
+	assign dbg_reg_x31 = cpuregs[31];
 
 	// Internal PCPI Cores
 
@@ -2530,253 +2560,6 @@ module picorv32_pcpi_div (
 `else
 			quotient_msk <= quotient_msk >> 1;
 `endif
-		end
-	end
-endmodule
-
-/***************************************************************
- * picorv32_wb
- ***************************************************************/
-
-module picorv32_wb #(
-	parameter [ 0:0] ENABLE_COUNTERS = 1,
-	parameter [ 0:0] ENABLE_COUNTERS64 = 1,
-	parameter [ 0:0] ENABLE_REGS_16_31 = 1,
-	parameter [ 0:0] ENABLE_REGS_DUALPORT = 1,
-	parameter [ 0:0] TWO_STAGE_SHIFT = 1,
-	parameter [ 0:0] BARREL_SHIFTER = 0,
-	parameter [ 0:0] TWO_CYCLE_COMPARE = 0,
-	parameter [ 0:0] TWO_CYCLE_ALU = 0,
-	parameter [ 0:0] COMPRESSED_ISA = 0,
-	parameter [ 0:0] CATCH_MISALIGN = 1,
-	parameter [ 0:0] CATCH_ILLINSN = 1,
-	parameter [ 0:0] ENABLE_PCPI = 0,
-	parameter [ 0:0] ENABLE_MUL = 0,
-	parameter [ 0:0] ENABLE_FAST_MUL = 0,
-	parameter [ 0:0] ENABLE_DIV = 0,
-	parameter [ 0:0] ENABLE_IRQ = 0,
-	parameter [ 0:0] ENABLE_IRQ_QREGS = 1,
-	parameter [ 0:0] ENABLE_IRQ_TIMER = 1,
-	parameter [ 0:0] ENABLE_TRACE = 0,
-	parameter [ 0:0] REGS_INIT_ZERO = 0,
-	parameter [31:0] MASKED_IRQ = 32'h 0000_0000,
-	parameter [31:0] LATCHED_IRQ = 32'h ffff_ffff,
-	parameter [31:0] PROGADDR_RESET = 32'h 0000_0000,
-	parameter [31:0] PROGADDR_IRQ = 32'h 0000_0010,
-	parameter [31:0] STACKADDR = 32'h ffff_ffff
-) (
-	output [7:0] trap,
-	output [31:0] dbg_insn_addr,
-	output [31:0] dbg_insn_opcode,
-
-	// Wishbone interfaces
-	input wb_rst_i,
-	input wb_clk_i,
-
-	output reg [31:0] wbm_adr_o,
-	output reg [31:0] wbm_dat_o,
-	input [31:0] wbm_dat_i,
-	output reg wbm_we_o,
-	output reg [3:0] wbm_sel_o,
-	output reg wbm_stb_o,
-	input wbm_ack_i,
-	output reg wbm_cyc_o,
-
-	// Pico Co-Processor Interface (PCPI)
-	output        pcpi_valid,
-	output [31:0] pcpi_insn,
-	output [31:0] pcpi_rs1,
-	output [31:0] pcpi_rs2,
-	input         pcpi_wr,
-	input  [31:0] pcpi_rd,
-	input         pcpi_wait,
-	input         pcpi_ready,
-
-	// IRQ interface
-	input  [31:0] irq,
-	output [31:0] eoi,
-
-`ifdef RISCV_FORMAL
-	output        rvfi_valid,
-	output [63:0] rvfi_order,
-	output [31:0] rvfi_insn,
-	output        rvfi_trap,
-	output        rvfi_halt,
-	output        rvfi_intr,
-	output [ 4:0] rvfi_rs1_addr,
-	output [ 4:0] rvfi_rs2_addr,
-	output [31:0] rvfi_rs1_rdata,
-	output [31:0] rvfi_rs2_rdata,
-	output [ 4:0] rvfi_rd_addr,
-	output [31:0] rvfi_rd_wdata,
-	output [31:0] rvfi_pc_rdata,
-	output [31:0] rvfi_pc_wdata,
-	output [31:0] rvfi_mem_addr,
-	output [ 3:0] rvfi_mem_rmask,
-	output [ 3:0] rvfi_mem_wmask,
-	output [31:0] rvfi_mem_rdata,
-	output [31:0] rvfi_mem_wdata,
-`endif
-
-	// Trace Interface
-	output        trace_valid,
-	output [35:0] trace_data,
-
-	output debug_state,
-
-	output mem_instr
-);
-	wire        mem_valid;
-	wire [31:0] mem_addr;
-	wire [31:0] mem_wdata;
-	wire [ 3:0] mem_wstrb;
-	reg         mem_ready;
-	reg [31:0] mem_rdata;
-
-	wire clk;
-	wire resetn;
-
-	assign clk = wb_clk_i;
-	assign resetn = ~wb_rst_i;
-
-	picorv32 #(
-		.ENABLE_COUNTERS     (ENABLE_COUNTERS     ),
-		.ENABLE_COUNTERS64   (ENABLE_COUNTERS64   ),
-		.ENABLE_REGS_16_31   (ENABLE_REGS_16_31   ),
-		.ENABLE_REGS_DUALPORT(ENABLE_REGS_DUALPORT),
-		.TWO_STAGE_SHIFT     (TWO_STAGE_SHIFT     ),
-		.BARREL_SHIFTER      (BARREL_SHIFTER      ),
-		.TWO_CYCLE_COMPARE   (TWO_CYCLE_COMPARE   ),
-		.TWO_CYCLE_ALU       (TWO_CYCLE_ALU       ),
-		.COMPRESSED_ISA      (COMPRESSED_ISA      ),
-		.CATCH_MISALIGN      (CATCH_MISALIGN      ),
-		.CATCH_ILLINSN       (CATCH_ILLINSN       ),
-		.ENABLE_PCPI         (ENABLE_PCPI         ),
-		.ENABLE_MUL          (ENABLE_MUL          ),
-		.ENABLE_FAST_MUL     (ENABLE_FAST_MUL     ),
-		.ENABLE_DIV          (ENABLE_DIV          ),
-		.ENABLE_IRQ          (ENABLE_IRQ          ),
-		.ENABLE_IRQ_QREGS    (ENABLE_IRQ_QREGS    ),
-		.ENABLE_IRQ_TIMER    (ENABLE_IRQ_TIMER    ),
-		.ENABLE_TRACE        (ENABLE_TRACE        ),
-		.REGS_INIT_ZERO      (REGS_INIT_ZERO      ),
-		.MASKED_IRQ          (MASKED_IRQ          ),
-		.LATCHED_IRQ         (LATCHED_IRQ         ),
-		.PROGADDR_RESET      (PROGADDR_RESET      ),
-		.PROGADDR_IRQ        (PROGADDR_IRQ        ),
-		.STACKADDR           (STACKADDR           )
-	) picorv32_core (
-		.clk      (clk   ),
-		.resetn   (resetn),
-		.trap     (trap  ),
-
-		.mem_valid(mem_valid),
-		.mem_addr (mem_addr ),
-		.mem_wdata(mem_wdata),
-		.mem_wstrb(mem_wstrb),
-		.mem_instr(mem_instr),
-		.mem_ready(mem_ready),
-		.mem_rdata(mem_rdata),
-
-		.pcpi_valid(pcpi_valid),
-		.pcpi_insn (pcpi_insn ),
-		.pcpi_rs1  (pcpi_rs1  ),
-		.pcpi_rs2  (pcpi_rs2  ),
-		.pcpi_wr   (pcpi_wr   ),
-		.pcpi_rd   (pcpi_rd   ),
-		.pcpi_wait (pcpi_wait ),
-		.pcpi_ready(pcpi_ready),
-
-		.irq(irq),
-		.eoi(eoi),
-
-`ifdef RISCV_FORMAL
-		.rvfi_valid    (rvfi_valid    ),
-		.rvfi_order    (rvfi_order    ),
-		.rvfi_insn     (rvfi_insn     ),
-		.rvfi_trap     (rvfi_trap     ),
-		.rvfi_halt     (rvfi_halt     ),
-		.rvfi_intr     (rvfi_intr     ),
-		.rvfi_rs1_addr (rvfi_rs1_addr ),
-		.rvfi_rs2_addr (rvfi_rs2_addr ),
-		.rvfi_rs1_rdata(rvfi_rs1_rdata),
-		.rvfi_rs2_rdata(rvfi_rs2_rdata),
-		.rvfi_rd_addr  (rvfi_rd_addr  ),
-		.rvfi_rd_wdata (rvfi_rd_wdata ),
-		.rvfi_pc_rdata (rvfi_pc_rdata ),
-		.rvfi_pc_wdata (rvfi_pc_wdata ),
-		.rvfi_mem_addr (rvfi_mem_addr ),
-		.rvfi_mem_rmask(rvfi_mem_rmask),
-		.rvfi_mem_wmask(rvfi_mem_wmask),
-		.rvfi_mem_rdata(rvfi_mem_rdata),
-		.rvfi_mem_wdata(rvfi_mem_wdata),
-`endif
-		.dbg_insn_addr(dbg_insn_addr),
-		.dbg_insn_opcode(dbg_insn_opcode),
-
-		.trace_valid(trace_valid),
-		.trace_data (trace_data)
-	);
-
-	localparam IDLE = 2'b00;
-	localparam WBSTART = 2'b01;
-	localparam WBEND = 2'b10;
-
-	reg [1:0] state;
-	assign debug_state = state;
-
-	wire we;
-	assign we = (mem_wstrb[0] | mem_wstrb[1] | mem_wstrb[2] | mem_wstrb[3]);
-
-	always @(posedge wb_clk_i) begin
-		if (wb_rst_i) begin
-			wbm_adr_o <= 0;
-			wbm_dat_o <= 0;
-			wbm_we_o <= 0;
-			wbm_sel_o <= 0;
-			wbm_stb_o <= 0;
-			wbm_cyc_o <= 0;
-			state <= IDLE;
-		end else begin
-			case (state)
-				IDLE: begin
-					if (mem_valid) begin
-						wbm_adr_o <= mem_addr;
-						wbm_dat_o <= mem_wdata;
-						wbm_we_o <= we;
-						wbm_sel_o <= mem_wstrb;
-
-						wbm_stb_o <= 1'b1;
-						wbm_cyc_o <= 1'b1;
-						state <= WBSTART;
-					end else begin
-						mem_ready <= 1'b0;
-
-						wbm_stb_o <= 1'b0;
-						wbm_cyc_o <= 1'b0;
-						wbm_we_o <= 1'b0;
-					end
-				end
-				WBSTART:begin
-					if (wbm_ack_i) begin
-						mem_rdata <= wbm_dat_i;
-						mem_ready <= 1'b1;
-
-						state <= WBEND;
-
-						wbm_stb_o <= 1'b0;
-						wbm_cyc_o <= 1'b0;
-						wbm_we_o <= 1'b0;
-					end
-				end
-				WBEND: begin
-					mem_ready <= 1'b0;
-
-					state <= IDLE;
-				end
-				default:
-					state <= IDLE;
-			endcase
 		end
 	end
 endmodule

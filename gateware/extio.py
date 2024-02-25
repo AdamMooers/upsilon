@@ -38,7 +38,7 @@ class SPIMaster(Module):
         :param spi_cycle_half_wait: Verilog parameter: see file.
         """
 
-        self.bus = Interface(data_width = 32, address_width=32, addressing="word")
+        self.bus = Interface(data_width = 32, address_width=32, addressing="byte")
         self.addr_space_size = 0x10
 
         self.comb += [

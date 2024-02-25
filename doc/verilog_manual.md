@@ -289,3 +289,8 @@ Verilator. For example, if you have a file called `mod.v` in the folder
 preprocessed file for you.
 
 Another alternative is to use GNU `m4`.
+
+## RAM Check failure on boot
+
+You might have overloaded the CSR bus. Move some CSRs to a wishbone
+bus module. See /gateware/swic.py for some simple Wishbone bus examples.

@@ -26,3 +26,4 @@ for key in j["csr_registers"]:
         print(f'{key} = const({j["csr_registers"][key]["addr"]})')
 
 print(f'pico0_ram = const({j["memories"]["pico0_ram"]["base"]})')
+print(f'pico0_dbg_reg = const({j["memories"]["pico0_dbg_reg"]["base"]})')
