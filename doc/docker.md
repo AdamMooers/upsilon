@@ -73,8 +73,13 @@ gateway `192.168.2.1`. Make sure this is not the default route. Make sure
 to adjust your firewall to allow traffic on the `192.168.2.0/24` range.
 
 If your local network already uses the `192.168.2.0/24` range, then you must
-modify `upsilon/firmware/soc.py` to use different IPs. You must rebuild the
+modify `upsilon/gateware/soc.py` to use different IPs. You must rebuild the
 SoC after doing this.
+
+The controller boots using TFTP with port `6969`. If you cannot use this
+port, you can modify `upsilon/gateware/soc.py` to a different value. This value
+is hardcoded into the SoC and any change to it requires a rebuild of the SoC.
+You must also change the port in `upsilon/build/Makefile` under `tftp`.
 
 ## Setup Images
 

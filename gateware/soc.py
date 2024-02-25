@@ -216,11 +216,21 @@ class _CRG(Module):
             self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
 class UpsilonSoC(SoCCore):
-    def __init__(self, variant):
+    def add_ip(self, ip_str, ip_name):
+        for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
+            self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
+
+    def __init__(self,
+                 variant="a7-100",
+                 local_ip="192.168.2.50",
+                 remote_ip="192.168.2.100",
+                 tftp_port=6969):
+
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
+
         """
         These source files need to be sorted so that modules
         that rely on another module come later. For instance,
@@ -268,8 +278,6 @@ class UpsilonSoC(SoCCore):
                 csr_address_width=14,
                 csr_paging=0x800,
                 csr_ordering="big",
-                local_ip='192.168.2.50',
-                remote_ip='192.168.2.100',
                 timer_uptime = True)
         # This initializes the connection to the physical DRAM interface.
         self.submodules.ddrphy = s7ddrphy.A7DDRPHY(platform.request("ddram"),
@@ -284,16 +292,25 @@ class UpsilonSoC(SoCCore):
             module      = MT41K128M16(sys_clk_freq, "1:4"),
             l2_cache_size = 8192
         )
+
+        # Initialize Ethernet
         self.submodules.ethphy = LiteEthPHYMII(
             clock_pads = platform.request("eth_clocks"),
             pads       = platform.request("eth"))
         self.add_ethernet(phy=self.ethphy, dynamic_ip=True)
 
+        # Initialize network information
+        self.add_ip(local_ip, "LOCALIP")
+        self.add_ip(remote_ip, "REMOTEIP")
+        self.add_constant("TFTP_SERVER_PORT", tftp_port)
+
+        # Add pins
         platform.add_extension(io)
         self.submodules.base = Base(ClockSignal(), self.sdram, platform)
 
 def main():
-    soc =UpsilonSoC("a7-100")
+    """ Add modifications to SoC variables here """
+    soc =UpsilonSoC()
     builder = Builder(soc, csr_json="csr.json", compile_software=True)
     builder.build()
 
