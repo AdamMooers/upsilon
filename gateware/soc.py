@@ -177,7 +177,9 @@ class UpsilonSoC(SoCCore):
         self.bus.add_slave(name + "_ram", ram_iface.buses[0],
                 SoCRegion(origin=None, size=size, cached=True))
 
-        pico.add_params(param_origin)
+        param_iface = pico.add_cl_params(param_origin, name + "_cl.json")
+        self.bus.add_slave(name + "_cl", param_iface,
+                SoCRegion(origin=None, size=size, cached=False))
 
     def __init__(self,
                  variant="a7-100",

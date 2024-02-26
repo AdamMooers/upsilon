@@ -14,7 +14,13 @@ class PreemptiveInterface(LiteXModule):
      """ A preemptive interface is a manually controlled Wishbone interface
      that stands between multiple masters (potentially interconnects) and a
      single slave. A master controls which master (or interconnect) has access
-     to the slave. This is to avoid bus contention by having multiple buses. """
+     to the slave. This is to avoid bus contention by having multiple buses.
+
+     To use this module, instantiate it. Then connect the controlling master
+     to ``self.buses[0]``. Connect the other masters to ``self.buses[1]``, etc.
+     Since the buses are seperate, origins don't have to be the same, but the
+     size of the region will be the same as the slave interface.
+     """
  
      def __init__(self, masters_len, slave, addressing="word"):
          """
@@ -94,57 +100,103 @@ class PreemptiveInterface(LiteXModule):
  
          self.comb += Case(self.master_select.storage, cases)
 
-#TODO: Generalize CSR stuff
-class ControlLoopParameters(LiteXModule):
-    """ Interface for the Linux CPU to write parameters to the CPU
-        and for the CPU to write data back to the CPU without complex
-        locking mechanisms.
+class SpecialRegister:
+    """ Special registers used for small bits of communiciation. """
+    def __init__(self, name, direction, width):
+        """
+        :param name: Name of the register, seen in mmio.py.
+        :param direction: One of "PR" (pico-read main-write) or "PW" (pico-write main-read).
+        :param width: Width in bits, from 0 exclusive to 32 inclusive.
+        """
+        assert direction in ["PR", "PW"]
+        assert 0 < width and width <= 32
+        self.name = name
+        self.direction = direction
+        self.width = width
 
-        This is a hack and will be replaced later with a more general
-        memory region.
-    """
-    def __init__(self):
-        self.cl_I = CSRStorage(32, description='Integral parameter')
-        self.cl_P = CSRStorage(32, description='Proportional parameter')
-        self.deltaT = CSRStorage(32, description='Wait parameter')
-        self.setpt = CSRStorage(32, description='Setpoint')
-        self.zset = CSRStatus(32, description='Set Z position')
-        self.zpos = CSRStatus(32, description='Measured Z position')
- 
-        self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
-        self.width = 0x20
-        self.comb += [
-                self.bus.err.eq(0),
-        ]
+    def from_tuples(*tuples):
+        return [SpecialRegister(*args) for args in tuples]
 
-        self.did_write = CSRStatus(8)
-        self.sync += [
-                If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
-                    Case(self.bus.adr[0:4], {
-                        0x0: self.bus.dat_r.eq(self.cl_I.storage),
-                        0x4: self.bus.dat_r.eq(self.cl_P.storage),
-                        0x8: self.bus.dat_r.eq(self.deltaT.storage),
-                        0xC: self.bus.dat_r.eq(self.setpt.storage),
-                        0x10: If(self.bus.we,
-                                self.zset.status.eq(self.bus.dat_w),
-                                self.did_write.status.eq(self.did_write.status + 1),
-                            ).Else(
-                                self.bus.dat_r.eq(self.zset.status)
-                            ),
-                        0x14: If(self.bus.we,
-                                self.zpos.status.eq(self.bus.dat_w),
-                            ).Else(
-                                self.bus.dat_r.eq(self.zpos.status)
-                            ),
-                        "default": self.bus.dat_r.eq(0xdeadc0de),
-                    }),
-                    self.bus.ack.eq(1),
-                ).Elif(~self.bus.cyc,
-                    self.bus.ack.eq(0),
-                )
-        ]
+class RegisterInterface(LiteXModule):
+    """ Defines "registers" that are either exclusively CPU-write Pico-read
+    or CPU-read pico-write. These registers are stored as flip-flops. """
+    def __init__(self, registers):
+        """
+        :param registers: List of instances of SpecialRegister.
+        """
 
-class PicoRV32RegisterRead(LiteXModule):
+        self.picobus = Interface(data_width = 32, address_width = 32, addressing="byte")
+        self.mainbus = Interface(data_width = 32, address_width = 32, addressing="byte")
+
+        pico_case = {"default": self.picobus.dat_r.eq(0xFACADE)}
+        main_case = {"default": self.picobus.dat_r.eq(0xEDACAF)}
+
+        # Tuple list of (SpecialRegister, offset)
+        self.registers = []
+
+        for num, reg in enumerate(registers):
+            self.registers.append((reg, num*0x4))
+
+            # Round up the width of the stored signal to a multiple of 8.
+            wid = round_up_to_word(reg.width)
+            sig = Signal(wid)
+            def make_write_case(target_bus):
+                """ Function to handle write selection for ``target_bus``. """
+                writes = []
+                if wid >= 8:
+                    writes.append(If(target_bus.sel[0],
+                        sig[0:8].eq(target_bus.dat_w[0:8])))
+                if wid >= 16:
+                    writes.append(If(target_bus.sel[1],
+                        sig[8:16].eq(target_bus.dat_w[8:16])))
+                if wid >= 32:
+                    writes.append(If(target_bus.sel[2],
+                        sig[16:24].eq(target_bus.dat_w[16:24])))
+                    writes.append(If(target_bus.sel[3],
+                        sig[24:32].eq(target_bus.dat_w[24:32])))
+                return writes
+
+            if reg.direction == "PR":
+                pico_case[num*4] = self.picobus.dat_r.eq(sig)
+                main_case[num*4] = If(self.mainbus.we,
+                        *make_write_case(self.mainbus)).Else(
+                                self.mainbus.dat_r.eq(sig))
+            else:
+                main_case[num*4] = self.mainbus.dat_r.eq(sig)
+                pico_case[num*4] = If(self.picobus.we,
+                        *make_write_case(self.picobus)).Else(
+                                self.picobus.dat_r.eq(sig))
+
+        self.width = round_up_to_pow_2(len(registers)*0x4)
+        # Since array indices are exclusive in python (unlike in Verilog),
+        # use the bit length of the power of 2, not the bit length of the
+        # maximum addressable value.
+        bitlen = self.width.bit_length()
+        def bus_logic(bus, cases):
+            self.sync += If(bus.cyc & bus.stb & ~bus.ack,
+                            Case(bus.adr[0:bitlen], cases),
+                            bus.ack.eq(1)
+                    ).Elif(~bus.cyc,
+                            bus.ack.eq(0))
+
+        bus_logic(self.mainbus, main_case)
+        bus_logic(self.picobus, pico_case)
+
+    def dump_json(self, filename):
+        """ Dump description of offsets to JSON file. """
+        d = {}
+        for reg, off in self.registers:
+            d[reg.name] = {
+                    "width" : reg.width,
+                    "direction" : reg.direction,
+                    "offset": off
+            }
+            import json
+            with open(filename, 'wt') as f:
+                json.dump(d, f)
+
+class RegisterRead(LiteXModule):
+    """ Inspect PicoRV32 registers via Wishbone bus. """
     def __init__(self):
         self.regs = [Signal(32) for i in range(1,32)]
         self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
@@ -154,17 +206,12 @@ class PicoRV32RegisterRead(LiteXModule):
         for i, reg in enumerate(self.regs):
             cases[i*0x4] = self.bus.dat_r.eq(reg)
 
-        self.debug_addr = CSRStatus(32)
-        self.debug_cntr = CSRStatus(16)
-
         # CYC -> transfer in progress
         # STB -> data is valid on the input lines
         self.sync += [
                 If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
                     Case(self.bus.adr[0:7], cases),
                     self.bus.ack.eq(1),
-                    self.debug_addr.status.eq(self.bus.adr),
-                    self.debug_cntr.status.eq(self.debug_cntr.status + 1),
                 ).Elif(self.bus.cyc != 1,
                     self.bus.ack.eq(0)
                 )
@@ -178,12 +225,29 @@ class PicoRV32RegisterRead(LiteXModule):
 # Copyright (c) 2019 Tim 'mithro' Ansell <me@mith.ro>
 # Copyright (c) 2018 William D. Jones <thor0505@comcast.net>
 # SPDX-License-Identifier: BSD-2-Clause
-
 class PicoRV32(LiteXModule):
-    def add_params(self, origin):
-        params = ControlLoopParameters()
-        self.add_module("params", params)
-        self.mmap.add_region('params', BasicRegion(origin, params.width, params.bus))
+    def add_cl_params(self, origin, dumpname):
+        """ Add parameter region for control loop variables. Dumps the
+        region information to a JSON file `dumpname`.
+
+        :param origin: Origin of the region for the PicoRV32.
+        :param dumpname: File to dump offsets within the region (common to
+          both Pico and Main CPU).
+        :return: Interface used by main cpu to control variables.
+        """
+        params = RegisterInterface(
+                SpecialRegister.from_tuples(
+                    ("cl_I", "PR", 32),
+                    ("cl_P", "PR", 32),
+                    ("deltaT", "PR", 32),
+                    ("setpt", "PR", 32),
+                    ("zset", "PW", 32),
+                    ("zpos", "PW", 32),
+                ))
+        self.add_module("cl_params", params)
+        self.mmap.add_region("cl_params", BasicRegion(origin, params.width, params.picobus))
+        params.dump_json(dumpname)
+        return params.mainbus
 
     def __init__(self, name, start_addr=0x10000, irq_addr=0x10010, stackaddr=0x100FF):
         self.name = name
@@ -197,7 +261,7 @@ class PicoRV32(LiteXModule):
         self.dbg_insn_addr = CSRStatus(32)
         self.dbg_insn_opcode = CSRStatus(32)
 
-        self.debug_reg_read = PicoRV32RegisterRead()
+        self.debug_reg_read = RegisterRead()
         reg_args = {}
         for i in range(1,32):
             reg_args[f"o_dbg_reg_x{i}"] = self.debug_reg_read.regs[i-1]
