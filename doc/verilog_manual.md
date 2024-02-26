@@ -294,3 +294,11 @@ Another alternative is to use GNU `m4`.
 
 You might have overloaded the CSR bus. Move some CSRs to a wishbone
 bus module. See /gateware/swic.py for some simple Wishbone bus examples.
+This can also happen due to timing errors across the main CPU bus.
+
+## Accesses to a Wishbone bus memory area do not work
+
+Try reading 16 words (64 bytes) into the memory area and see if the
+behavior changes. Many times this is due to the Wishbone Cache interfering
+with volatile memory. Set the `cached` parameter in the SoCRegion to
+`False` when adding the slave.

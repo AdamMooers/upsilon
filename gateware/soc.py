@@ -167,7 +167,7 @@ class UpsilonSoC(SoCCore):
         pico = PicoRV32(name, origin, origin+0x10)
         self.add_module(name, pico)
         self.bus.add_slave(name + "_dbg_reg", pico.debug_reg_read.bus,
-                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=True))
+                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=False))
 
         ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
         ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)

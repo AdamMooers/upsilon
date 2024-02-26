@@ -117,6 +117,7 @@ class ControlLoopParameters(LiteXModule):
                 self.bus.err.eq(0),
         ]
 
+        self.did_write = CSRStatus(8)
         self.sync += [
                 If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
                     Case(self.bus.adr[0:4], {
@@ -125,7 +126,8 @@ class ControlLoopParameters(LiteXModule):
                         0x8: self.bus.dat_r.eq(self.deltaT.storage),
                         0xC: self.bus.dat_r.eq(self.setpt.storage),
                         0x10: If(self.bus.we,
-                                self.zset.status.eq(self.bus.dat_w)
+                                self.zset.status.eq(self.bus.dat_w),
+                                self.did_write.status.eq(self.did_write.status + 1),
                             ).Else(
                                 self.bus.dat_r.eq(self.zset.status)
                             ),
@@ -137,7 +139,7 @@ class ControlLoopParameters(LiteXModule):
                         "default": self.bus.dat_r.eq(0xdeadc0de),
                     }),
                     self.bus.ack.eq(1),
-                ).Elif(self.bus.cyc != 1,
+                ).Elif(~self.bus.cyc,
                     self.bus.ack.eq(0),
                 )
         ]
@@ -146,14 +148,14 @@ class PicoRV32RegisterRead(LiteXModule):
     def __init__(self):
         self.regs = [Signal(32) for i in range(1,32)]
         self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
-        self.width = 0x80
+        self.width = 0x100
 
         cases = {"default": self.bus.dat_r.eq(0xdeaddead)}
         for i, reg in enumerate(self.regs):
             cases[i*0x4] = self.bus.dat_r.eq(reg)
 
-        # self.debug_addr = CSRStatus(32)
-        # self.debug_cntr = CSRStatus(16)
+        self.debug_addr = CSRStatus(32)
+        self.debug_cntr = CSRStatus(16)
 
         # CYC -> transfer in progress
         # STB -> data is valid on the input lines
@@ -161,8 +163,8 @@ class PicoRV32RegisterRead(LiteXModule):
                 If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
                     Case(self.bus.adr[0:7], cases),
                     self.bus.ack.eq(1),
-                    #self.debug_addr.status.eq(self.bus.adr),
-                    #self.debug_cntr.status.eq(self.debug_cntr.status + 1),
+                    self.debug_addr.status.eq(self.bus.adr),
+                    self.debug_cntr.status.eq(self.debug_cntr.status + 1),
                 ).Elif(self.bus.cyc != 1,
                     self.bus.ack.eq(0)
                 )

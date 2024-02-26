@@ -17,7 +17,7 @@ def check_running():
     print("Opcode:", u(machine.mem32[pico0_dbg_insn_opcode]))
 
     for num in range(0,31):
-        print("Register", num + 1, u(machine.mem32[pico0_dbg_reg + num*0x4]))
+        print("Reg", num + 1, ":", u(machine.mem32[pico0_dbg_reg + num*0x4]))
 
 def run_program(prog, cl_I):
     # Reset PicoRV32
