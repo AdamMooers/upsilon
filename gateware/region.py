@@ -21,18 +21,23 @@ added manually and there is no sanity checking.
 
 class BasicRegion:
     """ Simple class for storing a RAM region. """
-    def __init__(self, origin, size, bus=None):
+    def __init__(self, origin, size, bus=None, registers=None):
         """
         :param origin: Positive integer denoting the start location
            of the memory region.
         :param size: Size of the memory region. This must be of the form
            (2**N - 1).
         :param bus: Instance of a wishbone bus interface.
+        :param registers: Dictionary where keys are names of addressable
+          areas in the region, values have "offset" and "width", and
+          optionally other parameters that help with describing the
+          subregion.
         """
 
         self.origin = origin
         self.size = size
         self.bus = bus
+        self.registers = registers
 
     def decoder(self):
         """
@@ -56,7 +61,7 @@ class BasicRegion:
         return lambda addr: addr[rightbits:32] == (self.origin >> rightbits)
 
     def to_dict(self):
-        return {"origin" : self.origin, "size": self.size}
+        return {"origin" : self.origin, "size": self.size, "registers": self.registers}
 
     def __str__(self):
         return str(self.to_dict())

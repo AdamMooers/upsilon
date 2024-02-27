@@ -182,20 +182,22 @@ class RegisterInterface(LiteXModule):
         bus_logic(self.mainbus, main_case)
         bus_logic(self.picobus, pico_case)
 
-    def dump_json(self, filename):
-        """ Dump description of offsets to JSON file. """
-        d = {}
+        # Generate addresses
+        self.addresses = {}
         for reg, off in self.registers:
-            d[reg.name] = {
+            self.addresses[reg.name] = {
                     "width" : reg.width,
                     "direction" : reg.direction,
                     "offset": off
             }
-            import json
-            with open(filename, 'wt') as f:
-                json.dump(d, f)
 
 class RegisterRead(LiteXModule):
+    pico_registers = {
+        "ra", "sp", "gp", "tp", "t0", "t1", "t2", "s0", "t1", "t2",
+        "s0/fp", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2",
+        "s3", "s4", "s5", "s6", "s7", "t3", "t4", "t5", "t6",
+    }
+    registers = {name: {"origin" : num * 4, "size" : 4, "rw": False} for num, name in enumerate(pico_registers)}
     """ Inspect PicoRV32 registers via Wishbone bus. """
     def __init__(self):
         self.regs = [Signal(32) for i in range(1,32)]
@@ -233,7 +235,7 @@ class PicoRV32(LiteXModule):
         :param origin: Origin of the region for the PicoRV32.
         :param dumpname: File to dump offsets within the region (common to
           both Pico and Main CPU).
-        :return: Interface used by main cpu to control variables.
+        :return: Parameter module (used for accessing metadata).
         """
         params = RegisterInterface(
                 SpecialRegister.from_tuples(
@@ -245,9 +247,9 @@ class PicoRV32(LiteXModule):
                     ("zpos", "PW", 32),
                 ))
         self.add_module("cl_params", params)
-        self.mmap.add_region("cl_params", BasicRegion(origin, params.width, params.picobus))
+        self.mmap.add_region("cl_params", BasicRegion(origin, params.width, params.picobus, params.addresses))
         params.dump_json(dumpname)
-        return params.mainbus
+        return params
 
     def __init__(self, name, start_addr=0x10000, irq_addr=0x10010, stackaddr=0x100FF):
         self.name = name
@@ -292,7 +294,6 @@ class PicoRV32(LiteXModule):
                 self.d_dat_w.status.eq(mem_wdata),
         ]
 
-        # NOTE: need to compile to these extact instructions
         self.specials += Instance("picorv32",
             p_COMPRESSED_ISA = 1,
             p_ENABLE_MUL = 1,

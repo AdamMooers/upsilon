@@ -63,6 +63,7 @@ from liteeth.phy.mii import LiteEthPHYMII
 from util import *
 from swic import *
 from extio import *
+from region import BasicRegion
 
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
@@ -104,6 +105,9 @@ io = [
 #    ("dac_mosi", 0, Pins("B11 B18 E16 D8 V12 D5 D3 D2"), IOStandard("LVCMOS33")),
 #    ("dac_miso", 0, Pins("A11 A18 D15 C7 V10 B7 F4 H2"), IOStandard("LVCMOS33")),
 #    ("dac_sck", 0, Pins("D12 K16 C15 E7 V11 E6 F3 G2"), IOStandard("LVCMOS33")),
+    ("adc_conv_0", 0, Pins("V15"), IOStandard("LVCMOS33")),
+    ("adc_sck_0", 0, Pins("U16"), IOStandard("LVCMOS33")),
+    ("adc_sdo_0", 0, Pins("P14"), IOStandard("LVCMOS33")),
 #    ("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
 #    ("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
 #    ("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
@@ -149,6 +153,10 @@ class UpsilonSoC(SoCCore):
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
+    def add_slave_with_registers(self, name, bus, region, registers):
+        self.bus.add_slave(name, bus, region)
+        self.soc_subregions[name] = registers
+
     def add_blockram(self, name, size, connect_now=True):
         mod = SRAM(size)
         self.add_module(name, mod)
@@ -163,23 +171,48 @@ class UpsilonSoC(SoCCore):
         self.add_module(name, mod)
         return mod
 
-    def add_picorv32(self, name, size=0x1000, origin=0x10000, param_origin=0x100000):
+    def add_picorv32(self, name, size=0x1000, origin=0x10000):
         pico = PicoRV32(name, origin, origin+0x10)
         self.add_module(name, pico)
-        self.bus.add_slave(name + "_dbg_reg", pico.debug_reg_read.bus,
-                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=False))
+        self.add_slave_with_registers(name + "_dbg_reg", pico.debug_reg_read.bus,
+                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=False),
+                pico.debug_reg_read.registers)
 
         ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
         ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)
         pico.mmap.add_region("main",
                 BasicRegion(origin=origin, size=size, bus=ram_iface.buses[1]))
 
-        self.bus.add_slave(name + "_ram", ram_iface.buses[0],
-                SoCRegion(origin=None, size=size, cached=True))
+        self.add_slave_with_registers(name + "_ram", ram_iface.buses[0],
+                SoCRegion(origin=None, size=size, cached=True),
+                None)
 
+    def picorv32_add_cl(self, name, param_origin=0x100000):
+        pico = self.get_module(name)
         param_iface = pico.add_cl_params(param_origin, name + "_cl.json")
         self.bus.add_slave(name + "_cl", param_iface,
                 SoCRegion(origin=None, size=size, cached=False))
+
+    def add_AD5791(self, name, **kwargs):
+        args = SPIMaster.AD5791_PARAMS
+        args.update(kwargs)
+        spi = SPIMaster(**args)
+        self.add_module(name, spi)
+        return spi
+
+    def add_LT_adc(self, name, **kwargs):
+        args = SPIMaster.LT_ADC_PARAMS
+        args.update(kwargs)
+        args["mosi"] = Signal()
+
+        # SPI Master brings ss_L low when converting and keeps it high
+        # when idle. The ADC is the opposite, so invert the signal here.
+        conv_high = Signal()
+        self.comb += conv_high.eq(~kwargs["ss_L"])
+
+        spi = SPIMaster(**args)
+        self.add_module(name, spi)
+        return spi
 
     def __init__(self,
                  variant="a7-100",
@@ -198,6 +231,11 @@ class UpsilonSoC(SoCCore):
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
+
+        # The SoC won't know the origins until LiteX sorts out all the
+        # memory regions, so they go into a dictionary directly instead
+        # of through MemoryMap.
+        self.soc_subregions = {}
 
         """
         These source files need to be sorted so that modules
@@ -263,16 +301,49 @@ class UpsilonSoC(SoCCore):
 
         # Add pins
         platform.add_extension(io)
-        self.submodules.spi0 = SPIMaster(
-                platform.request("module_reset"),
-                platform.request("dac_miso_0"),
-                platform.request("dac_mosi_0"),
-                platform.request("dac_sck_0"),
-                platform.request("dac_ss_L_0"),
-        )
-        self.bus.add_slave("spi0", self.spi0.bus, SoCRegion(origin=None, size=self.spi0.addr_space_size, cached=False))
-        
+
+        # Add control loop DACs and ADCs.
         self.add_picorv32("pico0")
+        # XXX: I don't have the time to restructure my code to make it
+        # elegant, that comes when things work
+        module_reset = platform.request("module_reset")
+        self.add_AD5791("dac0",
+                rst=module_reset,
+                miso=platform.request("dac_miso_0"),
+                mosi=platform.request("dac_mosi_0"),
+                sck=platform.request("dac_sck_0"),
+                ss_L=platform.request("dac_ss_L_0"),
+        )
+
+        self.add_preemptive_interface("dac0_PI", 2, self.dac0)
+        self.add_slave_with_registers("dac0", self.dac0_PI.buses[0],
+                SoCRegion(origin=None, size=self.dac0.width, cached=False),
+                self.dac0.registers)
+        self.pico0.mmap.add_region("dac0",
+                    BasicRegion(origin=0x200000, size=self.dac0.width,
+                                bus=self.dac0_PI.buses[1],
+                                registers=self.dac0.registers))
+
+        self.add_LT_adc("adc0",
+                rst=module_reset,
+                miso=platform.request("adc_sdo_0"),
+                sck=platform.request("adc_sck_0"),
+                ss_L=platform.request("adc_conv_0"),
+                spi_wid=18,
+        )
+        self.add_preemptive_interface("adc0_PI", 2, self.adc0)
+        self.add_slave_with_registers("adc0", self.adc0_PI.buses[0],
+                SoCRegion(origin=None, size=self.adc0.width, cached=False),
+                self.adc0.registers)
+        self.pico0.mmap.add_region("adc0",
+                    BasicRegion(origin=0x300000, size=self.adc0.width,
+                                bus=self.adc0_PI.buses[1],
+                                registers=self.adc0.registers))
+
+    def do_finalize(self):
+        with open('soc_subregions.json', 'wt') as f:
+            import json
+            json.dump(self.soc_subregions, f)
 
 def main():
     from config import config

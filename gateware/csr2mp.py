@@ -13,17 +13,22 @@
 import collections
 import argparse
 import json
-import sys
-import mmio_descr
 
-with open(sys.argv[1], 'rt') as f:
-    j = json.load(f)
+with open('csr.json', 'rt') as f:
+    csrs = json.load(f)
 
 print("from micropython import const")
 
-for key in j["csr_registers"]:
+for key in csrs["csr_registers"]:
     if key.startswith("pico0"):
-        print(f'{key} = const({j["csr_registers"][key]["addr"]})')
+        print(f'{key} = const({csrs["csr_registers"][key]["addr"]})')
 
-print(f'pico0_ram = const({j["memories"]["pico0_ram"]["base"]})')
-print(f'pico0_dbg_reg = const({j["memories"]["pico0_dbg_reg"]["base"]})')
+with open('soc_subregions.json', 'rt') as f:
+    subregions = json.load(f)
+
+for key in subregions:
+    if subregions[key] is None:
+        print(f'{key} = const({csrs["memories"][key]["base"]})')
+    else:
+        print(f'{key}_base = const({csrs["memorys"][key]["base"]})')
+        print(f'{key} = {subregions[key].__repr__()}')

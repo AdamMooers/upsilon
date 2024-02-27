@@ -15,7 +15,7 @@ csr.json build/digilent_arty/digilent_arty.bit: soc.py
 	python3 soc.py
 
 mmio.py: csr.json csr2mp.py
-	python3 csr2mp.py csr.json > mmio.py
+	python3 csr2mp.py > mmio.py
 
 clean:
 	rm -rf build csr.json arty.dts arty.dtb mmio.py
