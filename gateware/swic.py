@@ -125,7 +125,7 @@ class RegisterInterface(LiteXModule):
     or CPU-read pico-write. These registers are stored as flip-flops. """
     def __init__(self, registers):
         """
-        :param registers: List of instances of SpecialRegister.
+        :param special_registers: List of instances of SpecialRegister.
         """
 
         self.picobus = Interface(data_width = 32, address_width = 32, addressing="byte")
@@ -135,11 +135,9 @@ class RegisterInterface(LiteXModule):
         main_case = {"default": self.picobus.dat_r.eq(0xEDACAF)}
 
         # Tuple list of (SpecialRegister, offset)
-        self.registers = []
+        self.registers = [(reg, num*0x4) for num, reg in enumerate(registers)]
 
-        for num, reg in enumerate(registers):
-            self.registers.append((reg, num*0x4))
-
+        for reg, off in self.registers:
             # Round up the width of the stored signal to a multiple of 8.
             wid = round_up_to_word(reg.width)
             sig = Signal(wid)
@@ -160,17 +158,17 @@ class RegisterInterface(LiteXModule):
                 return writes
 
             if reg.direction == "PR":
-                pico_case[num*4] = self.picobus.dat_r.eq(sig)
-                main_case[num*4] = If(self.mainbus.we,
+                pico_case[off] = self.picobus.dat_r.eq(sig)
+                main_case[off] = If(self.mainbus.we,
                         *make_write_case(self.mainbus)).Else(
                                 self.mainbus.dat_r.eq(sig))
             else:
-                main_case[num*4] = self.mainbus.dat_r.eq(sig)
-                pico_case[num*4] = If(self.picobus.we,
+                main_case[off] = self.mainbus.dat_r.eq(sig)
+                pico_case[off] = If(self.picobus.we,
                         *make_write_case(self.picobus)).Else(
                                 self.picobus.dat_r.eq(sig))
 
-        self.width = round_up_to_pow_2(len(registers)*0x4)
+        self.width = round_up_to_pow_2(sum([off for _, off in self.registers]))
         # Since array indices are exclusive in python (unlike in Verilog),
         # use the bit length of the power of 2, not the bit length of the
         # maximum addressable value.
@@ -187,11 +185,11 @@ class RegisterInterface(LiteXModule):
 
         # Generate addresses
         self.public_registers = {}
-        for reg, off in self.public_registers:
-            self.addresses[reg.name] = {
+        for reg, off in self.registers:
+            self.public_registers[reg.name] = {
                     "width" : reg.width,
                     "direction" : reg.direction,
-                    "offset": off
+                    "origin": off,
             }
 
 class RegisterRead(LiteXModule):
