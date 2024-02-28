@@ -30,5 +30,5 @@ for key in subregions:
     if subregions[key] is None:
         print(f'{key} = const({csrs["memories"][key]["base"]})')
     else:
-        print(f'{key}_base = const({csrs["memorys"][key]["base"]})')
+        print(f'{key}_base = const({csrs["memories"][key]["base"]})')
         print(f'{key} = {subregions[key].__repr__()}')
