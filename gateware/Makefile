@@ -8,25 +8,20 @@
 
 DEVICETREE_GEN_DIR=.
 
-all: rtl_codegen build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
-
-rtl_codegen:
-	cd rtl && make
+all: build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
 
 csr.json build/digilent_arty/digilent_arty.bit: soc.py
+	cd rtl && make
 	python3 soc.py
+
+mmio.py: csr.json csr2mp.py
+	python3 csr2mp.py > mmio.py
 
 clean:
 	rm -rf build csr.json arty.dts arty.dtb mmio.py
-	cd rtl && make clean
-test:
-	cd rtl && make test
 
 arty.dts: csr.json
 	litex_json2dts_linux csr.json > arty.dts
 
 arty.dtb: arty.dts
 	dtc -O dtb -o arty.dtb arty.dts
-
-mmio.py: csr2mp.py csr.json
-	python3 csr2mp.py csr.json > mmio.py

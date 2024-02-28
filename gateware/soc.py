@@ -3,6 +3,9 @@
 # Portions of this file incorporate code licensed under the
 # BSD 2-Clause License.
 #
+# Copyright (c) 2014-2022 Florent Kermarrec <florent@enjoy-digital.fr>
+# Copyright (c) 2013-2014 Sebastien Bourdeauducq <sb@m-labs.hk>
+
 # Copyright (c) 2015-2019 Florent Kermarrec <florent@enjoy-digital.fr>
 # Copyright (c) 2020 Antmicro <www.antmicro.com>
 # Copyright (c) 2022 Victor Suarez Rovere <suarezvictor@gmail.com>
@@ -33,7 +36,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ##########################################################################
-# Copyright 2023 (C) Peter McGoron
+# Copyright 2023-2024 (C) Peter McGoron
 #
 # This file is a part of Upsilon, a free and open source software project.
 # For license terms, refer to the files in `doc/copying` in the Upsilon
@@ -44,19 +47,23 @@
 # design, but another eval board will require some porting.
 from migen import *
 import litex_boards.platforms.digilent_arty as board_spec
-from litex.soc.cores.gpio import GPIOTristate
 from litex.soc.integration.builder import Builder
 from litex.build.generic_platform import IOStandard, Pins, Subsignal
 from litex.soc.integration.soc_core import SoCCore
+from litex.soc.integration.soc import SoCRegion, SoCBusHandler, SoCIORegion
 from litex.soc.cores.clock import S7PLL, S7IDELAYCTRL
 from litex.soc.interconnect.csr import AutoCSR, Module, CSRStorage, CSRStatus
+from litex.soc.interconnect.wishbone import Interface, SRAM, Decoder
 
 from litedram.phy import s7ddrphy
 from litedram.modules import MT41K128M16
 from litedram.frontend.dma import LiteDRAMDMAReader
 from liteeth.phy.mii import LiteEthPHYMII
 
-import mmio_descr
+from util import *
+from swic import *
+from extio import *
+from region import BasicRegion
 
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
@@ -85,102 +92,28 @@ generator. These pins are then connected to Verilog modules.
 
 If there is more than one pin in the Pins string, the resulting
 name will be a vector of pins.
+
+TODO: generate declaratively from constraints file.
 """
 io = [
-    ("differntial_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
-    ("dac_ss_L", 0, Pins("G13 D13 E15 F5 U12 D7 D4 E2"), IOStandard("LVCMOS33")),
-    ("dac_mosi", 0, Pins("B11 B18 E16 D8 V12 D5 D3 D2"), IOStandard("LVCMOS33")),
-    ("dac_miso", 0, Pins("A11 A18 D15 C7 V10 B7 F4 H2"), IOStandard("LVCMOS33")),
-    ("dac_sck", 0, Pins("D12 K16 C15 E7 V11 E6 F3 G2"), IOStandard("LVCMOS33")),
-    ("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
-    ("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
-    ("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
+#    ("differntial_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
+    ("dac_ss_L_0", 0, Pins("G13"), IOStandard("LVCMOS33")),
+    ("dac_mosi_0", 0, Pins("B11"), IOStandard("LVCMOS33")),
+    ("dac_miso_0", 0, Pins("A11"), IOStandard("LVCMOS33")),
+    ("dac_sck_0", 0, Pins("D12"), IOStandard("LVCMOS33")),
+#    ("dac_ss_L", 0, Pins("G13 D13 E15 F5 U12 D7 D4 E2"), IOStandard("LVCMOS33")),
+#    ("dac_mosi", 0, Pins("B11 B18 E16 D8 V12 D5 D3 D2"), IOStandard("LVCMOS33")),
+#    ("dac_miso", 0, Pins("A11 A18 D15 C7 V10 B7 F4 H2"), IOStandard("LVCMOS33")),
+#    ("dac_sck", 0, Pins("D12 K16 C15 E7 V11 E6 F3 G2"), IOStandard("LVCMOS33")),
+    ("adc_conv_0", 0, Pins("V15"), IOStandard("LVCMOS33")),
+    ("adc_sck_0", 0, Pins("U16"), IOStandard("LVCMOS33")),
+    ("adc_sdo_0", 0, Pins("P14"), IOStandard("LVCMOS33")),
+#    ("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
+#    ("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
+#    ("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
     ("module_reset", 0, Pins("D9"), IOStandard("LVCMOS33")),
-    ("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
+#    ("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
-
-# TODO: Assign widths to ADCs here using parameters
-
-class Base(Module, AutoCSR):
-    """ The subclass AutoCSR will automatically make CSRs related
-    to this class when those CSRs are attributes (i.e. accessed by
-    `self.csr_name`) of instances of this class. (CSRs are MMIO,
-    they are NOT RISC-V CSRs!)
-
-    Since there are a lot of input and output wires, the CSRs are
-    assigned using `setattr()`.
-
-    CSRs are for input wires (`CSRStorage`) or output wires
-    (`CSRStatus`).  The first argument to the CSR constructor is
-    the amount of bits the CSR takes. The `name` keyword argument
-    is required since the constructor needs the name of the attribute.
-    The `description` keyword is used for documentation.
-
-    In LiteX, modules in separate Verilog files are instantiated as
-        self.specials += Instance(
-            "module_name",
-            PARAMETER_NAME=value,
-            i_input = input_port,
-            o_output = output_port,
-            ...
-        )
-
-    Since the "base" module has a bunch of repeated input and output
-    pins that have to be connected to CSRs, the LiteX wrapper uses
-    keyword arguments to pass all the arguments.
-    """
-
-    def _make_csr(self, reg, num=None):
-        """ Add a CSR for a pin `f"{name}_{num}".`
-
-        :param name: Name of the MMIO register without prefixes or numerical
-          suffix.
-        :param num: Numerical suffix of this MMIO register. This is the only
-          parameter that should change when adding multiple CSRs of the same
-          name.
-        """
-
-        name = reg.name
-        if num is not None:
-            name = f"{name}_{num}"
-
-        if reg.rwperm == "read-only":
-            csrclass = CSRStatus
-        else:
-            csrclass = CSRStorage
-
-        csr = csrclass(reg.blen, name=name, description=None)
-        setattr(self, name, csr)
-
-        if csrclass is CSRStorage:
-            self.kwargs[f'i_{name}'] = csr.storage
-        elif csrclass is CSRStatus:
-            self.kwargs[f'o_{name}'] = csr.status
-        else:
-            raise Exception(f"Unknown class {csrclass}")
-
-    def __init__(self, clk, sdram, platform):
-        self.kwargs = {}
-
-        for reg in mmio_descr.registers:
-            if reg.num > 1:
-                for i in range(0,reg.num):
-                    self._make_csr(reg,i)
-            else:
-                self._make_csr(reg)
-
-        self.kwargs["i_clk"] = clk
-        self.kwargs["i_rst_L"] = ~platform.request("module_reset")
-        self.kwargs["i_dac_miso"] = platform.request("dac_miso")
-        self.kwargs["o_dac_mosi"] = platform.request("dac_mosi")
-        self.kwargs["o_dac_sck"] = platform.request("dac_sck")
-        self.kwargs["o_dac_ss_L"] = platform.request("dac_ss_L")
-        self.kwargs["o_adc_conv"] = platform.request("adc_conv")
-        self.kwargs["i_adc_sdo"] = platform.request("adc_sdo")
-        self.kwargs["o_adc_sck"] = platform.request("adc_sck")
-        self.kwargs["o_set_low"] = platform.request("differntial_output_low")
-
-        self.specials += Instance("base", **self.kwargs)
 
 # Clock and Reset Generator
 # I don't know how this works, I only know that it does.
@@ -220,16 +153,89 @@ class UpsilonSoC(SoCCore):
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
+    def add_slave_with_registers(self, name, bus, region, registers):
+        self.bus.add_slave(name, bus, region)
+        self.soc_subregions[name] = registers
+
+    def add_blockram(self, name, size, connect_now=True):
+        mod = SRAM(size)
+        self.add_module(name, mod)
+
+        if connect_now:
+            self.bus.add_slave(name, mod.bus,
+                    SoCRegion(origin=None, size=size, cached=True))
+        return mod
+
+    def add_preemptive_interface(self, name, size, slave):
+        mod = PreemptiveInterface(size, slave)
+        self.add_module(name, mod)
+        return mod
+
+    def add_picorv32(self, name, size=0x1000, origin=0x10000):
+        pico = PicoRV32(name, origin, origin+0x10)
+        self.add_module(name, pico)
+        self.add_slave_with_registers(name + "_dbg_reg", pico.debug_reg_read.bus,
+                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=False),
+                pico.debug_reg_read.registers)
+
+        ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
+        ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)
+        pico.mmap.add_region("main",
+                BasicRegion(origin=origin, size=size, bus=ram_iface.buses[1]))
+
+        self.add_slave_with_registers(name + "_ram", ram_iface.buses[0],
+                SoCRegion(origin=None, size=size, cached=True),
+                None)
+
+    def picorv32_add_cl(self, name, param_origin=0x100000):
+        pico = self.get_module(name)
+        param_iface = pico.add_cl_params(param_origin, name + "_cl.json")
+        self.bus.add_slave(name + "_cl", param_iface,
+                SoCRegion(origin=None, size=size, cached=False))
+
+    def add_AD5791(self, name, **kwargs):
+        args = SPIMaster.AD5791_PARAMS
+        args.update(kwargs)
+        spi = SPIMaster(**args)
+        self.add_module(name, spi)
+        return spi
+
+    def add_LT_adc(self, name, **kwargs):
+        args = SPIMaster.LT_ADC_PARAMS
+        args.update(kwargs)
+        args["mosi"] = Signal()
+
+        # SPI Master brings ss_L low when converting and keeps it high
+        # when idle. The ADC is the opposite, so invert the signal here.
+        conv_high = Signal()
+        self.comb += conv_high.eq(~kwargs["ss_L"])
+
+        spi = SPIMaster(**args)
+        self.add_module(name, spi)
+        return spi
+
     def __init__(self,
                  variant="a7-100",
                  local_ip="192.168.2.50",
                  remote_ip="192.168.2.100",
                  tftp_port=6969):
+        """
+        :param variant: Arty A7 variant. Accepts "a7-35" or "a7-100".
+        :param local_ip: The IP that the BIOS will use when transmitting.
+        :param remote_ip: The IP that the BIOS will use when retreving
+          the Linux kernel via TFTP.
+        :param tftp_port: Port that the BIOS uses for TFTP.
+        """
 
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
+
+        # The SoC won't know the origins until LiteX sorts out all the
+        # memory regions, so they go into a dictionary directly instead
+        # of through MemoryMap.
+        self.soc_subregions = {}
 
         """
         These source files need to be sorted so that modules
@@ -243,21 +249,10 @@ class UpsilonSoC(SoCCore):
         Since Yosys doesn't support modern Verilog, only put preprocessed
         (if applicable) files here.
         """
-        platform.add_source("rtl/spi/spi_switch_preprocessed.v")
+        platform.add_source("rtl/picorv32/picorv32.v")
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_no_write_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_no_read_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_no_write_preprocessed.v")
-        platform.add_source("rtl/spi/spi_master_ss_no_read_preprocessed.v")
-        platform.add_source("rtl/control_loop/sign_extend.v")
-        platform.add_source("rtl/control_loop/intsat.v")
-        platform.add_source("rtl/control_loop/boothmul_preprocessed.v")
-        platform.add_source("rtl/control_loop/control_loop_math.v")
-        platform.add_source("rtl/control_loop/control_loop.v")
-#       platform.add_source("rtl/waveform/bram_interface_preprocessed.v")
-#       platform.add_source("rtl/waveform/waveform_preprocessed.v")
-        platform.add_source("rtl/base/base.v")
+        platform.add_source("rtl/spi/spi_master_ss.v")
+        platform.add_source("rtl/spi/spi_master_ss_wb.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -306,11 +301,53 @@ class UpsilonSoC(SoCCore):
 
         # Add pins
         platform.add_extension(io)
-        self.submodules.base = Base(ClockSignal(), self.sdram, platform)
+
+        # Add control loop DACs and ADCs.
+        self.add_picorv32("pico0")
+        # XXX: I don't have the time to restructure my code to make it
+        # elegant, that comes when things work
+        module_reset = platform.request("module_reset")
+        self.add_AD5791("dac0",
+                rst=module_reset,
+                miso=platform.request("dac_miso_0"),
+                mosi=platform.request("dac_mosi_0"),
+                sck=platform.request("dac_sck_0"),
+                ss_L=platform.request("dac_ss_L_0"),
+        )
+
+        self.add_preemptive_interface("dac0_PI", 2, self.dac0)
+        self.add_slave_with_registers("dac0", self.dac0_PI.buses[0],
+                SoCRegion(origin=None, size=self.dac0.width, cached=False),
+                self.dac0.registers)
+        self.pico0.mmap.add_region("dac0",
+                    BasicRegion(origin=0x200000, size=self.dac0.width,
+                                bus=self.dac0_PI.buses[1],
+                                registers=self.dac0.registers))
+
+        self.add_LT_adc("adc0",
+                rst=module_reset,
+                miso=platform.request("adc_sdo_0"),
+                sck=platform.request("adc_sck_0"),
+                ss_L=platform.request("adc_conv_0"),
+                spi_wid=18,
+        )
+        self.add_preemptive_interface("adc0_PI", 2, self.adc0)
+        self.add_slave_with_registers("adc0", self.adc0_PI.buses[0],
+                SoCRegion(origin=None, size=self.adc0.width, cached=False),
+                self.adc0.registers)
+        self.pico0.mmap.add_region("adc0",
+                    BasicRegion(origin=0x300000, size=self.adc0.width,
+                                bus=self.adc0_PI.buses[1],
+                                registers=self.adc0.registers))
+
+    def do_finalize(self):
+        with open('soc_subregions.json', 'wt') as f:
+            import json
+            json.dump(self.soc_subregions, f)
 
 def main():
-    """ Add modifications to SoC variables here """
-    soc =UpsilonSoC()
+    from config import config
+    soc =UpsilonSoC(**config)
     builder = Builder(soc, csr_json="csr.json", compile_software=True)
     builder.build()
 

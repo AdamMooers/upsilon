@@ -6,6 +6,11 @@ source distribution.
 
 __________________________________________________________________________
 
+This document is from when there was a substantial amount of hand-written
+Verilog in this project, and hence is out of date. It is kept here because
+it is a good introduction to FPGAs. For more recent information, see
+/doc/gateware.rst .
+
 The Hardware Maintenance Manual is an overview of the hardware (non-software)
 parts of Upsilon.
 
@@ -236,56 +241,3 @@ You should use the Dockerfiles included with upsilon. They are simple and are
 pinned to the latest known stable version that can build Upsilon. If you really
 want to install LiteX and F4PGA to your system, just follow the commands in
 the docker files.
-
-# Workarounds and Hacks
-
-## LiteX Compile Times Take Too Long for Testing
-
-Set `compile_software` to `False` in `soc.py` when checking for Verilog
-compile errors. Set it back when you do an actual compile run, or your
-program will not boot.
-
-If LiteX complains about not having a RiscV compiler, that is because
-your system does not have compatible RISC-V compiler in your `$PATH`.
-Refer to the LiteX install instructions above to see how to set up the
-SiFive GCC, which will work.
-
-## F4PGA Crashes When Using Block RAM
-
-This is really a Yosys (and really, an abc bug). F4PGA defaults to using
-the ABC flow, which can break, especially for block RAM. To fix, edit out
-`-abc` in the tcl script (find it before you install it...)
-
-## Modules Simulate Correctly, but Don't Work at All in Hardware
-
-Yosys fails to calculate computed parameter values correctly. For instance,
-
-    parameter CTRLVAL = 5;
-    localparam VALUE = CTRLVAL + 1;
-
-Yosys will *silently* fail to compile this, setting `VALUE` to be equal
-to 0. The solution is to use macros.
-
-## Reset Pins Don't Work
-
-On the Arty A7 there is a Reset button. This is connected to the CPU and only
-resets the CPU. Possibly due to timing issues modules get screwed up if they
-share a reset pin with the CPU. The code currently connects button 0 to reset
-the modules seperately from the CPU.
-
-## Verilog Macros Don't Work
-
-Verilog's preprocessor is awful. F4PGA (through yosys) barely supports it.
-
-You should only use Verilog macros as a replacement for `localparam`.
-When you need to do so, you must preprocess the file with
-Verilator. For example, if you have a file called `mod.v` in the folder
-`firmware/rtl/mod/`, then in the file `firmware/rtl/mod/Makefile` add
-
-    codegen: [...] mod_preprocessed.v
-
-(putting it after all other generated files). The file
-`firmware/rtl/common.makefile` should automatically generate the
-preprocessed file for you.
-
-Another alternative is to use GNU `m4`.

@@ -35,9 +35,9 @@ hardware-copy: upsilon-hardware.tar.gz
 	# XXX: this always fails if there are very high UIDs, but the
 	# file is copied successfully.
 	-docker cp upsilon-hardware.tar.gz upsilon-hardware:/home/user/upsilon-hardware.tar.gz
+	docker exec -ti upsilon-hardware tar -xvf upsilon-hardware.tar.gz
 hardware-execute:
 	docker exec -ti upsilon-hardware /bin/bash -lc ' \
-		tar -xvf upsilon-hardware.tar.gz && \
 		cd upsilon/gateware && \
 		source ~/conda/xc7/conda/etc/profile.d/conda.sh && \
 		conda activate xc7 && \
@@ -45,10 +45,13 @@ hardware-execute:
 hardware-shell:
 	docker exec -ti upsilon-hardware /bin/bash -l
 hardware-get:
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/build/digilent_arty/gateware/digilent_arty.v ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/build/digilent_arty/gateware/digilent_arty.bit ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/arty.dtb ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/soc_subregions.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0.json ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware

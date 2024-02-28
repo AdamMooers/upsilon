@@ -30,6 +30,7 @@ COPY --chown=user:user f4pga.tar.gz /home/user
 RUN tar -xvf f4pga.tar.gz \
     && rm f4pga.tar.gz \
     && cd f4pga/f4pga \ 
+#    && sed -i 's/-abc9//g' ./wrappers/tcl/xc7.f4pga.tcl \
     && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; pip install . ninja meson'
 
 #LITEX
@@ -37,6 +38,6 @@ COPY --chown=user:user litex/litex_setup.py /home/user
 RUN mkdir /home/user/litex \
     && chmod +x litex_setup.py \
     && cd litex/ \
-    && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; ../litex_setup.py --init --install --user --tag=2023.04' \
+    && bash -c 'source ~/conda/xc7/conda/etc/profile.d/conda.sh; conda activate xc7; ../litex_setup.py --init --install --user --tag=2023.12' \
     && rm ../litex_setup.py
 
