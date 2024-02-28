@@ -10,12 +10,22 @@ DEVICETREE_GEN_DIR=.
 
 all: build/digilent_arty/digilent_arty.bit arty.dtb mmio.py
 
-csr.json build/digilent_arty/digilent_arty.bit: soc.py
+mmio.py csr.json build/digilent_arty/digilent_arty.bit: soc.py
+	@# Litex Version Check (current version 2023.12)
+	@if ! pip show litex | awk '/Version:/ { split($$2, a, "\\."); if (a[1] < 2023 || a[2] < 12) exit(1)}'; then \
+		pip show litex; \
+		echo "You are using an old version of LiteX!"; \
+		echo "Update LiteX or remake your image."; \
+		exit 1; \
+	fi
+	
+	@if [ ! -f config.py ]; then \
+		echo "No config file found! If you are just starting, do"; \
+		echo "$$ cp config.py.def config.py"; \
+	fi
+	
 	cd rtl && make
 	python3 soc.py
-
-mmio.py: csr.json csr2mp.py
-	python3 csr2mp.py > mmio.py
 
 clean:
 	rm -rf build csr.json arty.dts arty.dtb mmio.py

@@ -108,19 +108,40 @@ The only masters and slaves that are word-addressed are the ones that are
 from LiteX itself. Those have special code to convert to the byte-addressed
 masters/slaves.
 
+If the slave has one bus, it **must** be an attribute called ``bus``.
+
 Each class that is accessed by a wishbone bus **must** have an attribute
 called ``width`` that is the size, in bytes, of the region. This must be a power
 of 2 (exception: wrappers around slaves since they might wrap LiteX slaves
 that don't have ``width`` attributes).
+
+Each class **should** have a attribute ``public_registers`` that is a dictionary,
+keys are names of the register shown to the programmer and
+
+1. ``origin``: offset of the register in memory
+2. ``size``: size of the register in bytes (multiple of 4)
+
+are required attributes. Other attributes are ``rw``, ``direction``, that are
+explained in /doc/controller_manual.rst .
 
 -----------------------------
 Adding Slaves to the Main CPU
 -----------------------------
 
 After adding a module with an ``Interface``, the interface is connected to
-to main CPU bus by adding::
+to main CPU bus by calling one of two functions.
 
-    self.add_slave(name, iface, SoCRegion(origin=None, size=iface.width, cached=False)
+If the slave region has no special areas in it, call::
+
+    self.bus.add_slave(name, slave.bus, SoCRegion(origin=None, size=slave.width, cached=False)
+
+If the slave region has registers, add::
+
+    self.add_slave_with_registers(name, iface, SoCRegion(...), slave.public_registers)
+
+where the SoCRegion parameters are the same as before. Each slave device
+should have a ``slave.width`` and a ``slave.public_registers`` attribute,
+unless noted. Some slaves have only one bus, some have multiple.
 
 The Wishbone cache is very confusing and causes custom Wishbone bus code to
 not work properly. Since a lot of this memory is volatile you should never

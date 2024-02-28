@@ -52,6 +52,7 @@ hardware-get:
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/soc_subregions.json ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0.json ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0_mmio.h ../boot/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware

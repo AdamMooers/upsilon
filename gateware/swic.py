@@ -4,6 +4,9 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
+# XXX: PicoRV32 code only handles word-sized registers correctly. Memory
+# regions made up of multiple words are not supported right now.
+
 from migen import *
 from litex.soc.interconnect.csr import CSRStorage, CSRStatus
 from litex.soc.interconnect.wishbone import Interface, SRAM, Decoder
@@ -183,8 +186,8 @@ class RegisterInterface(LiteXModule):
         bus_logic(self.picobus, pico_case)
 
         # Generate addresses
-        self.addresses = {}
-        for reg, off in self.registers:
+        self.public_registers = {}
+        for reg, off in self.public_registers:
             self.addresses[reg.name] = {
                     "width" : reg.width,
                     "direction" : reg.direction,
@@ -197,7 +200,7 @@ class RegisterRead(LiteXModule):
         "s0/fp", "s1", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "s2",
         "s3", "s4", "s5", "s6", "s7", "t3", "t4", "t5", "t6",
     }
-    registers = {name: {"origin" : num * 4, "size" : 4, "rw": False} for num, name in enumerate(pico_registers)}
+    public_registers = {name: {"origin" : num * 4, "width" : 4, "rw": False} for num, name in enumerate(pico_registers)}
     """ Inspect PicoRV32 registers via Wishbone bus. """
     def __init__(self):
         self.regs = [Signal(32) for i in range(1,32)]
@@ -218,6 +221,24 @@ class RegisterRead(LiteXModule):
                     self.bus.ack.eq(0)
                 )
         ]
+
+def gen_pico_header(pico_name):
+    """ Generate PicoRV32 C header for this CPU from JSON file. """
+    import json
+    with open(pico_name + "_mmio.h", "wt") as out:
+        print('#pragma once', file=out)
+
+        with open(pico_name + ".json") as f:
+            js = json.load(f)
+
+        for region in js:
+            if js[region]["registers"] is None:
+                continue
+            origin = js[region]["origin"]
+            for reg in js[region]["registers"]:
+                macname = f"{region}_{reg}".upper()
+                loc = origin + js[region]["registers"][reg]["origin"]
+                print(f"#define {macname} (volatile uint32_t *)({loc})", file=out)
 
 # Parts of this class come from LiteX.
 #
@@ -247,8 +268,7 @@ class PicoRV32(LiteXModule):
                     ("zpos", "PW", 32),
                 ))
         self.add_module("cl_params", params)
-        self.mmap.add_region("cl_params", BasicRegion(origin, params.width, params.picobus, params.addresses))
-        params.dump_json(dumpname)
+        self.mmap.add_region("cl_params", BasicRegion(origin, params.width, params.picobus, params.public_registers))
         return params
 
     def __init__(self, name, start_addr=0x10000, irq_addr=0x10010, stackaddr=0x100FF):
@@ -344,4 +364,5 @@ class PicoRV32(LiteXModule):
 
     def do_finalize(self):
         self.mmap.dump_mmap(self.name + ".json")
+        gen_pico_header(self.name)
         self.mmap.finalize()

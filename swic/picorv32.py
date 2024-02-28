@@ -21,6 +21,9 @@ def u(n):
     # Converts possibly signed number to unsigned 32 bit.
     return hex(n & 0xFFFFFFFF)
 
+
+# XXX: Currently hardcoded for Pico0. Future versions should accept a
+# class that has fields.
 def dump():
     print("Running:", "yes" if machine.mem32[pico0_enable] else "no")
     print("Trap status:", trapcode[machine.mem32[pico0_trap]])

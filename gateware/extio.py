@@ -30,7 +30,7 @@ class SPIMaster(Module):
 
     width = 0x10
 
-    registers = {
+    public_registers = {
             "finished_or_ready": {
                 "origin" : 0,
                 "width" : 4,

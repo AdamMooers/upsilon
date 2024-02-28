@@ -61,7 +61,7 @@ class BasicRegion:
         return lambda addr: addr[rightbits:32] == (self.origin >> rightbits)
 
     def to_dict(self):
-        return {"origin" : self.origin, "size": self.size, "registers": self.registers}
+        return {"origin" : self.origin, "width": self.size, "registers": self.registers}
 
     def __str__(self):
         return str(self.to_dict())
