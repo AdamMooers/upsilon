@@ -14,7 +14,7 @@ csr.json build/digilent_arty/digilent_arty.bit: soc.py
 	cd rtl && make
 	python3 soc.py
 
-mmio.py: csr.json csr2mp.py
+mmio.py: csr.json soc_subregions.json csr2mp.py
 	python3 csr2mp.py > mmio.py
 
 clean:
