@@ -138,7 +138,7 @@ tftp:
 	cd ../boot && py3tftp --host 192.168.2.100 -p 6969 -v
 
 copy:
-	scp -O ../boot/mmio.py ../linux/comm.py upsilon:~/
+	scp -O ../boot/mmio.py ../linux/comm.py ../swic/load_exec.py ../swic/picorv32.py upsilon:~/
 
 ###### External projects
 
