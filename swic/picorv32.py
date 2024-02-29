@@ -31,4 +31,4 @@ def dump():
 
     # Skip the zero register, since it's always zero.
     for num, name in enumerate(reg_names[1:],start=1):
-        print(name + ":", u(machine.mem32[pico0_dbg_reg + 0x4*num]))
+        print(name + ":", u(machine.mem32[pico0_dbg_reg[name]['origin'] + 0x4*num]))
