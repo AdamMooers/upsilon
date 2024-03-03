@@ -10,14 +10,20 @@ class WaveformTestbench : public TB<Vwaveform_sim> {
 	public:
 		void start_test(int, int, int, bool);
 		void halt_check(bool);
-		WaveformTestbench(int _bailout) : TB<Vwaveform_sim>(_bailout) {}
+		void wait_until_loop_complete();
+		void check_data();
+		void clear_recv_data();
+		WaveformTestbench(int _bailout = 0) : TB<Vwaveform_sim>(_bailout) {}
 	private:
 		std::vector<uint32_t> send_words;
 		std::vector<uint32_t> recv_words;
 		void fill_data(int num);
-		void check_data();
 		void posedge() override;
 };
+
+void WaveformTestbench::clear_recv_data() {
+	recv_words.clear();
+}
 
 void WaveformTestbench::posedge() {
 	if (!mod.ram_finished) {
@@ -38,6 +44,8 @@ void WaveformTestbench::fill_data(int num) {
 	auto distrib = std::uniform_int_distribution<uint32_t>(0,(1 << 20) - 1);
 
 	send_words.clear();
+	clear_recv_data();
+
 	for (int i = 0; i < num; i++) {
 		send_words.push_back(distrib(engine));
 	}
@@ -51,7 +59,7 @@ void WaveformTestbench::check_data() {
 		/* SPI message has an extra bit to access DAC register */
 		auto was_sent = 1 << 20 | send_words.at(i % len);
 		if (was_sent != recv_words.at(i % len)) {
-			std::cout << i << ":" << was_sent << "!=" << recv_words[i % len] << std::endl;
+			std::cout << i << ":" << std::hex << was_sent << "!=" << std::hex << recv_words[i % len] << std::endl;
 			std::exit(1);
 		}
 	}
@@ -86,6 +94,18 @@ void WaveformTestbench::halt_check(bool check_for_finish) {
 	check_data();
 }
 
+void WaveformTestbench::wait_until_loop_complete() {
+	if (!mod.do_loop)
+		throw std::logic_error("Need to run with do_loop");
+
+	/* wait for the counter to go past the start */
+	while (!mod.cntr)
+		run_clock();
+	/* wait for the counter to return to the start */
+	while (mod.cntr)
+		run_clock();
+}
+
 WaveformTestbench *tb;
 
 void cleanup() {
@@ -95,14 +115,26 @@ void cleanup() {
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
-	tb = new WaveformTestbench(100000);
+	tb = new WaveformTestbench();
 	atexit(cleanup);
 
-	tb->start_test(64, 14, 20, false);
-	tb->halt_check(true);
+	std::cout << "Running single output tests" << std::endl;
+	for (int i = 1; i < 5; i++) {
+		tb->start_test(64*i, 14, 20, false);
+		tb->halt_check(true);
+	}
 
-	tb->start_test(64, 14, 20, true);
-	tb->halt_check(false);
+	std::cout << "run loop tests" << std::endl;
+	for (int i = 1; i < 5; i++) {
+		tb->start_test(64*i, 14, 20, true);
+
+		/* Check that the code will run multiple times */
+		for (int j = 0; j < 5; j++) {
+			tb->wait_until_loop_complete();
+			tb->check_data();
+			tb->clear_recv_data();
+		}
+	}
 
 	return 0;
 }
