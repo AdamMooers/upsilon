@@ -97,7 +97,7 @@ verilator-execute:
 		make clean && \
 		make test \
 		'
-verilator-copy-waveform:
+verilator-get:
 	docker cp upsilon-verilator:/home/user/upsilon/gateware/rtl/waveform/waveform.fst ./
 verilator-clean:
 	-docker container stop upsilon-verilator

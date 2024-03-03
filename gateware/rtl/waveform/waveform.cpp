@@ -112,6 +112,8 @@ void cleanup() {
 	delete tb;
 }
 
+/* TODO: change around other constants, not just waveform size */
+#define NUM_INCRS (3+1)
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -119,13 +121,13 @@ int main(int argc, char *argv[]) {
 	atexit(cleanup);
 
 	std::cout << "Running single output tests" << std::endl;
-	for (int i = 1; i < 5; i++) {
+	for (int i = 1; i < NUM_INCRS; i++) {
 		tb->start_test(64*i, 14, 20, false);
 		tb->halt_check(true);
 	}
 
 	std::cout << "run loop tests" << std::endl;
-	for (int i = 1; i < 5; i++) {
+	for (int i = 1; i < NUM_INCRS; i++) {
 		tb->start_test(64*i, 14, 20, true);
 
 		/* Check that the code will run multiple times */
@@ -135,6 +137,44 @@ int main(int argc, char *argv[]) {
 			tb->clear_recv_data();
 		}
 	}
+
+	std::cout << "Start with single output, then try loop" << std::endl;
+	for (int i = 1; i < NUM_INCRS; i++) {
+		tb->start_test(64*i, 14, 20, false);
+
+		/* Run the clock for a little bit */
+		for (int j = 0; j < 60; j++)
+			tb->run_clock();
+
+		tb->mod.do_loop = 1;
+		while (tb->mod.cntr)
+			tb->run_clock();
+
+		for (int j = 0; j < 5; j++) {
+			tb->wait_until_loop_complete();
+			tb->check_data();
+			tb->clear_recv_data();
+		}
+	}
+
+	std::cout << "Interrupt single output" << std::endl;
+	tb->start_test(1024, 14, 20, false);
+	for (int j = 0; j < 60; j++)
+		tb->run_clock();
+
+	if (tb->mod.cntr == 0 || tb->mod.cntr == 1024-1)
+		throw std::logic_error("Counter should not be this");
+	tb->mod.run = 0;
+	auto cntr = tb->mod.cntr;
+	while (!tb->mod.ready) {
+		tb->run_clock();
+		if (tb->mod.cntr == cntr + 1)
+			throw std::logic_error("Did not stop");
+	}
+
+	std::cout << "Test run after interrupt" << std::endl;
+	tb->start_test(1024, 14, 20, false);
+	tb->halt_check(true);
 
 	return 0;
 }
