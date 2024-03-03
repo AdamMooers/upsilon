@@ -285,7 +285,6 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/picorv32/picorv32.v")
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
-        platform.add_source("rtl/spi/spi_master_ss_wb.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,

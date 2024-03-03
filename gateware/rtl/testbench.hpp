@@ -24,6 +24,15 @@ template <class TOP> class TB {
 		mod.final();
 	}
 
+	/* This function is called at the positive edge of ever clock
+	 * cycle.
+	 *
+	 * It's intended use is for glue code, like a bus handler.
+	 *
+	 * The bulk of the simulation code (driving external inputs into the
+	 * simulated module and observing results) should be done outside of
+	 * this function.
+	 */
 	virtual void posedge() {}
 
 	void run_clock() {
