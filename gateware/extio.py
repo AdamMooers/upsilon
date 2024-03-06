@@ -10,45 +10,159 @@ from litex.soc.interconnect.wishbone import Interface
 from util import *
 from region import *
 
-'''
 class Waveform(LiteXModule):
-    """ Read from a memory location and output the values in that location
-        to a DAC. """
+    """ A Wishbone bus master that sends a waveform to a SPI master
+        by reading from RAM. """
 
-    def __init__(self, max_size=16):
-        # Interface used by Waveform to read and write data
-        self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
+    public_registers = {
+            "run" : {
+                "origin": 0,
+                "size": 4,
+                "rw": True,
+            },
+            "cntr": {
+                "origin": 0x4,
+                "size": 4,
+                "rw": False,
+            },
+            "do_loop": {
+                "origin": 0x8,
+                "size" : 4,
+                "rw" : True,
+            },
+            "finished_or_ready": {
+                "origin": 0xC,
+                "size" : 4,
+                "rw" : False,
+            },
+            "wform_size": {
+                "origin": 0x10,
+                "size": 4,
+                "rw" : True,
+            },
+            "timer": {
+                "origin": 0x14,
+                "size" : 4,
+                "rw" : False,
+            },
+            "timer_spacing": {
+                "origin" : 0x18,
+                "size" : 4,
+                "rw" : True,
+            }
+    }
 
-        # Interface used by Main CPU to control Waveform
-        self.mainbus = Interface(data_width = 32, address_width = 32, addressing="byte")
-        self.mmap = MemoryMap()
+    width = 0x20
 
-        self.start = Signal()
-        self.cntr = Signal(max_size)
-        self.loop = Signal()
-        self.finished = Signal()
-        self.ready = Signal()
+    def __init__(self,
+            ram_start_addr = 0,
+            spi_start_addr = 0x10000000,
+            counter_max_wid = 16,
+            timer_wid = 16,
+    ):
+        # This is Waveform's bus to control SPI and RAM devices it owns.
+        self.masterbus = Interface(address_width=32, data_width=32, addressing="byte")
+        # This is the Waveform's interface that is controlled by the Main CPU.
+        self.slavebus = b = Interface(address_width=32, data_width=32, addressing="byte")
 
-        self.comb += [
-                If(self.mainbus.cyc & self.mainbus.stb & ~self.mainbus.ack,
-                    Cases(self.mainbus.adr[0:4], {
-                        0x0: self.mainbus.dat_r.eq(self.finished << 1 | self.ready),
-                        0x4: If(self.mainbus.we,
-                                self.start.eq(self.mainbus.dat_w[0]),
-                                self.loop.eq(self.mainbus.dat_w[1]),
-                            ).Else(
-                                self.mainbus.dat_r.eq(self.start << 1 | self.loop),
-                            ),
-                        0x8: self.mainbus.dat_r.eq(self.cntr)
-                    }),
-                    self.mainbus.ack.eq(1),
-                ).Elif(~self.mainbus.cyc,
-                    self.mainbus.ack.eq(0),
+        self.mmap = MemoryMap(self.masterbus)
+        self.mmap.add_region("ram",
+                BasicRegion(ram_start_addr, None))
+        self.mmap.add_region("spi",
+                BasicRegion(spi_start_addr, None))
+
+        run = Signal()
+        cntr = Signal(counter_max_wid)
+        do_loop = Signal()
+        ready = Signal()
+        finished = Signal()
+        wform_size = Signal(counter_max_wid)
+        timer = Signal(timer_wid)
+        timer_spacing = Signal(timer_wid)
+
+        self.comb += If(b.cyc & b.stb & ~b.ack,
+                Case(b.adr, {
+                    0x0: If(b.we,
+                           run.eq(b.dat_w[0]),
+                         ).Else(
+                           b.dat_r[0].eq(run)
+                         ),
+                    0x4: [
+                        b.dat_r[0:counter_max_wid].eq(cntr),
+                    ],
+                    0x8: [
+                        If(b.we,
+                            do_loop.eq(b.dat_w[0]),
+                        ).Else(
+                            b.dat_r[0].eq(do_loop),
+                        )
+                    ],
+                    0xC: [
+                        b.dat_r[0].eq(ready),
+                        b.dat_r[1].eq(finished),
+                    ],
+                    0x10: If(b.we,
+                            wform_size.eq(b.dat_w[0:counter_max_wid]),
+                        ).Else(
+                            b.dat_r[0:counter_max_wid].eq(wform_size)
+                        ),
+                    0x14: b.dat_r[0:timer_wid].eq(timer),
+                    0x18: If(b.we,
+                            timer_spacing.eq(b.dat_w[0:timer_wid]),
+                        ).Else(
+                            b.dat_r[0:timer_wid].eq(timer_spacing),
+                        ),
+                        # (W)A(V)EFO(RM)
+                    "default": b.dat_r.eq(0xAEF0AEF0),
+                    }
                 ),
-        ]
-'''
+                b.ack.eq(1),
+            ).Elif(~b.cyc,
+                    b.ack.eq(0),
+            )
+
+        self.specials += Instance("waveform",
+                p_RAM_START_ADDR = ram_start_addr,
+                p_SPI_START_ADDR = spi_start_addr,
+                p_COUNTER_MAX_WID = counter_max_wid,
+                p_TIMER_WID = timer_wid,
+
+                i_clk = ClockSignal(),
+
+                i_run = run,
+                o_cntr = cntr,
+                i_do_loop = do_loop,
+                o_finished = finished,
+                o_ready = ready,
+                i_wform_size = wform_size,
+                o_timer = timer,
+                i_timer_spacing = timer_spacing,
+
+                o_wb_adr = self.masterbus.adr,
+                o_wb_cyc = self.masterbus.cyc,
+                o_wb_we = self.masterbus.we,
+                o_wb_stb = self.masterbus.stb,
+                o_wb_sel = self.masterbus.sel,
+                o_wb_dat_w = self.masterbus.dat_w,
+                i_wb_dat_r = self.masterbus.dat_r,
+                i_wb_ack = self.masterbus.ack,
+        )
+
+    def add_ram(self, bus, size):
+        self.mmap.regions['ram'].bus = bus
+        self.mmap.regions['ram'].size = size
+
+    def add_spi(self, bus):
+        # Waveform code has the SPI hardcoded in, because it is a Verilog
+        # module.
+        self.mmap.regions['spi'].bus = bus
+        self.mmap.regions['spi'].size = SPIMaster.width
+
+    def do_finalize(self):
+        self.mmap.finalize()
 
 class SPIMaster(Module):
+    # IF THESE ARE CHANGED, CHANGE waveform.v !!
     AD5791_PARAMS = {
                 "polarity" :0,
                 "phase" :1,
@@ -152,7 +266,7 @@ class SPIMaster(Module):
 
         self.sync += [
                 If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
-                    Cases(self.bus.adr[0:5], {
+                    Case(self.bus.adr[0:5], {
                         0x0: [
                             self.bus.dat_r[2:].eq(0),
                             self.bus.dat_r[0:2].eq(finished_or_ready),
@@ -166,22 +280,22 @@ class SPIMaster(Module):
                                 self.bus.dat_r[0].eq(arm),
                             ),
                             self.bus.ack.eq(1),
-                            ]
+                            ],
                         0x8: [
-                            self.bus.dat_r[wid:].eq(0),
-                            self.bus.dat_r[0:wid].eq(from_slave),
+                            self.bus.dat_r[spi_wid:].eq(0),
+                            self.bus.dat_r[0:spi_wid].eq(from_slave),
                             self.bus.ack.eq(1),
                             ],
                         0xC: [
                             If(self.bus.we,
-                            to_slave.eq(self.bus.dat_r[0:wid]),
+                            to_slave.eq(self.bus.dat_r[0:spi_wid]),
                             ).Else(
-                                self.bus.dat_r[wid:].eq(0),
-                                self.bus.dat_r[0:wid].eq(to_slave),
+                                self.bus.dat_r[spi_wid:].eq(0),
+                                self.bus.dat_r[0:spi_wid].eq(to_slave),
                             ),
                             self.bus.ack.eq(1),
-                            ]
-                        0x10: If(finished | ready_to_arm,
+                            ],
+                        0x10: If(finished_or_ready[0] | finished_or_ready[1],
                             self.bus.dat_r[1:].eq(0),
                             self.bus.dat_r.eq(finished_or_ready),
                         ),
@@ -189,7 +303,7 @@ class SPIMaster(Module):
                         # 0xSPI00SPI
                             self.bus.dat_r.eq(0x57100571),
                     }),
-                ).Elif(~self.bus.clk,
+                ).Elif(~self.bus.cyc,
                     self.bus.ack.eq(0)
                 )
             ]

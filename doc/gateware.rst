@@ -303,3 +303,13 @@ LiteX build will stop after creating the module tree. This  is because you
 imported a module that does not exist. LiteX will silently fail if a Verilog
 source file you added does not exist, so either remove the module or add the
 file.
+
+---------------------------------------------
+I overrode finalize and now things are broken
+---------------------------------------------
+
+*Never* override the ``finalize()`` function in a Migen module.
+
+Each Migen module has a ``finalize()`` function inherited from the class. This
+does code generation and calls ``do_finalize()``, which is a user-defined
+function.

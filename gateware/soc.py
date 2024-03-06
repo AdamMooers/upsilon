@@ -165,31 +165,33 @@ class UpsilonSoC(SoCCore):
         self.bus.add_slave(name, bus, region)
         self.soc_subregions[name] = registers
 
-    def add_blockram(self, name, size, connect_now=True):
-        """ Add a blockram module to the system.
+    def add_preemptive_interface_for_slave(self, name, slave_bus, slave_width, slave_registers, addressing="word"):
+        """ Add a PreemptiveInterface in front of a Wishbone Slave interface.
 
-        :param connect_now: Connect the block ram directly to the SoC.
-           You will probably never need this, since this just adds
-           more ram to the main CPU which already has 256 MiB of RAM.
-           Only useful for testing to see if the Blockram works by poking
-           it directly from the main CPU.
+        :param name: Name of the module and the Wishbone bus region.
+        :param slave_bus: Instance of Wishbone.Interface.
+        :param slave_width: Width of the region.
+        :param slave_registers: Register inside the bus region.
+        :return: The PI module.
         """
+        pi = PreemptiveInterface(slave_bus, addressing=addressing)
+        self.add_module(name, pi)
+        self.add_slave_with_registers(name, pi.add_master(),
+                SoCRegion(origin=None, size=slave_width, cached=False),
+                slave_registers)
+        return pi
+
+    def add_blockram(self, name, size):
+        """ Add a blockram module to the system.  """
         mod = SRAM(size)
         self.add_module(name, mod)
 
-        if connect_now:
-            self.bus.add_slave(name, mod.bus,
-                    SoCRegion(origin=None, size=size, cached=True))
-        return mod
+        pi = self.add_preemptive_interface_for_slave(name + "_PI", mod.bus,
+                size, None, "word")
 
-    def add_preemptive_interface(self, name, size, slave):
-        """ Add a preemptive interface with "size" connected to the slave's bus. """
-        mod = PreemptiveInterface(size, slave)
-        self.add_module(name, mod)
-        return mod
+        return mod, pi
 
     def add_picorv32(self, name, size=0x1000, origin=0x10000):
-
         # Add PicoRV32 core
         pico = PicoRV32(name, origin, origin+0x10)
         self.add_module(name, pico)
@@ -200,19 +202,11 @@ class UpsilonSoC(SoCCore):
                 pico.debug_reg_read.public_registers)
 
         # Add a Block RAM for the PicoRV32 toexecute from.
-        ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
-
-        # Control access to the Block RAM from the main CPU.
-        ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)
+        ram, ram_pi = self.add_blockram(name + "_ram", size=size)
 
         # Allow access from the PicoRV32 to the Block RAM.
         pico.mmap.add_region("main",
-                BasicRegion(origin=origin, size=size, bus=ram_iface.buses[1]))
-
-        # Allow access from the main CPU to the Block RAM.
-        self.add_slave_with_registers(name + "_ram", ram_iface.buses[0],
-                SoCRegion(origin=None, size=size, cached=True),
-                None)
+                BasicRegion(origin=origin, size=size, bus=ram_pi.add_master()))
 
     def picorv32_add_cl(self, name, param_origin=0x100000):
         """ Add a register area containing the control loop parameters to the
@@ -227,13 +221,25 @@ class UpsilonSoC(SoCCore):
                 params.public_registers)
 
     def add_AD5791(self, name, **kwargs):
+        """ Adds an AD5791 SPI master to the SoC.
+
+        :return: A tuple of the SPI master module and the PI module.
+        """
         args = SPIMaster.AD5791_PARAMS
         args.update(kwargs)
         spi = SPIMaster(**args)
         self.add_module(name, spi)
-        return spi
+
+        pi = self.add_preemptive_interface_for_slave(name + "_PI", spi.bus,
+                spi.width, spi.public_registers, "byte")
+
+        return spi, pi
 
     def add_LT_adc(self, name, **kwargs):
+        """ Adds a Linear Technologies ADC SPI master to the SoC.
+
+        :return: A tuple of the SPI master module and the PI module.
+        """
         args = SPIMaster.LT_ADC_PARAMS
         args.update(kwargs)
         args["mosi"] = Signal()
@@ -245,7 +251,18 @@ class UpsilonSoC(SoCCore):
 
         spi = SPIMaster(**args)
         self.add_module(name, spi)
-        return spi
+
+        pi = self.add_preemptive_interface_for_slave(name + "_PI", spi.bus,
+                spi.width, spi.public_registers, "byte")
+        return spi, pi
+
+    def add_waveform(self, name):
+        wf = Waveform()
+
+        self.add_module(name, wf)
+        pi = self.add_preemptive_interface_for_slave(name + "_PI",
+                wf.slavebus, wf.width, wf.public_registers, "byte")
+        return wf, pi
 
     def __init__(self,
                  variant="a7-100",
@@ -285,6 +302,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/picorv32/picorv32.v")
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
+        platform.add_source("rtl/waveform/waveform.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -337,10 +355,16 @@ class UpsilonSoC(SoCCore):
         # Add control loop DACs and ADCs.
         self.add_picorv32("pico0")
         self.picorv32_add_cl("pico0")
-        # XXX: I don't have the time to restructure my code to make it
-        # elegant, that comes when things work
-        # If DACs don't work, comment out from here
+
+        # Add waveform generator.
+        self.add_waveform("wf0")
+
+        # Waveform generator RAM storage
+        self.add_blockram("wf0_ram", 4096)
+        self.wf0.add_ram(self.wf0_ram_PI.add_master(), 4096)
+
         module_reset = platform.request("module_reset")
+
         self.add_AD5791("dac0",
                 rst=module_reset,
                 miso=platform.request("dac_miso_0"),
@@ -348,15 +372,11 @@ class UpsilonSoC(SoCCore):
                 sck=platform.request("dac_sck_0"),
                 ss_L=platform.request("dac_ss_L_0"),
         )
-
-        self.add_preemptive_interface("dac0_PI", 2, self.dac0)
-        self.add_slave_with_registers("dac0", self.dac0_PI.buses[0],
-                SoCRegion(origin=None, size=self.dac0.width, cached=False),
-                self.dac0.public_registers)
         self.pico0.mmap.add_region("dac0",
                     BasicRegion(origin=0x200000, size=self.dac0.width,
-                                bus=self.dac0_PI.buses[1],
+                                bus=self.dac0_PI.add_master(),
                                 registers=self.dac0.public_registers))
+        self.wf0.add_spi(self.dac0_PI.add_master())
 
         self.add_LT_adc("adc0",
                 rst=module_reset,
@@ -365,15 +385,10 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request("adc_conv_0"),
                 spi_wid=18,
         )
-        self.add_preemptive_interface("adc0_PI", 2, self.adc0)
-        self.add_slave_with_registers("adc0", self.adc0_PI.buses[0],
-                SoCRegion(origin=None, size=self.adc0.width, cached=False),
-                self.adc0.public_registers)
         self.pico0.mmap.add_region("adc0",
                     BasicRegion(origin=0x300000, size=self.adc0.width,
-                                bus=self.adc0_PI.buses[1],
+                                bus=self.adc0_PI.add_master(),
                                 registers=self.adc0.public_registers))
-        # To here
 
     def do_finalize(self):
         with open('soc_subregions.json', 'wt') as f:
