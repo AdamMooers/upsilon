@@ -174,7 +174,7 @@ class UpsilonSoC(SoCCore):
         :param slave_registers: Register inside the bus region.
         :return: The PI module.
         """
-        pi = PreemptiveInterface(slave_bus, addressing=addressing)
+        pi = PreemptiveInterface(slave_bus, addressing=addressing, name=name)
         self.add_module(name, pi)
         self.add_slave_with_registers(name, pi.add_master(),
                 SoCRegion(origin=None, size=slave_width, cached=False),
@@ -358,6 +358,10 @@ class UpsilonSoC(SoCCore):
 
         # Add waveform generator.
         self.add_waveform("wf0")
+        self.pico0.mmap.add_region("wf0",
+                BasicRegion(origin=0x400000, size=self.wf0.width,
+                    bus=self.wf0_PI.add_master(),
+                    registers=self.wf0.public_registers))
 
         # Waveform generator RAM storage
         self.add_blockram("wf0_ram", 4096)
@@ -390,6 +394,13 @@ class UpsilonSoC(SoCCore):
                                 bus=self.adc0_PI.add_master(),
                                 registers=self.adc0.public_registers))
 
+        # Pre-finalizations. Very bad hacks.
+        self.pico0_ram_PI.pre_finalize()
+        self.dac0_PI.pre_finalize()
+        self.adc0_PI.pre_finalize()
+        self.wf0_ram_PI.pre_finalize()
+        self.wf0_PI.pre_finalize()
+
     def do_finalize(self):
         with open('soc_subregions.json', 'wt') as f:
             json.dump(self.soc_subregions, f)
@@ -411,9 +422,9 @@ def generate_main_cpu_include(csr_file):
 
         for key in subregions:
             if subregions[key] is None:
-                print(f'{key} = const({csrs["memories"][key]["base"]})', file=out)
+                print(f'{key} = const({csrs["memories"][key.lower()]["base"]})', file=out)
             else:
-                print(f'{key}_base = const({csrs["memories"][key]["base"]})', file=out)
+                print(f'{key}_base = const({csrs["memories"][key.lower()]["base"]})', file=out)
                 print(f'{key} = {subregions[key].__repr__()}', file=out)
 
 def main():

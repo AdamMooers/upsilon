@@ -25,35 +25,54 @@ class PreemptiveInterface(LiteXModule):
     size of the region will be the same as the slave interface.
     """
 
-    def __init__(self, slave_bus, addressing="word"):
+    def __init__(self, slave_bus, addressing="word", name=None):
         """
         :param slave_bus: Instance of Wishbone.Interface that connects to the
           slave's bus.
         :param addressing: Addressing style of the slave. Default is "word". Note
           that masters may have to convert when selecting self.buses. This conversion
           is not done in this module.
+        :param name: Name for debugging purposes.
         """
 
         self.slave_bus = slave_bus
         self.addressing=addressing
         self.buses = []
+        self.name = name
+
+        self.pre_finalize_done = False
 
     def add_master(self):
         """ Adds a new master bus to the PI.
 
         :return: The interface to the bus.
         """
+        if self.pre_finalize_done:
+            raise Exception(self.name + ": Attempted to modify PreemptiveInterface after pre-finalize")
+
         iface = Interface(data_width=32, address_width=32, addressing=self.addressing)
         self.buses.append(iface)
         return iface
- 
-    def do_finalize(self):
+
+    def pre_finalize(self):
+        # NOTE: DUMB HACK! CSR bus logic is NOT generated when inserted at do_finalize time!
+
+        if self.pre_finalize_done:
+            raise Exception(self.name + ": Cannot pre-finalize twice")
+        self.pre_finalize_done = True
+
         masters_len = len(self.buses)
-        if masters_len == 0:
-            return None
         if masters_len > 1:
             self.master_select = CSRStorage(masters_len, name='master_select', description='RW bitstring of which master interconnect to connect to')
  
+    def do_finalize(self):
+        if not self.pre_finalize_done:
+            raise Exception(self.name + ": PreemptiveInterface needs a manual call to pre_finalize()")
+
+        masters_len = len(self.buses)
+        if masters_len == 0:
+            return None
+
         """
         Construct a combinatorial case statement. In verilog, the case
         statment would look like
@@ -138,6 +157,9 @@ class SpecialRegister:
 class RegisterInterface(LiteXModule):
     """ Defines "registers" that are either exclusively CPU-write Pico-read
     or CPU-read pico-write. These registers are stored as flip-flops. """
+
+    # TODO: Add no-write registers that are ready only for both ends.
+    # Also make more flexible signal sizes.
     def __init__(self, registers):
         """
         :param special_registers: List of instances of SpecialRegister.
