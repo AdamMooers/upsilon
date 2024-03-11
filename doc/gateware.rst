@@ -147,6 +147,39 @@ The Wishbone cache is very confusing and causes custom Wishbone bus code to
 not work properly. Since a lot of this memory is volatile you should never
 enable the cache (possible exception: SRAM).
 
+---------------------------------------------------------
+Working Around LiteX using pre_finalize and mmio_closures
+---------------------------------------------------------
+
+LiteX runs code prior to calling ``finalize()``, such as CSR allocation,
+that makes it very difficult to write procedural code without preallocating
+lengths.
+
+Upsilon solves this with an ugly hack called ``pre_finalize``, which runs at
+the end of the SoC main module instantiation. All pre_finalize functions are
+put into a list which is run with no arguments and with their return result
+ignored.
+
+``pre_finalize`` calls are usually due to ``PreemptiveInterface``, which uses
+CSR registers.
+
+There is another ugly hack, ``mmio_closures``, which is used to generate the
+``mmio.py`` library. The ``mmio.py`` library groups together relevant memory
+regions and registers into instances of MicroPython classes. The only good
+way to do this is to generate the code for ``mmio.py`` at instantiation time,
+but the origin of each memory region is not known at instantiation time. The
+functions have to be delayed until after memory locations are allocated, but
+there is no hook in LiteX to do that, and the only interface I can think of
+that one can use to look at the origins is ``csr.json``.
+
+The solution is a list of closures that return strings that will be put into
+``mmio.py``. They take one argument, ``csrs``, the ``csr.json`` file as a
+Python dictionary. The closures use the memory location origin in ``csrs``
+to generate code with the correct offsets.
+
+Note that the ``csr.json`` file casefolds the memory locations into lowercase
+but keeps CSR registers as-is.
+
 ====================
 System Within a Chip
 ====================
@@ -313,3 +346,9 @@ I overrode finalize and now things are broken
 Each Migen module has a ``finalize()`` function inherited from the class. This
 does code generation and calls ``do_finalize()``, which is a user-defined
 function.
+
+=========
+TODO List
+=========
+
+Pseudo CSR bus for the main CPU?

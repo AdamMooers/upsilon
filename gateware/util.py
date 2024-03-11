@@ -15,7 +15,7 @@ def round_up_to_pow_2(n):
     # If n is a power of 2, then n - 1 has a smaller bit length than n.
     # If n is not a power of 2, then n - 1 has the same bit length.
     l = (n - 1).bit_length()
-    return  1 << (l + 1)
+    return  1 << l
 
 def round_up_to_word(n):
     """ Round up to 8, 16, or 32. """

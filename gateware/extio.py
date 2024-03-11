@@ -15,44 +15,50 @@ class Waveform(LiteXModule):
         by reading from RAM. """
 
     public_registers = {
-            "run" : {
-                "origin": 0,
-                "size": 4,
-                "rw": True,
-            },
-            "cntr": {
-                "origin": 0x4,
-                "size": 4,
-                "rw": False,
-            },
-            "do_loop": {
-                "origin": 0x8,
-                "size" : 4,
-                "rw" : True,
-            },
-            "finished_or_ready": {
-                "origin": 0xC,
-                "size" : 4,
-                "rw" : False,
-            },
-            "wform_size": {
-                "origin": 0x10,
-                "size": 4,
-                "rw" : True,
-            },
-            "timer": {
-                "origin": 0x14,
-                "size" : 4,
-                "rw" : False,
-            },
-            "timer_spacing": {
-                "origin" : 0x18,
-                "size" : 4,
-                "rw" : True,
-            }
+            "run" : Register(
+                origin=0,
+                bitwidth=1,
+                rw=True,
+            ),
+            "cntr": Register(
+                origin=0x4,
+                bitwidth=16,
+                rw=False,
+            ),
+            "do_loop": Register(
+                origin=0x8,
+                bitwidth= 1,
+                rw= True,
+            ),
+            "finished_or_ready": Register(
+                origin=0xC,
+                bitwidth= 2,
+                rw= False,
+            ),
+            "wform_width": Register(
+                origin=0x10,
+                bitwidth=16,
+                rw= True,
+            ),
+            "timer": Register(
+                origin=0x14,
+                bitwidth= 16,
+                rw= False,
+            ),
+            "timer_spacing": Register(
+                origin= 0x18,
+                bitwidth= 16,
+                rw= True,
+            )
     }
 
     width = 0x20
+
+    def mmio(self, origin):
+        r = ""
+        for name, reg in self.public_registers.items():
+            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={reg.rw}),'
+        return r
 
     def __init__(self,
             ram_start_addr = 0,
@@ -80,7 +86,7 @@ class Waveform(LiteXModule):
         timer = Signal(timer_wid)
         timer_spacing = Signal(timer_wid)
 
-        self.comb += If(b.cyc & b.stb & ~b.ack,
+        self.sync += If(b.cyc & b.stb & ~b.ack,
                 Case(b.adr, {
                     0x0: If(b.we,
                            run.eq(b.dat_w[0]),
@@ -188,42 +194,48 @@ class SPIMaster(Module):
             # armed and finished with a transmission.
             # The second bit is the "ready" bit, when the master is
             # not armed and ready to be armed.
-            "ready_or_finished": {
-                "origin" : 0,
-                "width" : 4,
-                "rw": False,
-            },
+            "ready_or_finished": Register(
+                origin= 0,
+                bitwidth= 2,
+                rw=False,
+            ),
 
             # One bit to initiate a transmission cycle. Transmission
             # cycles CANNOT be interrupted.
-            "arm" : {
-                "origin": 4,
-                "width": 4,
-                "rw": True,
-            },
+            "arm" : Register(
+                origin=4,
+                bitwidth=1,
+                rw=True,
+            ),
 
             # Data sent from the SPI slave.
-            "from_slave": {
-                "origin": 8,
-                "width": 4,
-                "rw": False,
-            },
+            "from_slave": Register(
+                origin=8,
+                bitwidth=32,
+                rw=False,
+            ),
 
             # Data sent to the SPI slave.
-            "to_slave": {
-                "origin": 0xC,
-                "width": 4,
-                "rw": True
-            },
+            "to_slave": Register(
+                origin=0xC,
+                bitwidth=32,
+                rw=True
+            ),
 
             # Same as ready_or_finished, but halts until ready or finished
             # goes high. Dangerous, might cause cores to hang!
-            "wait_ready_or_finished": {
-                "origin": 0x10,
-                "width": 4,
-                "rw" : False,
-            },
+            "wait_ready_or_finished": Register(
+                origin=0x10,
+                bitwidth=2,
+                rw= False,
+            ),
     }
+
+    def mmio(self, origin):
+        r = ""
+        for name, reg in self.public_registers.items():
+            r += f'{name} = Register(loc={origin + reg.origin},bitwidth={reg.bitwidth},rw={reg.rw}),'
+        return r
 
     """ Wrapper for the SPI master verilog code. """
     def __init__(self, rst, miso, mosi, sck, ss_L,
