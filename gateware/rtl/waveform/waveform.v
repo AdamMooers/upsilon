@@ -15,6 +15,7 @@ module waveform #(
 
 	/* Waveform output control */
 	input run,
+	input force_stop,
 	output reg[COUNTER_MAX_WID-1:0] cntr,
 	input do_loop,
 	output reg finished,
@@ -57,7 +58,9 @@ localparam WAIT_PERIOD = 13;
 
 reg [4-1:0] state = CHECK_START;
 
-always @ (posedge clk) case (state)
+always @ (posedge clk) if (force_stop) begin
+	state <= CHECK_START;
+end else case (state)
 CHECK_START: if (run) begin
 		cntr <= 0;
 		ready <= 0;

@@ -49,7 +49,12 @@ class Waveform(LiteXModule):
                 origin= 0x18,
                 bitwidth= 16,
                 rw= True,
-            )
+            ),
+            "force_stop" : Register (
+                origin=0x1C,
+                bitwidth=1,
+                rw=True,
+            ),
     }
 
     width = 0x20
@@ -85,6 +90,7 @@ class Waveform(LiteXModule):
         wform_size = Signal(counter_max_wid)
         timer = Signal(timer_wid)
         timer_spacing = Signal(timer_wid)
+        force_stop = Signal()
 
         self.sync += If(b.cyc & b.stb & ~b.ack,
                 Case(b.adr, {
@@ -118,6 +124,11 @@ class Waveform(LiteXModule):
                         ).Else(
                             b.dat_r[0:timer_wid].eq(timer_spacing),
                         ),
+                    0x1C: If(b.we,
+                            force_stop.eq(b.dat_w[0]),
+                        ).Else(
+                            b.dat_r[0].eq(force_stop),
+                        ),
                         # (W)A(V)EFO(RM)
                     "default": b.dat_r.eq(0xAEF0AEF0),
                     }
@@ -136,6 +147,7 @@ class Waveform(LiteXModule):
                 i_clk = ClockSignal(),
 
                 i_run = run,
+                i_force_stop = force_stop,
                 o_cntr = cntr,
                 i_do_loop = do_loop,
                 o_finished = finished,
@@ -190,11 +202,11 @@ class SPIMaster(Module):
     width = 0x20
 
     public_registers = {
-            # The first bit is the "finished" bit, when the master is
-            # armed and finished with a transmission.
-            # The second bit is the "ready" bit, when the master is
+            # The first bit is the "ready" bit, when the master is
             # not armed and ready to be armed.
-            "ready_or_finished": Register(
+            # The second bit is the "finished" bit, when the master is
+            # armed and finished with a transmission.
+            "finished_or_ready": Register(
                 origin= 0,
                 bitwidth= 2,
                 rw=False,
@@ -224,7 +236,7 @@ class SPIMaster(Module):
 
             # Same as ready_or_finished, but halts until ready or finished
             # goes high. Dangerous, might cause cores to hang!
-            "wait_ready_or_finished": Register(
+            "wait_finished_or_ready": Register(
                 origin=0x10,
                 bitwidth=2,
                 rw= False,
@@ -333,7 +345,8 @@ class SPIMaster(Module):
             p_PHASE = phase,
 
             i_clk = ClockSignal(),
-            i_rst_L = rst,
+            # module_reset is active high
+            i_rst_L = ~rst,
             i_miso = miso,
             o_mosi = mosi,
             o_sck_wire = sck,

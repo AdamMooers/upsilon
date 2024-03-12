@@ -15,6 +15,7 @@ module waveform_sim #(
 
 	/* Waveform output control */
 	input run,
+	input force_stop,
 	output [COUNTER_MAX_WID-1:0] cntr,
 	input do_loop,
 	output finished,
@@ -52,6 +53,7 @@ waveform #(
 ) wf (
 	.clk(clk),
 	.run(run),
+	.force_stop(force_stop),
 	.cntr(cntr),
 	.do_loop(do_loop),
 	.finished(finished),

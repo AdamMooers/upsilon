@@ -38,6 +38,10 @@ class Waveform(Immutable):
         while self.regs.finished_or_ready == 0:
             pass
 
+    def force_stop(self):
+        self.regs.force_stop = 1
+        selff.regs.force_stop = 0
+
     def dump(self):
         """ Dump contents of control registers. """
         return self.regs.dump()

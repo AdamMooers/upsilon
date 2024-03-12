@@ -274,7 +274,7 @@ class UpsilonSoC(SoCCore):
         def f(csrs):
             wid = kwargs["spi_wid"]
             origin = csrs["memories"][name.lower() + "_pi"]['base']
-            return f'{name} = SPI({wid}, {origin}, {spi.mmio(origin)})'
+            return f'{name} = SPI({wid}, {name}_PI, {origin}, {spi.mmio(origin)})'
         self.mmio_closures.append(f)
 
         return spi, pi
