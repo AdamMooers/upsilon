@@ -43,3 +43,7 @@ build/opensbi/
 build/upsilon/
 swic/*.bin
 swic/*.elf
+swic/*mmio.h
+linux/*mpy
+linux/mmio.py
+build/venv

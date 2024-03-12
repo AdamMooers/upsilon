@@ -23,6 +23,12 @@ openFPGALoader:
 	cd openFPGALoader/build && cmake ..
 	cd openFPGALoader/build && cmake --build .
 
+#### Local pip
+
+venv-create:
+	python3 -m venv venv
+	. venv/bin/activate && pip install mpy-cross
+
 ###### Containers
 
 ### Hardware container
@@ -51,8 +57,8 @@ hardware-get:
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/csr.json ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/soc_subregions.json ../boot/
 	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0.json ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../boot/
-	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0_mmio.h ../boot/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/mmio.py ../linux/
+	docker cp upsilon-hardware:/home/user/upsilon/gateware/pico0_mmio.h ../swic/
 hardware-clean:
 	-docker container stop upsilon-hardware
 	-docker container rm upsilon-hardware
