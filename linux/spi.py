@@ -3,14 +3,14 @@ from registers import *
 class SPI(RegisterRegion):
     def __init__(self, spiwid, spi_PI, origin, **regs):
         self.spiwid = spiwid
-        self.spi_PI = spi_PI
+        self.PI = spi_PI
         super().__init__(origin, **regs)
 
     def send(self, val, force=False):
-        if self.spi_PI.v != 0 and not force:
+        if self.PI.v != 0 and not force:
             raise Exception("SPI is controlled by another master")
 
-        self.spi_PI.v = 0
+        self.PI.v = 0
 
         self.arm.v = 0
         while self.finished_or_ready.v == 0:

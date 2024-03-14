@@ -93,41 +93,40 @@ class Waveform(LiteXModule):
         force_stop = Signal()
 
         self.sync += If(b.cyc & b.stb & ~b.ack,
-                Case(b.adr, {
+                Case(b.adr[0:5], {
                     0x0: If(b.we,
                            run.eq(b.dat_w[0]),
                          ).Else(
-                           b.dat_r[0].eq(run)
+                           b.dat_r.eq(run)
                          ),
                     0x4: [
-                        b.dat_r[0:counter_max_wid].eq(cntr),
+                        b.dat_r.eq(cntr),
                     ],
                     0x8: [
                         If(b.we,
                             do_loop.eq(b.dat_w[0]),
                         ).Else(
-                            b.dat_r[0].eq(do_loop),
+                            b.dat_r.eq(do_loop),
                         )
                     ],
                     0xC: [
-                        b.dat_r[0].eq(ready),
-                        b.dat_r[1].eq(finished),
+                        b.dat_r.eq(finished << 1 | ready),
                     ],
                     0x10: If(b.we,
                             wform_size.eq(b.dat_w[0:counter_max_wid]),
                         ).Else(
-                            b.dat_r[0:counter_max_wid].eq(wform_size)
+                            b.dat_r.eq(wform_size)
                         ),
-                    0x14: b.dat_r[0:timer_wid].eq(timer),
+                    0x14: b.dat_r.eq(timer),
                     0x18: If(b.we,
                             timer_spacing.eq(b.dat_w[0:timer_wid]),
                         ).Else(
-                            b.dat_r[0:timer_wid].eq(timer_spacing),
+                            b.dat_r.eq(timer_spacing),
                         ),
                     0x1C: If(b.we,
                             force_stop.eq(b.dat_w[0]),
                         ).Else(
-                            b.dat_r[0].eq(force_stop),
+                            b.dat_r.eq(force_stop),
                         ),
                         # (W)A(V)EFO(RM)
                     "default": b.dat_r.eq(0xAEF0AEF0),

@@ -305,6 +305,9 @@ class UpsilonSoC(SoCCore):
         return self.add_spi_master(name, **args)
 
     def add_waveform(self, name, ram_len, **kwargs):
+        # TODO: Either set the SPI interface at instantiation time,
+        # or allow waveform to read more than one SPI bus (either by
+        # master switching or addressing by Waveform).
         kwargs['counter_max_wid'] = minbits(ram_len)
         wf = Waveform(**kwargs)
 
@@ -316,8 +319,8 @@ class UpsilonSoC(SoCCore):
         wf.add_ram(bram_pi.add_master(name), ram_len)
 
         def f(csrs):
-            origin = csrs["memories"][name.lower() + "_pi"]["base"]
-            return f'{name} = RegisterRegion({origin}, {wf.mmio(origin)})'
+            param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
+            return f'{name} = Waveform({name}_ram, {name}_PI, {name}_ram_PI, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
         self.mmio_closures.append(f)
         return wf, pi
 

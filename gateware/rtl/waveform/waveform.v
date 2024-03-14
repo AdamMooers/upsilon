@@ -67,6 +67,7 @@ CHECK_START: if (run) begin
 		state <= CHECK_LEN;
 	end else begin
 		ready <= 1;
+		finished <= 0;
 	end
 CHECK_LEN: if (cntr >= wform_size) begin
 		if (do_loop) begin
@@ -79,11 +80,9 @@ CHECK_LEN: if (cntr >= wform_size) begin
 		state <= READ_RAM;
 	end
 WAIT_FINISHED: if (!run) begin
-		finished <= 0;
 		state <= CHECK_START;
 	end else if (do_loop) begin
 		state <= READ_RAM;
-		finished <= 0;
 		cntr <= 0;
 	end else begin
 		finished <= 1;
@@ -174,7 +173,6 @@ end
  * master switch for the DAC to the main CPU.
  */
 WAIT_PERIOD: if (!run) begin
-	finished <= 0;
 	state <= CHECK_START;
 end else if (timer < timer_spacing) begin
 	timer <= timer + 1;

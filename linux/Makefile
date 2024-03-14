@@ -2,7 +2,7 @@
 
 .SUFFIXES: .mpy .py
 
-MPY=picorv32.mpy registers.mpy spi.mpy  waveform.mpy mmio.mpy
+MPY=picorv32.mpy registers.mpy spi.mpy  waveform.mpy mmio.mpy random.mpy
 
 all: $(MPY)
 .py.mpy:
