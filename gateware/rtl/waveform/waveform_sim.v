@@ -1,132 +1,154 @@
-/* Copyright 2023 (C) Peter McGoron
+/* Copyright 2024 (C) Peter McGoron
+ *
  * This file is a part of Upsilon, a free and open source software project.
  * For license terms, refer to the files in `doc/copying` in the Upsilon
  * source distribution.
  */
+
 module waveform_sim #(
-	parameter DAC_WID = 24,
-	parameter DAC_WID_SIZ = 5,
-	parameter DAC_POLARITY = 0,
-	parameter DAC_PHASE = 1,
-	parameter DAC_CYCLE_HALF_WAIT = 10,
-	parameter DAC_CYCLE_HALF_WAIT_SIZ = 4,
-	parameter DAC_SS_WAIT = 5,
-	parameter DAC_SS_WAIT_SIZ = 3,
-	parameter TIMER_WID = 32,
-	parameter WORD_WID = 20,
-	parameter WORD_AMNT_WID = 11,
-	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
-	parameter RAM_REAL_START = 32'h12340,
-	parameter RAM_CNTR_LEN = 12,
-	parameter TOTAL_RAM_WORD_MINUS_ONE = 4095,
-	parameter DELAY_CNTR_LEN = 8,
-	parameter DELAY_TOTAL = 12,
-	parameter RAM_WID = 32,
-	parameter RAM_WORD_WID = 16,
-	parameter RAM_WORD_INCR = 2
+	parameter RAM_START_ADDR = 32'h0,
+	parameter SPI_START_ADDR = 32'h10000000,
+	parameter COUNTER_MAX_WID = 16,
+	parameter TIMER_WID = 16
 ) (
 	input clk,
-	input rst_L,
-	input arm,
-	input halt_on_finish,
-	output waveform_finished,
-	output running,
-	input [TIMER_WID-1:0] time_to_wait,
 
-	/* User interface */
-	input refresh_start,
-	input [RAM_WID-1:0] start_addr,
-	output reg refresh_finished,
-
-	output [DAC_WID-1:0] from_master,
+	/* Waveform output control */
+	input run,
+	input force_stop,
+	output [COUNTER_MAX_WID-1:0] cntr,
+	input do_loop,
 	output finished,
-	input rdy,
-	output spi_err,
+	output ready,
+	input [COUNTER_MAX_WID-1:0] wform_size,
+	output [TIMER_WID-1:0] timer,
+	input [TIMER_WID-1:0] timer_spacing,
 
-	input[RAM_WORD_WID-1:0] backing_store [TOTAL_RAM_WORD_MINUS_ONE:0]
+	/* data requests to Verilator */
+
+	output reg [32-1:0] offset,
+	output reg [32-1:0] spi_data,
+	input [32-1:0] ram_data,
+	output reg [1:0] enable,
+	input ram_finished,
+
+	/* Misc */
+	input [32-1:0] spi_max_wait
 );
 
-wire sck;
-wire ss_L;
-wire mosi;
-
-spi_slave_no_write #(
-	.WID(DAC_WID),
-	.WID_LEN(DAC_WID_SIZ),
-	.POLARITY(DAC_POLARITY),
-	.PHASE(DAC_PHASE)
-) slave (
-	.clk(clk),
-	.sck(sck),
-	.rst_L(rst_L),
-	.ss_L(ss_L),
-	.mosi(mosi),
-	.from_master(from_master),
-	.finished(finished),
-	.rdy(rdy),
-	.err(spi_err)
-);
-
-wire [RAM_WID-1:0] ram_dma_addr;
-wire [RAM_WORD_WID-1:0] ram_word;
-wire ram_read;
-wire ram_valid;
-
-dma_sim #(
-	.RAM_WID(RAM_WID),
-	.RAM_WORD_WID(RAM_WORD_WID),
-	.RAM_REAL_START(RAM_REAL_START),
-	.RAM_CNTR_LEN(RAM_CNTR_LEN),
-	.TOTAL_RAM_WORD_MINUS_ONE(TOTAL_RAM_WORD_MINUS_ONE),
-	.DELAY_CNTR_LEN(DELAY_CNTR_LEN),
-	.DELAY_TOTAL(DELAY_TOTAL)
-) dma_sim (
-	.clk(clk),
-	.ram_dma_addr(ram_dma_addr),
-	.ram_word(ram_word),
-	.ram_read(ram_read),
-	.ram_valid(ram_valid),
-	.backing_store(backing_store)
-);
+wire [32-1:0] wb_adr;
+wire wb_cyc;
+wire wb_we;
+wire wb_stb;
+wire [32-1:0] wb_dat_w;
+reg [32-1:0] wb_dat_r;
+wire [4-1:0] wb_sel;
+reg wb_ack = 0;
 
 waveform #(
-	.DAC_WID(DAC_WID),
-	.DAC_WID_SIZ(DAC_WID_SIZ),
-	.DAC_POLARITY(DAC_POLARITY),
-	.DAC_PHASE(DAC_PHASE),
-	.DAC_CYCLE_HALF_WAIT(DAC_CYCLE_HALF_WAIT),
-	.DAC_CYCLE_HALF_WAIT_SIZ(DAC_CYCLE_HALF_WAIT_SIZ),
-	.DAC_SS_WAIT(DAC_SS_WAIT),
-	.DAC_SS_WAIT_SIZ(DAC_SS_WAIT_SIZ),
-	.TIMER_WID(TIMER_WID),
-	.WORD_WID(WORD_WID),
-	.WORD_AMNT_WID(WORD_AMNT_WID),
-	.WORD_AMNT(WORD_AMNT),
-	.RAM_WID(RAM_WID),
-	.RAM_WORD_WID(RAM_WORD_WID),
-	.RAM_WORD_INCR(RAM_WORD_INCR)
-) waveform (
+	.RAM_START_ADDR(RAM_START_ADDR),
+	.SPI_START_ADDR(SPI_START_ADDR),
+	.COUNTER_MAX_WID(COUNTER_MAX_WID),
+	.TIMER_WID(TIMER_WID)
+) wf (
 	.clk(clk),
-	.arm(arm),
-	.rst_L(rst_L),
-	.halt_on_finish(halt_on_finish),
-	.running(running),
-	.finished(waveform_finished),
-	.time_to_wait(time_to_wait),
-
-	.refresh_start(refresh_start),
-	.start_addr(start_addr),
-	.refresh_finished(refresh_finished),
-
-	.ram_dma_addr(ram_dma_addr),
-	.ram_word(ram_word),
-	.ram_read(ram_read),
-	.ram_valid(ram_valid),
-
-	.mosi(mosi),
-	.sck(sck),
-	.ss_L(ss_L)
+	.run(run),
+	.force_stop(force_stop),
+	.cntr(cntr),
+	.do_loop(do_loop),
+	.finished(finished),
+	.ready(ready),
+	.wform_size(wform_size),
+	.timer(timer),
+	.timer_spacing(timer_spacing),
+	.wb_adr(wb_adr),
+	.wb_cyc(wb_cyc),
+	.wb_we(wb_we),
+	.wb_stb(wb_stb),
+	.wb_dat_w(wb_dat_w),
+	.wb_dat_r(wb_dat_r),
+	.wb_ack(wb_ack),
+	.wb_sel(wb_sel)
 );
 
+reg [32-1:0] spi_cntr = 0;
+reg spi_armed = 0;
+reg spi_running = 0;
+reg spi_ready_to_arm = 1;
+reg spi_finished = 0;
+
+/* SPI Delay simulation */
+
+always @ (posedge clk) if ((spi_armed || spi_running) && !spi_finished) begin
+	spi_running <= 1;
+	spi_ready_to_arm <= 0;
+	if (spi_cntr == spi_max_wait) begin
+		spi_cntr <= 0;
+		spi_finished <= 1;
+	end else begin
+		spi_cntr <= spi_cntr + 1;
+	end
+end else if (spi_finished) begin
+	spi_running <= 0;
+	if (!spi_armed) begin
+		spi_finished <= 0;
+		spi_ready_to_arm <= 1;
+	end
+end
+
+/* Bus handlers */
+
+always @* if (wb_we && wb_sel != 4'b1111)
+	$error("Write request without writing entire word");
+
+always @ (posedge clk) if (wb_cyc & wb_stb & ~wb_ack) begin
+	if (wb_adr >= SPI_START_ADDR) case (wb_adr)
+	SPI_START_ADDR | 32'h4: if (wb_we) begin
+		spi_armed <= wb_dat_w[0];
+		wb_ack <= 1;
+	end else begin
+		wb_dat_r[0] <= spi_armed;
+		wb_ack <= 1;
+	end
+	SPI_START_ADDR | 32'hC: begin
+		if (!wb_we) $error("Waveform should never read the to_slave register");
+
+		/* Write SPI Data to verilator immediately, but have a counter
+		 * running in the background to simulate SPI transfer */
+		spi_data <= wb_dat_w;
+		enable <= 2'b10;
+		if (ram_finished) begin
+			enable <= 0;
+			wb_ack <= 1;
+		end
+	end
+	SPI_START_ADDR | 32'h10: begin
+		if (wb_we) $error("Blocking SPI status check is read only register");
+		if (spi_ready_to_arm  || spi_finished) begin
+			wb_dat_r[0] <= spi_ready_to_arm;
+			wb_dat_r[1] <= spi_finished;
+			wb_ack <= 1;
+		end
+	end
+	default: begin
+		$error("Invalid SPI address");
+	end
+	endcase else begin
+		offset <= wb_adr;
+		enable <= 2'b01;
+		if (ram_finished) begin
+			wb_dat_r <= ram_data;
+			enable <= 0;
+			wb_ack <= 1;
+		end
+	end
+end else if (~wb_cyc) begin
+	wb_ack <= 0;
+end
+
+initial begin
+	$dumpfile("waveform.fst");
+	$dumpvars;
+end
+
 endmodule
-`undefineall

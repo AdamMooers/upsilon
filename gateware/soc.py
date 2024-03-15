@@ -64,6 +64,7 @@ from util import *
 from swic import *
 from extio import *
 from region import BasicRegion
+import json
 
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
@@ -150,57 +151,148 @@ class _CRG(Module):
 
 class UpsilonSoC(SoCCore):
     def add_ip(self, ip_str, ip_name):
+        # The IP of the FPGA and the IP of the TFTP server are stored as
+        # "constants" which turn into preprocessor defines.
+
+        # They are IPv4 addresses that are split into octets. So the local
+        # ip is LOCALIP1, LOCALIP2, etc.
         for seg_num, ip_byte in enumerate(ip_str.split('.'),start=1):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
     def add_slave_with_registers(self, name, bus, region, registers):
+        """ Add a bus slave, and also add its registers to the subregions
+        dictionary. """
         self.bus.add_slave(name, bus, region)
         self.soc_subregions[name] = registers
 
-    def add_blockram(self, name, size, connect_now=True):
+    def add_preemptive_interface_for_slave(self, name, slave_bus, slave_width, slave_registers, addressing="word"):
+        """ Add a PreemptiveInterface in front of a Wishbone Slave interface.
+
+        :param name: Name of the module and the Wishbone bus region.
+        :param slave_bus: Instance of Wishbone.Interface.
+        :param slave_width: Width of the region.
+        :param slave_registers: Register inside the bus region.
+        :return: The PI module.
+        """
+        pi = PreemptiveInterface(slave_bus, addressing=addressing, name=name)
+        self.add_module(name, pi)
+        self.add_slave_with_registers(name, pi.add_master("main"),
+                SoCRegion(origin=None, size=slave_width, cached=False),
+                slave_registers)
+
+        def f(csrs):
+            # CSRs are not case-folded, but Wishbone memory regions are!!
+            return f'{name} = Register({csrs["csr_registers"][name + "_master_select"]["addr"]})'
+
+        self.mmio_closures.append(f)
+        self.pre_finalize.append(lambda : pi.pre_finalize(name + "_main_PI.json"))
+        return pi
+
+    def add_blockram(self, name, size):
+        """ Add a blockram module to the system.  """
         mod = SRAM(size)
         self.add_module(name, mod)
 
-        if connect_now:
-            self.bus.add_slave(name, mod.bus,
-                    SoCRegion(origin=None, size=size, cached=True))
-        return mod
+        pi = self.add_preemptive_interface_for_slave(name + "_PI", mod.bus,
+                size, None, "word")
 
-    def add_preemptive_interface(self, name, size, slave):
-        mod = PreemptiveInterface(size, slave)
-        self.add_module(name, mod)
-        return mod
+        def f(csrs):
+            return f'{name} = FlatArea({csrs["memories"][name.lower() + "_pi"]["base"]}, {size})'
+        self.mmio_closures.append(f)
 
-    def add_picorv32(self, name, size=0x1000, origin=0x10000):
-        pico = PicoRV32(name, origin, origin+0x10)
+        return mod, pi
+
+    def add_picorv32(self, name, size=0x1000, origin=0x10000, param_origin=0x100000):
+        """ Add a PicoRV32 core.
+
+        :param name: Name of the PicoRV32 module in the Main CPU.
+        :param size: Size of the PicoRV32 RAM region.
+        :param origin: Start position of the PicoRV32.
+        :param param_origin: Origin of the PicoRV32 param region in the PicoRV32
+           memory.
+        """
+        # Add PicoRV32 core
+        pico = PicoRV32(name, origin, origin+0x10, param_origin)
         self.add_module(name, pico)
-        self.add_slave_with_registers(name + "_dbg_reg", pico.debug_reg_read.bus,
-                SoCRegion(origin=None, size=pico.debug_reg_read.width, cached=False),
-                pico.debug_reg_read.registers)
 
-        ram = self.add_blockram(name + "_ram", size=size, connect_now=False)
-        ram_iface = self.add_preemptive_interface(name + "ram_iface", 2, ram)
+        # Attach registers to main CPU at pre-finalize time.
+        def pre_finalize():
+            pico.params.pre_finalize()
+            self.add_slave_with_registers(name + "_params", pico.params.firstbus,
+                SoCRegion(origin=None, size=pico.params.width, cached=False),
+                pico.params.public_registers)
+            pico.mmap.add_region("params",
+                BasicRegion(origin=pico.param_origin, size=pico.params.width, bus=pico.params.secondbus,
+                    registers=pico.params.public_registers))
+        self.pre_finalize.append(pre_finalize)
+
+        # Add a Block RAM for the PicoRV32 toexecute from.
+        ram, ram_pi = self.add_blockram(name + "_ram", size=size)
+
+        # Add this at the end so the Blockram declaration comes before this one
+        def f(csrs):
+            param_origin = csrs["memories"][f'{name.lower()}_params']["base"]
+            return f'{name}_params = RegisterRegion({param_origin}, {pico.params.mmio(param_origin)})\n' \
+                    + f'{name} = PicoRV32({name}_ram, {name}_params, {name}_ram_PI)'
+        self.mmio_closures.append(f)
+
+        # Allow access from the PicoRV32 to the Block RAM.
         pico.mmap.add_region("main",
-                BasicRegion(origin=origin, size=size, bus=ram_iface.buses[1]))
+                BasicRegion(origin=origin, size=size, bus=ram_pi.add_master(name)))
 
-        self.add_slave_with_registers(name + "_ram", ram_iface.buses[0],
-                SoCRegion(origin=None, size=size, cached=True),
-                None)
-
-    def picorv32_add_cl(self, name, param_origin=0x100000):
+    def picorv32_add_cl(self, name):
+        """ Add a register area containing the control loop parameters to the
+            PicoRV32.
+        """
         pico = self.get_module(name)
-        param_iface = pico.add_cl_params(param_origin, name + "_cl.json")
-        self.bus.add_slave(name + "_cl", param_iface,
-                SoCRegion(origin=None, size=size, cached=False))
+        params = pico.add_cl_params()
+
+    def picorv32_add_pi(self, name, region_name, pi_name, origin, width, registers):
+        """ Add a PreemptiveInterface master to a PicoRV32 MemoryMap region.
+
+        :param name: Name of the PicoRV32 module.
+        :param region_name: Name of the region in the PicoRV32 MMAP.
+        :param pi_name: Name of the PreemptiveInterface module in the main CPU.
+        :param origin: Origin of the memory region in the PicoRV32.
+        :param width: Width of the region in the PicoRV32.
+        :param registers: Registers of the region.
+        """
+        pico = self.get_module(name)
+        pi = self.get_module(pi_name)
+
+        pico.mmap.add_region(region_name,
+                BasicRegion(origin=origin, size=width,
+                    bus=pi.add_master(name), registers=registers))
+
+    def add_spi_master(self, name, **kwargs):
+        spi = SPIMaster(**kwargs)
+        self.add_module(name, spi)
+
+        pi = self.add_preemptive_interface_for_slave(name + "_PI", spi.bus,
+                spi.width, spi.public_registers, "byte")
+
+        def f(csrs):
+            wid = kwargs["spi_wid"]
+            origin = csrs["memories"][name.lower() + "_pi"]['base']
+            return f'{name} = SPI({wid}, {name}_PI, {origin}, {spi.mmio(origin)})'
+        self.mmio_closures.append(f)
+
+        return spi, pi
 
     def add_AD5791(self, name, **kwargs):
+        """ Adds an AD5791 SPI master to the SoC.
+
+        :return: A tuple of the SPI master module and the PI module.
+        """
         args = SPIMaster.AD5791_PARAMS
         args.update(kwargs)
-        spi = SPIMaster(**args)
-        self.add_module(name, spi)
-        return spi
+        return self.add_spi_master(name, **args)
 
     def add_LT_adc(self, name, **kwargs):
+        """ Adds a Linear Technologies ADC SPI master to the SoC.
+
+        :return: A tuple of the SPI master module and the PI module.
+        """
         args = SPIMaster.LT_ADC_PARAMS
         args.update(kwargs)
         args["mosi"] = Signal()
@@ -210,9 +302,27 @@ class UpsilonSoC(SoCCore):
         conv_high = Signal()
         self.comb += conv_high.eq(~kwargs["ss_L"])
 
-        spi = SPIMaster(**args)
-        self.add_module(name, spi)
-        return spi
+        return self.add_spi_master(name, **args)
+
+    def add_waveform(self, name, ram_len, **kwargs):
+        # TODO: Either set the SPI interface at instantiation time,
+        # or allow waveform to read more than one SPI bus (either by
+        # master switching or addressing by Waveform).
+        kwargs['counter_max_wid'] = minbits(ram_len)
+        wf = Waveform(**kwargs)
+
+        self.add_module(name, wf)
+        pi = self.add_preemptive_interface_for_slave(name + "_PI",
+                wf.slavebus, wf.width, wf.public_registers, "byte")
+
+        bram, bram_pi = self.add_blockram(name + "_ram", ram_len)
+        wf.add_ram(bram_pi.add_master(name), ram_len)
+
+        def f(csrs):
+            param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
+            return f'{name} = Waveform({name}_ram, {name}_PI, {name}_ram_PI, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
+        self.mmio_closures.append(f)
+        return wf, pi
 
     def __init__(self,
                  variant="a7-100",
@@ -237,6 +347,15 @@ class UpsilonSoC(SoCCore):
         # of through MemoryMap.
         self.soc_subregions = {}
 
+        # The SoC generates a Python module containing information about
+        # how to access registers from Micropython. This is a list of
+        # closures that print the code that will be placed in the module.
+        self.mmio_closures = []
+
+        # This is a list of closures that are run "pre-finalize", which
+        # is before the do_finalize() function is called.
+        self.pre_finalize = []
+
         """
         These source files need to be sorted so that modules
         that rely on another module come later. For instance,
@@ -252,7 +371,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/picorv32/picorv32.v")
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
-        platform.add_source("rtl/spi/spi_master_ss_wb.v")
+        platform.add_source("rtl/waveform/waveform.v")
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -301,12 +420,16 @@ class UpsilonSoC(SoCCore):
 
         # Add pins
         platform.add_extension(io)
+        module_reset = platform.request("module_reset")
 
         # Add control loop DACs and ADCs.
         self.add_picorv32("pico0")
-        # XXX: I don't have the time to restructure my code to make it
-        # elegant, that comes when things work
-        module_reset = platform.request("module_reset")
+        self.picorv32_add_cl("pico0")
+
+        # Add waveform generator.
+        self.add_waveform("wf0", 4096)
+        self.picorv32_add_pi("pico0", "wf0", "wf0_PI", 0x400000, self.wf0.width, self.wf0.public_registers)
+
         self.add_AD5791("dac0",
                 rst=module_reset,
                 miso=platform.request("dac_miso_0"),
@@ -314,15 +437,8 @@ class UpsilonSoC(SoCCore):
                 sck=platform.request("dac_sck_0"),
                 ss_L=platform.request("dac_ss_L_0"),
         )
-
-        self.add_preemptive_interface("dac0_PI", 2, self.dac0)
-        self.add_slave_with_registers("dac0", self.dac0_PI.buses[0],
-                SoCRegion(origin=None, size=self.dac0.width, cached=False),
-                self.dac0.registers)
-        self.pico0.mmap.add_region("dac0",
-                    BasicRegion(origin=0x200000, size=self.dac0.width,
-                                bus=self.dac0_PI.buses[1],
-                                registers=self.dac0.registers))
+        self.picorv32_add_pi("pico0", "dac0", "dac0_PI", 0x200000, self.dac0.width, self.dac0.public_registers)
+        self.wf0.add_spi(self.dac0_PI.add_master("wf0"))
 
         self.add_LT_adc("adc0",
                 rst=module_reset,
@@ -331,25 +447,37 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request("adc_conv_0"),
                 spi_wid=18,
         )
-        self.add_preemptive_interface("adc0_PI", 2, self.adc0)
-        self.add_slave_with_registers("adc0", self.adc0_PI.buses[0],
-                SoCRegion(origin=None, size=self.adc0.width, cached=False),
-                self.adc0.registers)
-        self.pico0.mmap.add_region("adc0",
-                    BasicRegion(origin=0x300000, size=self.adc0.width,
-                                bus=self.adc0_PI.buses[1],
-                                registers=self.adc0.registers))
+        self.picorv32_add_pi("pico0", "adc0", "adc0_PI", 0x300000, self.adc0.width, self.adc0.public_registers)
+
+        # Run pre-finalize
+        for f in self.pre_finalize:
+            f()
 
     def do_finalize(self):
         with open('soc_subregions.json', 'wt') as f:
-            import json
-            json.dump(self.soc_subregions, f)
+            regions = self.soc_subregions.copy()
+            for k in regions:
+                if regions[k] is not None:
+                    regions[k] = {name : reg._to_dict() for name, reg in regions[k].items()}
+            json.dump(regions, f)
 
-def main():
-    from config import config
-    soc =UpsilonSoC(**config)
-    builder = Builder(soc, csr_json="csr.json", compile_software=True)
-    builder.build()
+def generate_main_cpu_include(closures, csr_file):
+    """ Generate Micropython include from a JSON file. """
+    with open('mmio.py', 'wt') as out:
 
-if __name__ == "__main__":
-    main()
+        print("from registers import *", file=out)
+        print("from waveform import *", file=out)
+        print("from picorv32 import *", file=out)
+        print("from spi import *", file=out)
+        with open(csr_file, 'rt') as f:
+            csrs = json.load(f)
+
+        for f in closures:
+            print(f(csrs), file=out)
+
+from config import config
+soc =UpsilonSoC(**config)
+builder = Builder(soc, csr_json="csr.json", compile_software=True, compile_gateware=True)
+builder.build()
+
+generate_main_cpu_include(soc.mmio_closures, "csr.json")

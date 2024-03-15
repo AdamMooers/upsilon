@@ -108,23 +108,77 @@ The only masters and slaves that are word-addressed are the ones that are
 from LiteX itself. Those have special code to convert to the byte-addressed
 masters/slaves.
 
+If the slave has one bus, it **must** be an attribute called ``bus``.
+
 Each class that is accessed by a wishbone bus **must** have an attribute
 called ``width`` that is the size, in bytes, of the region. This must be a power
 of 2 (exception: wrappers around slaves since they might wrap LiteX slaves
 that don't have ``width`` attributes).
+
+Each class **should** have a attribute ``public_registers`` that is a dictionary,
+keys are names of the register shown to the programmer and
+
+1. ``origin``: offset of the register in memory
+2. ``size``: size of the register in bytes (multiple of 4)
+
+are required attributes. Other attributes are ``rw``, ``direction``, that are
+explained in /doc/controller_manual.rst .
 
 -----------------------------
 Adding Slaves to the Main CPU
 -----------------------------
 
 After adding a module with an ``Interface``, the interface is connected to
-to main CPU bus by adding::
+to main CPU bus by calling one of two functions.
 
-    self.add_slave(name, iface, SoCRegion(origin=None, size=iface.width, cached=False)
+If the slave region has no special areas in it, call::
+
+    self.bus.add_slave(name, slave.bus, SoCRegion(origin=None, size=slave.width, cached=False)
+
+If the slave region has registers, add::
+
+    self.add_slave_with_registers(name, iface, SoCRegion(...), slave.public_registers)
+
+where the SoCRegion parameters are the same as before. Each slave device
+should have a ``slave.width`` and a ``slave.public_registers`` attribute,
+unless noted. Some slaves have only one bus, some have multiple.
 
 The Wishbone cache is very confusing and causes custom Wishbone bus code to
 not work properly. Since a lot of this memory is volatile you should never
 enable the cache (possible exception: SRAM).
+
+---------------------------------------------------------
+Working Around LiteX using pre_finalize and mmio_closures
+---------------------------------------------------------
+
+LiteX runs code prior to calling ``finalize()``, such as CSR allocation,
+that makes it very difficult to write procedural code without preallocating
+lengths.
+
+Upsilon solves this with an ugly hack called ``pre_finalize``, which runs at
+the end of the SoC main module instantiation. All pre_finalize functions are
+put into a list which is run with no arguments and with their return result
+ignored.
+
+``pre_finalize`` calls are usually due to ``PreemptiveInterface``, which uses
+CSR registers.
+
+There is another ugly hack, ``mmio_closures``, which is used to generate the
+``mmio.py`` library. The ``mmio.py`` library groups together relevant memory
+regions and registers into instances of MicroPython classes. The only good
+way to do this is to generate the code for ``mmio.py`` at instantiation time,
+but the origin of each memory region is not known at instantiation time. The
+functions have to be delayed until after memory locations are allocated, but
+there is no hook in LiteX to do that, and the only interface I can think of
+that one can use to look at the origins is ``csr.json``.
+
+The solution is a list of closures that return strings that will be put into
+``mmio.py``. They take one argument, ``csrs``, the ``csr.json`` file as a
+Python dictionary. The closures use the memory location origin in ``csrs``
+to generate code with the correct offsets.
+
+Note that the ``csr.json`` file casefolds the memory locations into lowercase
+but keeps CSR registers as-is.
 
 ====================
 System Within a Chip
@@ -282,3 +336,19 @@ LiteX build will stop after creating the module tree. This  is because you
 imported a module that does not exist. LiteX will silently fail if a Verilog
 source file you added does not exist, so either remove the module or add the
 file.
+
+---------------------------------------------
+I overrode finalize and now things are broken
+---------------------------------------------
+
+*Never* override the ``finalize()`` function in a Migen module.
+
+Each Migen module has a ``finalize()`` function inherited from the class. This
+does code generation and calls ``do_finalize()``, which is a user-defined
+function.
+
+=========
+TODO List
+=========
+
+Pseudo CSR bus for the main CPU?

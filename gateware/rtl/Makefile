@@ -8,6 +8,13 @@ all: make_spi
 make_spi:
 	cd spi && make codegen
 
+test_waveform:
+	cd waveform && make test
+
+test: test_waveform
+
+clean:
+	cd waveform && make clean
 
 #make_bram:
 #	cd bram && make codegen

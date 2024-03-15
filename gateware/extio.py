@@ -8,8 +8,178 @@ from migen import *
 from litex.soc.interconnect.wishbone import Interface
 
 from util import *
+from region import *
+
+class Waveform(LiteXModule):
+    """ A Wishbone bus master that sends a waveform to a SPI master
+        by reading from RAM. """
+
+    public_registers = {
+            "run" : Register(
+                origin=0,
+                bitwidth=1,
+                rw=True,
+            ),
+            "cntr": Register(
+                origin=0x4,
+                bitwidth=16,
+                rw=False,
+            ),
+            "do_loop": Register(
+                origin=0x8,
+                bitwidth= 1,
+                rw= True,
+            ),
+            "finished_or_ready": Register(
+                origin=0xC,
+                bitwidth= 2,
+                rw= False,
+            ),
+            "wform_width": Register(
+                origin=0x10,
+                bitwidth=16,
+                rw= True,
+            ),
+            "timer": Register(
+                origin=0x14,
+                bitwidth= 16,
+                rw= False,
+            ),
+            "timer_spacing": Register(
+                origin= 0x18,
+                bitwidth= 16,
+                rw= True,
+            ),
+            "force_stop" : Register (
+                origin=0x1C,
+                bitwidth=1,
+                rw=True,
+            ),
+    }
+
+    width = 0x20
+
+    def mmio(self, origin):
+        r = ""
+        for name, reg in self.public_registers.items():
+            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={reg.rw}),'
+        return r
+
+    def __init__(self,
+            ram_start_addr = 0,
+            spi_start_addr = 0x10000000,
+            counter_max_wid = 16,
+            timer_wid = 16,
+    ):
+        # This is Waveform's bus to control SPI and RAM devices it owns.
+        self.masterbus = Interface(address_width=32, data_width=32, addressing="byte")
+        # This is the Waveform's interface that is controlled by the Main CPU.
+        self.slavebus = b = Interface(address_width=32, data_width=32, addressing="byte")
+
+        self.mmap = MemoryMap(self.masterbus)
+        self.mmap.add_region("ram",
+                BasicRegion(ram_start_addr, None))
+        self.mmap.add_region("spi",
+                BasicRegion(spi_start_addr, None))
+
+        run = Signal()
+        cntr = Signal(counter_max_wid)
+        do_loop = Signal()
+        ready = Signal()
+        finished = Signal()
+        wform_size = Signal(counter_max_wid)
+        timer = Signal(timer_wid)
+        timer_spacing = Signal(timer_wid)
+        force_stop = Signal()
+
+        self.sync += If(b.cyc & b.stb & ~b.ack,
+                Case(b.adr[0:5], {
+                    0x0: If(b.we,
+                           run.eq(b.dat_w[0]),
+                         ).Else(
+                           b.dat_r.eq(run)
+                         ),
+                    0x4: [
+                        b.dat_r.eq(cntr),
+                    ],
+                    0x8: [
+                        If(b.we,
+                            do_loop.eq(b.dat_w[0]),
+                        ).Else(
+                            b.dat_r.eq(do_loop),
+                        )
+                    ],
+                    0xC: [
+                        b.dat_r.eq(finished << 1 | ready),
+                    ],
+                    0x10: If(b.we,
+                            wform_size.eq(b.dat_w[0:counter_max_wid]),
+                        ).Else(
+                            b.dat_r.eq(wform_size)
+                        ),
+                    0x14: b.dat_r.eq(timer),
+                    0x18: If(b.we,
+                            timer_spacing.eq(b.dat_w[0:timer_wid]),
+                        ).Else(
+                            b.dat_r.eq(timer_spacing),
+                        ),
+                    0x1C: If(b.we,
+                            force_stop.eq(b.dat_w[0]),
+                        ).Else(
+                            b.dat_r.eq(force_stop),
+                        ),
+                        # (W)A(V)EFO(RM)
+                    "default": b.dat_r.eq(0xAEF0AEF0),
+                    }
+                ),
+                b.ack.eq(1),
+            ).Elif(~b.cyc,
+                    b.ack.eq(0),
+            )
+
+        self.specials += Instance("waveform",
+                p_RAM_START_ADDR = ram_start_addr,
+                p_SPI_START_ADDR = spi_start_addr,
+                p_COUNTER_MAX_WID = counter_max_wid,
+                p_TIMER_WID = timer_wid,
+
+                i_clk = ClockSignal(),
+
+                i_run = run,
+                i_force_stop = force_stop,
+                o_cntr = cntr,
+                i_do_loop = do_loop,
+                o_finished = finished,
+                o_ready = ready,
+                i_wform_size = wform_size,
+                o_timer = timer,
+                i_timer_spacing = timer_spacing,
+
+                o_wb_adr = self.masterbus.adr,
+                o_wb_cyc = self.masterbus.cyc,
+                o_wb_we = self.masterbus.we,
+                o_wb_stb = self.masterbus.stb,
+                o_wb_sel = self.masterbus.sel,
+                o_wb_dat_w = self.masterbus.dat_w,
+                i_wb_dat_r = self.masterbus.dat_r,
+                i_wb_ack = self.masterbus.ack,
+        )
+
+    def add_ram(self, bus, size):
+        self.mmap.regions['ram'].bus = bus
+        self.mmap.regions['ram'].size = size
+
+    def add_spi(self, bus):
+        # Waveform code has the SPI hardcoded in, because it is a Verilog
+        # module.
+        self.mmap.regions['spi'].bus = bus
+        self.mmap.regions['spi'].size = SPIMaster.width
+
+    def do_finalize(self):
+        self.mmap.finalize()
 
 class SPIMaster(Module):
+    # IF THESE ARE CHANGED, CHANGE waveform.v !!
     AD5791_PARAMS = {
                 "polarity" :0,
                 "phase" :1,
@@ -28,30 +198,55 @@ class SPIMaster(Module):
             "enable_mosi" : 0,
     }
 
-    width = 0x10
+    width = 0x20
 
-    registers = {
-            "finished_or_ready": {
-                "origin" : 0,
-                "width" : 4,
-                "rw": False,
-            },
-            "arm" : {
-                "origin": 4,
-                "width": 4,
-                "rw": True,
-            },
-            "from_slave": {
-                "origin": 8,
-                "width": 4,
-                "rw": False,
-            },
-            "to_slave": {
-                "origin": 0xC,
-                "width": 4,
-                "rw": True
-            },
+    public_registers = {
+            # The first bit is the "ready" bit, when the master is
+            # not armed and ready to be armed.
+            # The second bit is the "finished" bit, when the master is
+            # armed and finished with a transmission.
+            "finished_or_ready": Register(
+                origin= 0,
+                bitwidth= 2,
+                rw=False,
+            ),
+
+            # One bit to initiate a transmission cycle. Transmission
+            # cycles CANNOT be interrupted.
+            "arm" : Register(
+                origin=4,
+                bitwidth=1,
+                rw=True,
+            ),
+
+            # Data sent from the SPI slave.
+            "from_slave": Register(
+                origin=8,
+                bitwidth=32,
+                rw=False,
+            ),
+
+            # Data sent to the SPI slave.
+            "to_slave": Register(
+                origin=0xC,
+                bitwidth=32,
+                rw=True
+            ),
+
+            # Same as ready_or_finished, but halts until ready or finished
+            # goes high. Dangerous, might cause cores to hang!
+            "wait_finished_or_ready": Register(
+                origin=0x10,
+                bitwidth=2,
+                rw= False,
+            ),
     }
+
+    def mmio(self, origin):
+        r = ""
+        for name, reg in self.public_registers.items():
+            r += f'{name} = Register(loc={origin + reg.origin},bitwidth={reg.bitwidth},rw={reg.rw}),'
+        return r
 
     """ Wrapper for the SPI master verilog code. """
     def __init__(self, rst, miso, mosi, sck, ss_L,
@@ -83,11 +278,60 @@ class SPIMaster(Module):
 
         self.bus = Interface(data_width = 32, address_width=32, addressing="byte")
 
+        from_slave = Signal(spi_wid)
+        to_slave = Signal(spi_wid)
+        finished_or_ready = Signal(2)
+        arm = Signal()
+
         self.comb += [
                 self.bus.err.eq(0),
         ]
 
-        self.specials += Instance("spi_master_ss_wb",
+        self.sync += [
+                If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
+                    Case(self.bus.adr[0:5], {
+                        0x0: [
+                            self.bus.dat_r[2:].eq(0),
+                            self.bus.dat_r[0:2].eq(finished_or_ready),
+                            self.bus.ack.eq(1),
+                        ],
+                        0x4: [
+                            If(self.bus.we,
+                                arm.eq(self.bus.dat_w[0]),
+                            ).Else(
+                                self.bus.dat_r[1:].eq(0),
+                                self.bus.dat_r[0].eq(arm),
+                            ),
+                            self.bus.ack.eq(1),
+                            ],
+                        0x8: [
+                            self.bus.dat_r[spi_wid:].eq(0),
+                            self.bus.dat_r[0:spi_wid].eq(from_slave),
+                            self.bus.ack.eq(1),
+                            ],
+                        0xC: [
+                            If(self.bus.we,
+                            to_slave.eq(self.bus.dat_r[0:spi_wid]),
+                            ).Else(
+                                self.bus.dat_r[spi_wid:].eq(0),
+                                self.bus.dat_r[0:spi_wid].eq(to_slave),
+                            ),
+                            self.bus.ack.eq(1),
+                            ],
+                        0x10: If(finished_or_ready[0] | finished_or_ready[1],
+                            self.bus.dat_r[1:].eq(0),
+                            self.bus.dat_r.eq(finished_or_ready),
+                        ),
+                        "default":
+                        # 0xSPI00SPI
+                            self.bus.dat_r.eq(0x57100571),
+                    }),
+                ).Elif(~self.bus.cyc,
+                    self.bus.ack.eq(0)
+                )
+            ]
+
+        self.specials += Instance("spi_master_ss",
             p_SS_WAIT = ss_wait,
             p_SS_WAIT_TIMER_LEN = minbits(ss_wait),
             p_CYCLE_HALF_WAIT = spi_cycle_half_wait,
@@ -100,18 +344,16 @@ class SPIMaster(Module):
             p_PHASE = phase,
 
             i_clk = ClockSignal(),
-            i_rst_L = rst,
+            # module_reset is active high
+            i_rst_L = ~rst,
             i_miso = miso,
             o_mosi = mosi,
             o_sck_wire = sck,
             o_ss_L = ss_L,
 
-            i_wb_cyc = self.bus.cyc,
-            i_wb_stb = self.bus.stb,
-            i_wb_we = self.bus.we,
-            i_wb_sel = self.bus.sel,
-            i_wb_addr = self.bus.adr,
-            i_wb_dat_w = self.bus.dat_w,
-            o_wb_ack = self.bus.ack,
-            o_wb_dat_r = self.bus.dat_r,
+            o_from_slave = from_slave,
+            i_to_slave = to_slave,
+            o_finished = finished_or_ready[1],
+            o_ready_to_arm = finished_or_ready[0],
+            i_arm = arm,
         )

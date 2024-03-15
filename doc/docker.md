@@ -85,6 +85,11 @@ You must also change the port in `upsilon/build/Makefile` under `tftp`.
 
 Run `make images` to create all docker images.
 
+## Copy Default Config
+
+If you do not have a ``config.py`` file in ``/gateware``, copy ``config.py.def``
+to ``config.py``.
+
 ## Setup and Run Containers
 
 For `NAME` in `hardware`, `opensbi`, `buildroot`:

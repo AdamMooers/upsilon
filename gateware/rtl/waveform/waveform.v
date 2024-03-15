@@ -1,208 +1,185 @@
-/* Copyright 2023 (C) Peter McGoron
+/* Copyright 2024 (C) Peter McGoron
+ *
  * This file is a part of Upsilon, a free and open source software project.
  * For license terms, refer to the files in `doc/copying` in the Upsilon
  * source distribution.
  */
-/* Write a waveform to a DAC. */
-/* TODO: Add "how many values to go" counter. */
+
 module waveform #(
-	parameter DAC_WID = 24,
-	parameter DAC_WID_SIZ = 5,
-	parameter DAC_POLARITY = 0,
-	parameter DAC_PHASE = 1,
-	parameter DAC_CYCLE_HALF_WAIT = 10,
-	parameter DAC_CYCLE_HALF_WAIT_SIZ = 4,
-	parameter DAC_SS_WAIT = 5,
-	parameter DAC_SS_WAIT_SIZ = 3,
-	parameter TIMER_WID = 32,
-	parameter WORD_WID = 20,
-	parameter WORD_AMNT_WID = 11,
-	parameter [WORD_AMNT_WID-1:0] WORD_AMNT = 2047,
-	parameter RAM_WID = 32,
-	parameter RAM_WORD_WID = 16,
-	parameter RAM_WORD_INCR = 2
+	parameter RAM_START_ADDR = 32'h0,
+	parameter SPI_START_ADDR = 32'h10000000,
+	parameter COUNTER_MAX_WID = 16,
+	parameter TIMER_WID = 16
 ) (
 	input clk,
-	input rst_L,
-	input arm,
-	input halt_on_finish,
-	/* NOTE:
-	 * finished is used when a module wants to wait for a
-	 * waveform with the halt_on_finish flag finishes
-	 * one waveform.
-	 *
-	 * running is used when a module wants to know when
-	 * the waveform module has finished running after
-	 * deasserting arm.
-	 *
-	 * When in doubt, deassert arm and wait for running
-	 * to be deasserted.
-	 */
+
+	/* Waveform output control */
+	input run,
+	input force_stop,
+	output reg[COUNTER_MAX_WID-1:0] cntr,
+	input do_loop,
 	output reg finished,
-	output running,
-	input [TIMER_WID-1:0] time_to_wait,
+	output reg ready,
+	input [COUNTER_MAX_WID-1:0] wform_size,
+	output reg [TIMER_WID-1:0] timer,
+	input [TIMER_WID-1:0] timer_spacing,
 
-	/* User interface */
-	input refresh_start,
-	input [RAM_WID-1:0] start_addr,
-	output reg refresh_finished,
-
-	/* RAM interface */
-	output reg [RAM_WID-1:0] ram_dma_addr,
-	input [RAM_WORD_WID-1:0] ram_word,
-	output reg ram_read,
-	input ram_valid,
-
-	/* DAC wires. */
-	output mosi,
-	output sck,
-	output ss_L
+	/* Bus master */
+	output reg [32-1:0] wb_adr,
+	output reg wb_cyc,
+	output reg wb_we,
+	output wb_stb,
+	output [4-1:0] wb_sel,
+	output reg [32-1:0] wb_dat_w,
+	input [32-1:0] wb_dat_r,
+	input wb_ack
 );
 
-wire [WORD_WID-1:0] word;
-reg word_next = 0;
-wire word_ok;
-wire word_last;
-reg word_rst = 1;
+/* When a Wishbone cycle starts, the output is stable. */
+assign wb_stb = wb_cyc;
 
-bram_interface #(
-	.WORD_WID(WORD_WID),
-	.WORD_AMNT_WID(WORD_AMNT_WID),
-	.WORD_AMNT(WORD_AMNT),
-	.RAM_WID(RAM_WID),
-	.RAM_WORD_WID(RAM_WORD_WID),
-	.RAM_WORD_INCR(RAM_WORD_INCR)
-) bram (
-	.clk(clk),
-	.rst_L(rst_L),
-	.word(word),
-	.word_next(word_next),
-	.word_last(word_last),
-	.word_ok(word_ok),
-	.word_rst(word_rst),
+/* Always write 32 bits */
+assign wb_sel = 4'b1111;
 
-	.refresh_start(refresh_start),
-	.start_addr(start_addr),
-	.refresh_finished(refresh_finished),
+localparam CHECK_START = 0;
+localparam CHECK_LEN = 1;
+localparam WAIT_FINISHED = 2;
+localparam READ_RAM = 3;
+localparam WAIT_RAM = 4;
+localparam WRITE_DAC_DATA_ADR = 5;
+localparam WAIT_DAC_DATA_ADR = 6;
+localparam WRITE_DAC_ARM_ADR = 7;
+localparam WAIT_DAC_ARM_ADR = 8;
+localparam WRITE_DAC_DISARM_ADR = 9;
+localparam WAIT_DAC_DISARM_ADR = 10;
+localparam READ_DAC_FIN_ADR = 11;
+localparam WAIT_DAC_FIN_ADR = 12;
+localparam WAIT_PERIOD = 13;
 
-	.ram_dma_addr(ram_dma_addr),
-	.ram_word(ram_word),
-	.ram_read(ram_read),
-	.ram_valid(ram_valid)
-);
+reg [4-1:0] state = CHECK_START;
 
-wire dac_finished;
-reg dac_arm = 0;
-reg [DAC_WID-1:0] dac_out = 0;
-wire dac_ready_to_arm_unused;
-
-spi_master_ss_no_read #(
-	.WID(DAC_WID),
-	.WID_LEN(DAC_WID_SIZ),
-	.CYCLE_HALF_WAIT(DAC_CYCLE_HALF_WAIT),
-	.TIMER_LEN(DAC_CYCLE_HALF_WAIT_SIZ),
-	.POLARITY(DAC_POLARITY),
-	.PHASE(DAC_PHASE),
-	.SS_WAIT(DAC_SS_WAIT),
-	.SS_WAIT_TIMER_LEN(DAC_SS_WAIT_SIZ)
-) dac_master (
-	.clk(clk),
-	.rst_L(rst_L),
-	.ready_to_arm(dac_ready_to_arm_unused),
-	.mosi(mosi),
-	.sck_wire(sck),
-	.ss_L(ss_L),
-	.finished(dac_finished),
-	.arm(dac_arm),
-	.to_slave(dac_out)
-);
-
-localparam WAIT_ON_ARM = 0;
-localparam DO_WAIT = 1;
-localparam RECV_WORD = 2;
-localparam WAIT_ON_DAC = 3;
-localparam WAIT_ON_DISARM = 4;
-reg [2:0] state = WAIT_ON_ARM;
-
-reg [TIMER_WID-1:0] wait_timer = 0;
-
-assign running = state != WAIT_ON_ARM;
-
-always @ (posedge clk) if (!rst_L) begin
-	state <= WAIT_ON_ARM;
-	wait_timer <= 0;
-	finished <= 0;
-	word_rst <= 1;
-	word_next <= 0;
-	dac_out <= 0;
-	dac_arm <= 0;
+always @ (posedge clk) if (force_stop) begin
+	state <= CHECK_START;
 end else case (state)
-WAIT_ON_ARM: begin
-	finished <= 0;
-	if (arm) begin
-		state <= DO_WAIT;
-		word_rst <= 0;
-		wait_timer <= time_to_wait;
+CHECK_START: if (run) begin
+		cntr <= 0;
+		ready <= 0;
+		state <= CHECK_LEN;
 	end else begin
-		word_rst <= 1;
+		ready <= 1;
+		finished <= 0;
 	end
-end
-DO_WAIT: if (!arm) begin
-	state <= WAIT_ON_ARM;
-end else if (wait_timer == 0) begin
-	word_next <= 1;
-	state <= RECV_WORD;
-	wait_timer <= time_to_wait;
-end else begin
-	wait_timer <= wait_timer - 1;
-end
-RECV_WORD: begin
-`ifdef VERILATOR_SIMULATION
-	if (!word_next) begin
-		$error("RECV_WORD: word_next not asserted means hang");
-	end
-`endif
-
-	if (word_ok) begin
-		dac_out <= {4'b0001, word};
-		dac_arm <= 1;
-
-		word_next <= 0;
-		state <= WAIT_ON_DAC;
-	end
-end
-WAIT_ON_DAC: begin
-`ifdef VERILATOR_SIMULATION
-	if (!dac_arm) begin
-		$error("WAIT_ON_DAC: dac_arm not asserted means hang");
-	end
-`endif
-
-	if (dac_finished) begin
-		dac_arm <= 0;
-		/* Was the last word read *the* last word? */
-		if (word_last && halt_on_finish) begin
-			state <= WAIT_ON_DISARM;
-			finished <= 1;
+CHECK_LEN: if (cntr >= wform_size) begin
+		if (do_loop) begin
+			cntr <= 0;
+			state <= READ_RAM;
 		end else begin
-			state <= DO_WAIT;
-			wait_timer <= time_to_wait;
+			state <= WAIT_FINISHED;
 		end
+	end else begin
+		state <= READ_RAM;
 	end
+WAIT_FINISHED: if (!run) begin
+		state <= CHECK_START;
+	end else if (do_loop) begin
+		state <= READ_RAM;
+		cntr <= 0;
+	end else begin
+		finished <= 1;
+	end
+READ_RAM: begin
+	wb_adr <= RAM_START_ADDR + {16'b0, cntr};
+	wb_cyc <= 1; /* Always assigned STB when CYC is */
+	wb_we <= 0;
+	state <= WAIT_RAM;
 end
-WAIT_ON_DISARM: if (!arm) begin
-	state <= WAIT_ON_ARM;
+WAIT_RAM: if (wb_ack) begin
+	wb_cyc <= 0;
+	wb_dat_w <= 1 << 20 | wb_dat_r;
+	state <= WRITE_DAC_DATA_ADR;
 end
+WRITE_DAC_DATA_ADR: begin
+	wb_adr <= SPI_START_ADDR + 32'hC;
+	wb_cyc <= 1;
+	wb_we <= 1;
+	state <= WAIT_DAC_DATA_ADR;
+end
+WAIT_DAC_DATA_ADR: if (wb_ack) begin
+	wb_cyc <= 0;
+	/* This is not needed, since the next bus cycle is also a write. */
+	/* wb_we <= 0; */
+	state <= WRITE_DAC_ARM_ADR;
+end
+WRITE_DAC_ARM_ADR: begin
+	wb_adr <= SPI_START_ADDR + 32'h4;
+	wb_dat_w[0] <= 1;
+	wb_cyc <= 1;
+	/* wb_we <= 1; */
+	state <= WAIT_DAC_ARM_ADR;
+end
+WAIT_DAC_ARM_ADR: if (wb_ack) begin
+	wb_cyc <= 0;
+	/* This is not needed, since the next bus cycle is also a write. */
+	/* wb_we <= 0; */
+	state <= WRITE_DAC_DISARM_ADR;
+end
+/*
+ * After arming the SPI core, immediately disarm it.
+ * The SPI core will continue to execute after being disarmed until
+ * it completes a transmission cycle. Otherwise the core would spend
+ * two extra clock cycles if it disarmed after checking that the SPI
+ * master was done.
+ */
+WRITE_DAC_DISARM_ADR: begin
+	wb_adr <= SPI_START_ADDR + 32'h4;
+	wb_dat_w[0] <= 0;
+	wb_cyc <= 1;
+	/* This is not needed, since the previous bus cycle is also a write. */
+	/* wb_we <= 1; */
+	state <= WAIT_DAC_DISARM_ADR;
+end
+WAIT_DAC_DISARM_ADR: if (wb_ack) begin
+	wb_cyc <= 0;
+	/* Disable writes because next bus cycle is a write */
+	wb_we <= 0;
+	state <= READ_DAC_FIN_ADR;
+end
+/*
+ * This core reads from "wait_ready_or_finished", which will
+ * stall until the SPI core is ready to arm or finished with
+ * it's transmission.
+ * If the SPI device is disconnected it will just return 0 at all
+ * times (see PreemptiveInterface). To avoid getting the core stuck
+ * the FSM will continue without checking that the DAC is actually
+ * ready or finished.
+ */
+READ_DAC_FIN_ADR: begin
+	wb_adr <= SPI_START_ADDR + 32'h10;
+	wb_cyc <= 1;
+	state <= WAIT_DAC_FIN_ADR;
+end
+WAIT_DAC_FIN_ADR: if (wb_cyc) begin
+	wb_cyc <= 0;
+	state <= WAIT_PERIOD;
+	timer <= 0;
+end
+/* If the core tells the block to stop running, stop when SPI is not
+ * transmitting to the DAC.
+ *
+ * If you want the module to run until the end of the waveform, turn
+ * off looping and wait until the waveform ends. If you want the module
+ * to stop the waveform and keep the DAC in a known state, just turn
+ * the running flag off. If you need to stop it immediately, flip the
+ * master switch for the DAC to the main CPU.
+ */
+WAIT_PERIOD: if (!run) begin
+	state <= CHECK_START;
+end else if (timer < timer_spacing) begin
+	timer <= timer + 1;
+end else begin
+	cntr <= cntr + 1;
+	state <= CHECK_LEN;
+end
+default: state <= CHECK_START;
 endcase
-
-/* Warning! This will crash verilator with a segmentation fault!
-`ifdef VERILATOR
-initial begin
-	$dumpfile("waveform.fst");
-	$dumpvars();
-end
-`endif
-*/
-
 endmodule
-`undefineall

@@ -37,6 +37,10 @@ module spi_master_ss_wb
 	input [BUS_WID-1:0] wb_dat_w,
 	output reg wb_ack,
 	output reg [BUS_WID-1:0] wb_dat_r,
+
+	/* Used in Migen code */
+	output finished,
+	output ready_to_arm,
 );
 
 /* Address map:
@@ -52,8 +56,6 @@ module spi_master_ss_wb
 
 wire [WID-1:0] from_slave;
 reg [WID-1:0] to_slave;
-wire finished;
-wire ready_to_arm;
 reg arm;
 
 spi_master_ss #(
