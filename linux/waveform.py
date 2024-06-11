@@ -51,7 +51,7 @@ class Waveform(Immutable):
 
     def force_stop(self):
         self.regs.force_stop.v = 1
-        selff.regs.force_stop.v = 0
+        self.regs.force_stop.v = 0
 
     def dump(self):
         """ Dump contents of control registers. """
