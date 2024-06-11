@@ -311,7 +311,7 @@ class SPIMaster(Module):
                             ],
                         0xC: [
                             If(self.bus.we,
-                            to_slave.eq(self.bus.dat_r[0:spi_wid]),
+                                to_slave.eq(self.bus.dat_w[0:spi_wid]),
                             ).Else(
                                 self.bus.dat_r[spi_wid:].eq(0),
                                 self.bus.dat_r[0:spi_wid].eq(to_slave),
