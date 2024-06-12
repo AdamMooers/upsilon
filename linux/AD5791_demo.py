@@ -53,4 +53,11 @@ both to 16V. Turn both power supplies off and connect the negative rail to
 VSS on terminal J13 and the positive rail to VDD on terminal J13. Leave the
 power supplies isolated to eliminate ground loops through DGND since DGND
 is internally connected with the analog ground on the evaluation board.
+
+Turn on the positive bench power supply (VDD) followed by the negative
+bench power supply (connected to VSS). Next, connect USB to the ARTY board.
+This order ensures that VCC is powered after VDD, which, according to the
+datasheet, ensures that the DAC starts in a known good state. Finally,
+flash the ARTY, boot Linux, and follow the guide for running at the top.
+
 """
