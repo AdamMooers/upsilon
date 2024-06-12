@@ -1,3 +1,10 @@
+
+# Copyright 2024 (C) Adam Mooers
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon
+# source distribution.
+
 from spi import *
 
 """ This is a simple wrapper for the SPI controller to simplify
@@ -57,8 +64,23 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    # Set Output
-    def set_DAC_register_raw(self):
+    def set_DAC_register_raw(self, voltage_lsb, twos_comp = False):
+        """
+        Writes the LSB voltage to the DAC register.
+
+        Input -_DAC_SIGN_BIT corresponds to an output voltage of VREF_N
+        Input _DAC_SIGN_BIT-1 corresponds to an output voltage of VREF_P
+
+        A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
+        where n number of number of DAC bits (_DAC_BITS)
+
+        :param twos_comp: if true, the buffer is considered to be 2s-complement
+            and the sign-extended before being written. If false, the register is
+            considered to be binary offset and the offset correction is added in.
+            This setting is should follow the BIN2sC control register.
+            
+        :return: the raw voltage as stored in the DAC register with sign corrections
+        """
         pass
 
     def set_DAC_register_volts(self):
@@ -66,15 +88,19 @@ class AD5791():
 
     def read_DAC_register_lsb(self, twos_comp = False):
         """
-        Reads the LSB voltage from the DAC register and fixes the sign
+        Reads the LSB voltage from the DAC register. 
+        
+        Input -_DAC_SIGN_BIT corresponds to an output voltage of VREF_N
+        Input _DAC_SIGN_BIT-1 corresponds to an output voltage of VREF_P
+
+        A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
+        where n number of number of DAC bits (_DAC_BITS)
 
         :param twos_comp: if true, the buffer is considered to be 2s-complement
             and the sign-extended value will be returned. If false, the register is
-            considered to be binary offset, and an 
-
-            See the BIN2sC control register
-            setting in the datasheet. If false, 
-        :return: the raw voltage as stored in the DAC register, possibly sign-extended
+            considered to be binary offset and the offset correction is added in.
+            This setting is should follow the BIN2sC control register.
+        :return: the raw voltage as stored in the DAC register with sign corrections
         """
 
         # Send read request
@@ -97,15 +123,15 @@ class AD5791():
     def read_DAC_register_volts(self, twos_comp = False):
         """
         Converts the DAC register to volts using the formula specified in the
-        datasheet. Note that the formula implicitly assumes the input is binary
-        offset encoded (rather than 2's complement) so we convert to binary offset
-        and then apply the formula.
+        datasheet (see the DAC register page). Note that the datasheet formula 
+        implicitly assumes the input is binary offset encoded (rather than 2's 
+        complement) so we convert to binary offset and then apply the formula.
         """
         lsb_voltage = self.read_DAC_register_raw(twos_comp)
         lsb_voltage_bit_offset = lsb_voltage + self._DAC_SIGN_BIT
 
         voltage = (
-            ((self.VREF_P-self.VREF_N)/self._DAC_BIT_MASK)*lsb_voltage_bit_offset+
+            ((self.VREF_P-self.VREF_N)/self._DAC_BIT_MASK)*lsb_voltage_bit_offset +
             self.VREF_N
         )
 
