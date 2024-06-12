@@ -19,9 +19,10 @@ class AD5791():
     and right slightly faster, more legible, and more portable.
     """
     _DAC_BITS = 20
-    _DAC_BIT_MASK = (1 << (_DAC_BITS))-1
+    _DAC_ROLLOVER = 1 << _DAC_BITS
+    _DAC_BIT_MASK = _DAC_ROLLOVER - 1
     _DAC_SIGN_BIT = 1 << (_DAC_BITS - 1)
-    _DAC_MAGNITUDE_BIT_MASK = _DAC_SIGN_BIT-1
+    _DAC_MAGNITUDE_BIT_MASK = _DAC_SIGN_BIT - 1
 
     """ Pre bit-shifted registers. The w and r indicate if the write
         bit is set.
@@ -64,7 +65,7 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    def set_DAC_register_raw(self, voltage_lsb, twos_comp = False):
+    def set_DAC_register_raw(self, lsb_voltage, twos_comp = False):
         """
         Writes the LSB voltage to the DAC register.
 
@@ -74,17 +75,47 @@ class AD5791():
         A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
         where n number of number of DAC bits (_DAC_BITS)
 
+        The voltage is clamped from -_DAC_SIGN_BIT to _DAC_SIGN_BIT-1 to prevent
+        unexpected outputs if the voltage specified is not in bounds.
+
+        :param lsb_voltage: the LSB voltage to set the DAC output register with
         :param twos_comp: if true, the buffer is considered to be 2s-complement
             and the sign-extended before being written. If false, the register is
             considered to be binary offset and the offset correction is added in.
             This setting is should follow the BIN2sC control register.
-            
-        :return: the raw voltage as stored in the DAC register with sign corrections
         """
-        pass
 
-    def set_DAC_register_volts(self):
-        pass
+        clamped_voltage = max(-self._DAC_SIGN_BIT, min(self._DAC_SIGN_BIT-1, lsb_voltage))
+
+        if twos_comp and clamped_voltage < 0:
+            # This will sign-extend with the number of bits available to the DAC
+            clamped_voltage += self._DAC_ROLLOVER
+        elif not twos_comp:
+            clamped_voltage -= self._DAC_SIGN_BIT
+
+        buffer = self._registers["dac_w"] | clamped_voltage
+
+        self._spi_master.send(buffer)
+
+    def set_DAC_register_volts(self, voltage, twos_comp = False):
+        """
+        Writes the specified voltage, in volts, to the DAC register.
+
+        The voltage is clamped from VREF_N to VREF_P to prevent
+        unexpected outputs if the voltage specified is not in bounds.
+
+        :param voltage: the voltage to set the DAC output register with
+        :param twos_comp: if true, the buffer is considered to be 2s-complement
+            and the sign-extended before being written. If false, the register is
+            considered to be binary offset and the offset correction is added in.
+            This setting is should follow the BIN2sC control register.
+        """
+
+        # This is the ideal transfer function from the AD5791 datasheet inverted
+        voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
+        lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT
+
+        self.set_DAC_register_raw(self, lsb_voltage, twos_comp)
 
     def read_DAC_register_lsb(self, twos_comp = False):
         """
@@ -122,16 +153,17 @@ class AD5791():
 
     def read_DAC_register_volts(self, twos_comp = False):
         """
-        Converts the DAC register to volts using the formula specified in the
-        datasheet (see the DAC register page). Note that the datasheet formula 
-        implicitly assumes the input is binary offset encoded (rather than 2's 
-        complement) so we convert to binary offset and then apply the formula.
+        Converts the DAC register to volts using the ideal transfer function
+        formula specified in the datasheet (see the DAC register page). Note 
+        that the datasheet formula implicitly assumes the input is binary offset
+        encoded (rather than 2's complement) so we convert to binary offset
+        and then apply the formula.
         """
         lsb_voltage = self.read_DAC_register_raw(twos_comp)
-        lsb_voltage_bit_offset = lsb_voltage + self._DAC_SIGN_BIT
+        lsb_voltage_offset_formatted = lsb_voltage + self._DAC_SIGN_BIT
 
         voltage = (
-            ((self.VREF_P-self.VREF_N)/self._DAC_BIT_MASK)*lsb_voltage_bit_offset +
+            ((self.VREF_P-self.VREF_N)/self._DAC_BIT_MASK)*lsb_voltage_offset_formatted +
             self.VREF_N
         )
 
