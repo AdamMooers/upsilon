@@ -115,7 +115,7 @@ class AD5791():
         voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
         lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT
 
-        self.set_DAC_register_raw(self, lsb_voltage, twos_comp)
+        self.set_DAC_register_lsb(lsb_voltage, twos_comp)
 
     def read_DAC_register_lsb(self, twos_comp = False):
         """
