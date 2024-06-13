@@ -17,20 +17,7 @@ guide uses two isolated bench power supplies for the positive and negative
 DAC voltage rails although it could be adapted to work with the evaluation
 board's internal ADP5070 power supply as well.
 
-With USB disconnected, add the following interconnects between the 
-Arty PMOD A port and the AD5791 evaluation board's J12 header. 
-PMOD A numbers are from right to left and top to bottom with numbering 
-starting at 1. This demo only uses the top row of PMOD A.
-
-        | J12 Header    | PMOD A
-SS      |   SYNC        | Pin 1
-MOSI    |   SDIN        | Pin 2
-MISO    |   SDO         | Pin 3
-SCK     |   SCLK        | Pin 4
-GND     |   DGND        | Pin 5
-IOVCC   |   IOVCC       | Pin 6
-
-Next, configure the jumpers on the board to work with an external power
+First, configure the jumpers on the board to work with an external power
 supply:
 
 LK1: Slot A (datasheet recommends this always but it should not 
@@ -48,6 +35,19 @@ LK9: Slot A (to use VSS on J13 as the negative rail)
 LK10: Slot A (to use VDD on J13 as the positive rail)
 LK11: Removed (otherwise the DAC register is held at the clearcode value)
 
+Next, with USB disconnected, add the following interconnects between the 
+Arty PMOD A port and the AD5791 evaluation board's J12 header. PMOD A pin
+numbers are from right to left and top to bottom with numbering 
+starting at 1. This demo only uses the top row of PMOD A.
+
+        | J12 Header    | PMOD A
+SS      |   ~SYNC       | Pin 1
+MOSI    |   SDIN        | Pin 2
+MISO    |   SDO         | Pin 3
+SCK     |   SCLK        | Pin 4
+GND     |   DGND        | Pin 5
+IOVCC   |   IOVCC       | Pin 6
+
 Connect the positive and negative power supplies in series and set them
 both to 16V. Turn both power supplies off and connect the negative rail to 
 VSS on terminal J13 and the positive rail to VDD on terminal J13. Leave the
@@ -60,4 +60,7 @@ This order ensures that VCC is powered after VDD, which, according to the
 datasheet, ensures that the DAC starts in a known good state. Finally,
 flash the ARTY, boot Linux, and follow the guide for running at the top.
 
+Outputs are broken out on the VO and VO_buf SMB connectors at the top edge
+of the board. VO is directly connected to the oscillscope's output whereas
+VO_buf is run through a unity gain amplifier.
 """
