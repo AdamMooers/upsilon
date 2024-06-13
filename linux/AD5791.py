@@ -159,7 +159,7 @@ class AD5791():
         encoded (rather than 2's complement) so we convert to binary offset
         and then apply the formula.
         """
-        lsb_voltage = self.read_DAC_register_raw(twos_comp)
+        lsb_voltage = self.read_DAC_register_lsb(twos_comp)
         lsb_voltage_offset_formatted = lsb_voltage + self._DAC_SIGN_BIT
 
         voltage = (
