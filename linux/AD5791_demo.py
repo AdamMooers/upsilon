@@ -65,3 +65,58 @@ Outputs are broken out on the VO and VO_buf SMB connectors at the top edge
 of the board. VO is directly connected to the oscillscope's output whereas
 VO_buf is run through a unity gain amplifier.
 """
+
+import mmio
+from AD5791 import *
+
+VREF_N = -10.0
+VREF_P = 10.0
+
+dac = AD5791(mmio.dac0, VREF_N, VREF_P)
+
+# Although not strictly necessary if the power up sequence is handled correctly,
+# this ensures that the DAC is in a known good state
+dac.reset()
+
+"""
+Set up the DAC with the following configuration. See the datasheet for
+more details on what these flags mean.
+
+RBUF:     1 to enable an external buffer amplifier as configured in fig. 52
+          of the AD5791 datasheet. This is the configuration used on the 
+          evaluation board.
+OPGND:    0 to place the DAC in normal mode. On reset, this is set to 1 which means
+          the output is clamped to ground through a 6kOhm resistor.
+DACTRI:   0 to take the DAC out of tristate mode (connects the DAC to the
+          output pin)
+BIN/2sC:  0 to use 2's complement encoding (this is the default)
+SDODIS:   0 to enable the SDO pin (this is the default)
+LIN COMP: All 0 since the evaluation board is using +-10V references through the
+          ADR445 reference board
+"""
+
+twosCompEnabled = True
+
+settings = {
+    "RBUF": 1,
+    "OPGND": 0,
+    "DACTRI": 0,
+    "BIN2sC": 0 if twosCompEnabled else 1,
+    "SDODIS": 0,
+    "LINCOMP0": 0,
+    "LINCOMP1": 0,
+    "LINCOMP2": 0,
+    "LINCOMP3": 0,
+}
+
+dac.write_control_register(settings)
+
+"""
+Checking the response from the settings register provides a sanity
+check that the hardware is configured correctly. Likely causes for
+this assertion failing include power being off, the bus being incorrectly
+wired, or the clock frequency being too high.
+""" 
+settingsEcho = dac.read_control_register(settings)
+assert settingsEcho == settings, "The echoed settings did not match"
+
