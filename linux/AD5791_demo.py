@@ -11,11 +11,12 @@ guide and then transfer it to the booted Upsilon device (using
 `make copy` from the build directory). Finally, run it with the command
 `micropython AD5791_demo.py`.
 
-To run this demo, you will need an AD5791 evaluation board (model# 
+For hardware, you will need an AD5791 evaluation board (model# 
 EVAL-AD5791SDZ) connected to the DAC0 SPI bus of the Arty A7. This
 guide uses two isolated bench power supplies for the positive and negative
 DAC voltage rails although it could be adapted to work with the evaluation
-board's internal ADP5070 power supply as well.
+board's internal ADP5070 power supply as well (see the evaluation board
+datasheet for details on how to set this up).
 
 First, configure the jumpers on the board to work with an external power
 supply:
