@@ -27,6 +27,7 @@ class AD5791():
         bit is set.
     """
     _registers = {
+        "readback": 0x000000,
         "dac_r": 0x900000,
         "dac_w": 0x100000,
         "control_r": 0xA00000,
@@ -39,8 +40,8 @@ class AD5791():
     _control_reg_bit_offsets = {
         "RBUF": 1,
         "OPGND": 2,
-        "DACTRI": 3,
         "BIN2sC": 4,
+        "DACTRI": 3,
         "SDODIS": 5,
         "LINCOMP0": 6,
         "LINCOMP1": 7,
@@ -64,7 +65,7 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    def set_DAC_register_raw(self, lsb_voltage, twos_comp = False):
+    def set_DAC_register_lsb(self, lsb_voltage, twos_comp = False):
         """
         Writes the LSB voltage to the DAC register.
 
@@ -137,7 +138,7 @@ class AD5791():
         self._spi_master.send(self._registers["dac_r"])
 
         # Send an empty buffer to shift out the control register values
-        buffer = self._spi_master.send(0x000000)
+        buffer = self._spi_master.send(self._registers["readback"])
 
         # Extract the bits specifying the voltage
         value = buffer & self._DAC_BIT_MASK
@@ -178,10 +179,10 @@ class AD5791():
         self._spi_master.send(self._registers["control_r"])
 
         # Send an empty buffer to shift out the control register values
-        buffer = self._spi_master.send(0x000000)
+        buffer = self._spi_master.send(self._registers["readback"])
         decoded_registers = {}
 
-        for reg, offset in self._control_reg_bit_offsets:
+        for reg, offset in self._control_reg_bit_offsets.items():
             decoded_registers[reg] = (buffer >> offset) & 1
 
         return decoded_registers
@@ -198,8 +199,8 @@ class AD5791():
         """
 
         ctrl_buffer = self._registers["control_w"]
-        for flag in kwargs:
-            ctrl_buffer = ctrl_buffer | (1 << self._control_reg_bit_offsets[flag])
+        for flag, value in kwargs.items():
+            ctrl_buffer = ctrl_buffer | (value << self._control_reg_bit_offsets[flag])
         
         response = self._spi_master.send(ctrl_buffer)
         return response
