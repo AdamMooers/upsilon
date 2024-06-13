@@ -65,7 +65,7 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    def set_DAC_register_lsb(self, lsb_voltage, twos_comp = False):
+    def set_DAC_register_lsb(self, lsb_voltage, twos_comp = True):
         """
         Writes the LSB voltage to the DAC register.
 
@@ -97,7 +97,7 @@ class AD5791():
 
         self._spi_master.send(buffer)
 
-    def set_DAC_register_volts(self, voltage, twos_comp = False):
+    def set_DAC_register_volts(self, voltage, twos_comp = True):
         """
         Writes the specified voltage, in volts, to the DAC register.
 
@@ -117,7 +117,7 @@ class AD5791():
 
         self.set_DAC_register_lsb(lsb_voltage, twos_comp)
 
-    def read_DAC_register_lsb(self, twos_comp = False):
+    def read_DAC_register_lsb(self, twos_comp = True):
         """
         Reads the LSB voltage from the DAC register. 
         
@@ -151,7 +151,7 @@ class AD5791():
 
         return value
 
-    def read_DAC_register_volts(self, twos_comp = False):
+    def read_DAC_register_volts(self, twos_comp = True):
         """
         Converts the DAC register to volts using the ideal transfer function
         formula specified in the datasheet (see the DAC register page). Note 
