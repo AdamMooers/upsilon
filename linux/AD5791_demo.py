@@ -51,9 +51,11 @@ IOVCC   |   IOVCC       | Pin 6
 
 Connect the positive and negative power supplies in series and set them
 both to 16V. Turn both power supplies off and connect the negative rail to 
-VSS on terminal J13 and the positive rail to VDD on terminal J13. Leave the
-power supplies isolated to eliminate ground loops through DGND since DGND
-is internally connected with the analog ground on the evaluation board.
+VSS on terminal J13, ground through GND of terminal J13, and
+the positive rail to VDD on terminal J13. Leave the power supplies isolated
+to eliminate ground loops through DGND since DGND is internally connected to
+with both earth ground through the USB connection on the ARTY board and
+the analog ground (J13 GND) on the evaluation board.
 
 Turn on the positive bench power supply (VDD) followed by the negative
 bench power supply (connected to VSS). Next, connect USB to the ARTY board.
@@ -120,3 +122,4 @@ wired, or the clock frequency being too high.
 settingsEcho = dac.read_control_register(settings)
 assert settingsEcho == settings, "The echoed settings did not match"
 
+dac.set_DAC_register_volts(5.0)
