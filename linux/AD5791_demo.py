@@ -111,7 +111,7 @@ settings = {
     "LINCOMP3": 0,
 }
 
-dac.write_control_register(settings)
+dac.write_control_register(**settings)
 
 """
 Checking the response from the settings register provides a sanity
@@ -119,7 +119,7 @@ check that the hardware is configured correctly. Likely causes for
 this assertion failing include power being off, the bus being incorrectly
 wired, or the clock frequency being too high.
 """ 
-settingsEcho = dac.read_control_register(settings)
+settingsEcho = dac.read_control_register()
 assert settingsEcho == settings, "The echoed settings did not match"
 
 dac.set_DAC_register_volts(5.0)
