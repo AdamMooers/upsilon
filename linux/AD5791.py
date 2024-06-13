@@ -5,10 +5,9 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
-from spi import *
-
-""" This is a simple wrapper for the SPI controller to simplify
-    controlling the AD5791.
+""" 
+This is a simple wrapper for the AD5791 DAC intended to be used
+on the Upsilon main CPU
 """
 
 class AD5791():
