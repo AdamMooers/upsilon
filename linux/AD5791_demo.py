@@ -64,7 +64,7 @@ datasheet, ensures that the DAC starts in a known good state. Finally,
 flash the ARTY, boot Linux, and follow the guide for running at the top.
 
 Outputs are broken out on the VO and VO_buf SMB connectors at the top edge
-of the board. VO is directly connected to the oscillscope's output whereas
+of the board. VO is directly connected to the DAC's output whereas
 VO_buf is run through a unity gain amplifier.
 """
 
