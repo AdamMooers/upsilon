@@ -23,15 +23,16 @@ supply:
 
 LK1: Slot A (datasheet recommends this always but it should not 
      matter because we are using IOVCC through LK8 for digital power)
-LK2: Removed
+LK2: Removed because we are going to use the same supply for IOVCC and
+     VCC and we don't need the internal analog rails. The ADP7118 LDO
+     regulator for VCC is unnecessary and won't operate off 3.3V anyway.
 LK3: Inserted (to hold ~LDAC low because we want the output 
      to update synchronously i.e. directly after SYNC is brought high)
 LK4: Removed otherwise board is in reset mode
-LK5: Inserted (by datasheet recommendation although it should matter
-     because we are using IOVCC through LK8 for digital power)
+LK5: Inserted to bypass the ADP7118 regulator for VCC (see LK2 notes)
 LK6: Not applicable
 LK7: Not applicable
-LK8: Slot A (so that we can use IOVCC on J12 for digital power)
+LK8: Slot C (so that we can use the same supply for VCC and IOVCC)
 LK9: Slot A (to use VSS on J13 as the negative rail)
 LK10: Slot A (to use VDD on J13 as the positive rail)
 LK11: Removed (otherwise the DAC register is held at the clearcode value)
