@@ -48,13 +48,14 @@ MOSI    |   SDIN        | Pin 2
 MISO    |   SDO         | Pin 3
 SCK     |   SCLK        | Pin 4
 GND     |   DGND        | Pin 5
-IOVCC   |   IOVCC       | Pin 6
+
+Connect the Pin 6 of the PMOD A header to VCC on the J11 terminal.
 
 Connect the positive and negative power supplies in series and set them
-both to 16V. Turn both power supplies off and connect the negative rail to 
-VSS on terminal J13, ground through GND of terminal J13, and
-the positive rail to VDD on terminal J13. Leave the power supplies isolated
-to eliminate ground loops through DGND since DGND is internally connected to
+both to 16V. Turn both power supplies off and connect the negative rail (-16V)
+to VSS on terminal J13, ground through GND of terminal J13, and
+the positive rail (+16V) to VDD on terminal J13. Leave the power supplies isolated
+to eliminate ground loops through DGND since DGND is internally connects
 with both earth ground through the USB connection on the ARTY board and
 the analog ground (J13 GND) on the evaluation board.
 
