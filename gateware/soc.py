@@ -299,8 +299,10 @@ class UpsilonSoC(SoCCore):
 
         # SPI Master brings ss_L low when converting and keeps it high
         # when idle. The ADC is the opposite, so invert the signal here.
+        conv_pin = args["ss_L"]
         conv_high = Signal()
-        self.comb += conv_high.eq(~kwargs["ss_L"])
+        args["ss_L"] = conv_high
+        self.comb += conv_pin.eq(~conv_high)
 
         return self.add_spi_master(name, **args)
 
