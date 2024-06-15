@@ -183,7 +183,7 @@ class SPIMaster(Module):
     AD5791_PARAMS = {
                 "polarity" :0,
                 "phase" :1,
-                "spi_cycle_half_wait" : 10,
+                "spi_cycle_half_wait" : 5,
                 "ss_wait" : 5,
                 "enable_miso" : 1,
                 "enable_mosi" : 1,
@@ -194,7 +194,7 @@ class SPIMaster(Module):
             "polarity" : 1,
             "phase" : 0,
             "spi_cycle_half_wait" : 5,
-            "ss_wait" : 60,
+            "ss_wait" : 400,
             "enable_mosi" : 0,
     }
 
