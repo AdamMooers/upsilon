@@ -50,7 +50,7 @@ class LTC_ADC():
         :param v: the value to sign-extend
         :return: the value sign-extended
         """
-        return (v&_adc_magnitude_bit_mask) - (v&_adc_sign_bit_mask)
+        return (v&self._adc_magnitude_bit_mask) - (v&self._adc_sign_bit_mask)
 
     def read_voltage(self, conv_to_volts=True):
         """
