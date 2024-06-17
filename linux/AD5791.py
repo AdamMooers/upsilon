@@ -11,7 +11,6 @@ on the Upsilon main CPU
 """
 
 class AD5791():
-    _spi_master = None
 
     """
     The AD5791 is an 20-bit DAC. We pre-calculate the masks to make reads
@@ -20,13 +19,14 @@ class AD5791():
     _DAC_BITS = 20
     _DAC_ROLLOVER = 1 << _DAC_BITS
     _DAC_BIT_MASK = _DAC_ROLLOVER - 1
-    _DAC_SIGN_BIT = 1 << (_DAC_BITS - 1)
-    _DAC_MAGNITUDE_BIT_MASK = _DAC_SIGN_BIT - 1
+    _DAC_SIGN_BIT_MASK = 1 << (_DAC_BITS - 1)
+    _DAC_MAGNITUDE_BIT_MASK = _DAC_SIGN_BIT_MASK - 1
 
-    """ Pre bit-shifted registers. The w and r indicate if the write
-        bit is set.
+    """ 
+    Pre bit-shifted registers. The w and r indicate if the write
+    bit is set.
     """
-    _registers = {
+    _REGISTERS = {
         "readback": 0x000000,
         "dac_r": 0x900000,
         "dac_w": 0x100000,
@@ -37,7 +37,7 @@ class AD5791():
         "sw_control_w": 0x400000,
     }
 
-    _control_reg_bit_offsets = {
+    _CONTROL_REG_BIT_OFFSETS = {
         "RBUF": 1,
         "OPGND": 2,
         "BIN2sC": 4,
@@ -49,7 +49,7 @@ class AD5791():
         "LINCOMP3": 9,
     }
 
-    _sw_control_reg_bit_offsets = {
+    _SW_CONTROL_REG_BIT_OFFSETS = {
         "RESET": 2,
         "CLR": 1,
         "LDAC": 0,
@@ -57,9 +57,9 @@ class AD5791():
 
     def __init__(self, spi_master, VREF_N = -10.0, VREF_P = 10.0):
         """
-        :param spi_master: The SPI master which controls the DAC. Refer to soc.py
-            for the pinout for each bus.
-        
+        :param spi_master: The SPI master which controls the DAC
+        :param VREF_N: The DAC's negative reference voltage
+        :param VREF_P: The DAC's positive reference voltage
         """
         self._spi_master = spi_master
         self.VREF_N = VREF_N
@@ -69,13 +69,13 @@ class AD5791():
         """
         Writes the LSB voltage to the DAC register.
 
-        Input -_DAC_SIGN_BIT corresponds to an output voltage of VREF_N
-        Input _DAC_SIGN_BIT-1 corresponds to an output voltage of VREF_P
+        Input -_DAC_SIGN_BIT_MASK corresponds to an output voltage of VREF_N
+        Input _DAC_SIGN_BIT_MASK-1 corresponds to an output voltage of VREF_P
 
         A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
         where n number of number of DAC bits (_DAC_BITS)
 
-        The voltage is clamped from -_DAC_SIGN_BIT to _DAC_SIGN_BIT-1 to prevent
+        The voltage is clamped from -_DAC_SIGN_BIT_MASK to _DAC_SIGN_BIT_MASK-1 to prevent
         unexpected outputs if the voltage specified is not in bounds.
 
         :param lsb_voltage: the LSB voltage to set the DAC output register with
@@ -85,15 +85,15 @@ class AD5791():
             This setting is should follow the BIN2sC control register.
         """
 
-        clamped_voltage = max(-self._DAC_SIGN_BIT, min(self._DAC_SIGN_BIT-1, lsb_voltage))
+        clamped_voltage = max(-self._DAC_SIGN_BIT_MASK, min(self._DAC_SIGN_BIT_MASK-1, lsb_voltage))
 
         if twos_comp and clamped_voltage < 0:
             # This will sign-extend with the number of bits available to the DAC
             clamped_voltage += self._DAC_ROLLOVER
         elif not twos_comp:
-            clamped_voltage -= self._DAC_SIGN_BIT
+            clamped_voltage -= self._DAC_SIGN_BIT_MASK
 
-        buffer = self._registers["dac_w"] | clamped_voltage
+        buffer = self._REGISTERS["dac_w"] | clamped_voltage
 
         self._spi_master.send(buffer)
 
@@ -113,7 +113,7 @@ class AD5791():
 
         # This is the ideal transfer function from the AD5791 datasheet inverted
         voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
-        lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT
+        lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT_MASK
 
         self.set_DAC_register_lsb(lsb_voltage, twos_comp)
 
@@ -121,8 +121,8 @@ class AD5791():
         """
         Reads the LSB voltage from the DAC register. 
         
-        Input -_DAC_SIGN_BIT corresponds to an output voltage of VREF_N
-        Input _DAC_SIGN_BIT-1 corresponds to an output voltage of VREF_P
+        Input -_DAC_SIGN_BIT_MASK corresponds to an output voltage of VREF_N
+        Input _DAC_SIGN_BIT_MASK-1 corresponds to an output voltage of VREF_P
 
         A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
         where n number of number of DAC bits (_DAC_BITS)
@@ -135,19 +135,19 @@ class AD5791():
         """
 
         # Send read request
-        self._spi_master.send(self._registers["dac_r"])
+        self._spi_master.send(self._REGISTERS["dac_r"])
 
         # Send an empty buffer to shift out the control register values
-        buffer = self._spi_master.send(self._registers["readback"])
+        buffer = self._spi_master.send(self._REGISTERS["readback"])
 
         # Extract the bits specifying the voltage
         value = buffer & self._DAC_BIT_MASK
 
         if twos_comp:
-            value = (value & self._DAC_MAGNITUDE_BIT_MASK) - (value & self._DAC_SIGN_BIT)
+            value = (value & self._DAC_MAGNITUDE_BIT_MASK) - (value & self._DAC_SIGN_BIT_MASK)
         else:
             # In binary offset mode, the sign bit term is implicit so we add it in here
-            value = value - self._DAC_SIGN_BIT
+            value = value - self._DAC_SIGN_BIT_MASK
 
         return value
 
@@ -160,7 +160,7 @@ class AD5791():
         and then apply the formula.
         """
         lsb_voltage = self.read_DAC_register_lsb(twos_comp)
-        lsb_voltage_offset_formatted = lsb_voltage + self._DAC_SIGN_BIT
+        lsb_voltage_offset_formatted = lsb_voltage + self._DAC_SIGN_BIT_MASK
 
         voltage = (
             ((self.VREF_P-self.VREF_N)/self._DAC_BIT_MASK)*lsb_voltage_offset_formatted +
@@ -176,14 +176,14 @@ class AD5791():
 
         :return: a dictionary containing the control register fields
         """
-        self._spi_master.send(self._registers["control_r"])
+        self._spi_master.send(self._REGISTERS["control_r"])
 
         # Send an empty buffer to shift out the control register values
-        buffer = self._spi_master.send(self._registers["readback"])
+        buffer = self._spi_master.send(self._REGISTERS["readback"])
         decoded_registers = {}
 
-        for reg, offset in self._control_reg_bit_offsets.items():
-            decoded_registers[reg] = (buffer >> offset) & 1
+        for reg, offset in self._CONTROL_REG_BIT_OFFSETS.items():
+            decoded_REGISTERS[reg] = (buffer >> offset) & 1
 
         return decoded_registers
 
@@ -198,9 +198,9 @@ class AD5791():
         :return: the raw response from the DAC
         """
 
-        ctrl_buffer = self._registers["control_w"]
+        ctrl_buffer = self._REGISTERS["control_w"]
         for flag, value in kwargs.items():
-            ctrl_buffer = ctrl_buffer | (value << self._control_reg_bit_offsets[flag])
+            ctrl_buffer = ctrl_buffer | (value << self._CONTROL_REG_BIT_OFFSETS[flag])
         
         response = self._spi_master.send(ctrl_buffer)
         return response
@@ -213,8 +213,8 @@ class AD5791():
             e.g. DB0 corresponds to bit_to_set = 0.
         """
         sw_ctrl_buffer = (
-            self._registers["sw_control_w"] | 
-            (1 << self._sw_control_reg_bit_offsets[bit_to_set])
+            self._REGISTERS["sw_control_w"] | 
+            (1 << self._SW_CONTROL_REG_BIT_OFFSETS[bit_to_set])
         )
         self._spi_master.send(sw_ctrl_buffer)
 
