@@ -61,5 +61,5 @@ class LTC_ADC():
             voltage is returned in raw LSB units.
         :return: the voltage in the desired units
         """
-        voltage_lsb = self.__sign_extend(self._spi_master().send(0))
+        voltage_lsb = self.__sign_extend(self._spi_master.send(0))
         return voltage_lsb*_volts_per_lsb if conv_to_volts else voltage_lsb
