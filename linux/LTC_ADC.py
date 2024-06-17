@@ -9,6 +9,8 @@ This is a simple wrapper for Linear Technolgies ADCs (such as the LTC2336)
 intended to be used on the Upsilon main CPU.
 """
 
+import time
+
 class LTC_ADC():
     def __init__(self,
                 spi_master,
