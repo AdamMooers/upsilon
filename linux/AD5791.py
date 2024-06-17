@@ -183,7 +183,7 @@ class AD5791():
         decoded_registers = {}
 
         for reg, offset in self._CONTROL_REG_BIT_OFFSETS.items():
-            decoded_REGISTERS[reg] = (buffer >> offset) & 1
+            decoded_registers[reg] = (buffer >> offset) & 1
 
         return decoded_registers
 
