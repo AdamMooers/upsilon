@@ -43,7 +43,7 @@ class LTC_ADC():
         of the ADC during initialization.
         '''
         self._adc_sign_bit_mask = 1 << (adc_bits - 1)
-        self._adc_magnitude_bit_mask = _adc_sign_bit_mask - 1
+        self._adc_magnitude_bit_mask = self._adc_sign_bit_mask - 1
 
     def __sign_extend(self, v):
         """
