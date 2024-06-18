@@ -181,21 +181,23 @@ class Waveform(LiteXModule):
 class SPIMaster(Module):
     # IF THESE ARE CHANGED, CHANGE waveform.v !!
     AD5791_PARAMS = {
-                "polarity" :0,
-                "phase" :1,
-                "spi_cycle_half_wait" : 5,
-                "ss_wait" : 5,
-                "enable_miso" : 1,
-                "enable_mosi" : 1,
-                "spi_wid" : 24,
+        "polarity" :0,
+        "phase" :1,
+        "spi_cycle_half_wait" : 5,
+        "ss_wait" : 5,
+        "enable_miso" : 1,
+        "enable_mosi" : 1,
+        "spi_wid" : 24,
     }
 
+    # t_CONV+t_DSDOBUSYL = 3.005 uS max so we wait 3.02 uS for ss_wait
+    # to have a little bit of a buffer
     LT_ADC_PARAMS = {
-            "polarity" : 1,
-            "phase" : 0,
-            "spi_cycle_half_wait" : 5,
-            "ss_wait" : 400,
-            "enable_mosi" : 0,
+        "polarity" : 1,
+        "phase" : 0,
+        "spi_cycle_half_wait" : 5,
+        "ss_wait" : 302,
+        "enable_mosi" : 0,
     }
 
     width = 0x20
