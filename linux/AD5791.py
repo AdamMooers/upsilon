@@ -65,7 +65,7 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    def set_DAC_register_lsb(self, lsb_voltage, twos_comp = True):
+    def write_DAC_register_lsb(self, lsb_voltage, twos_comp = True):
         """
         Writes the LSB voltage to the DAC register.
 
@@ -94,10 +94,9 @@ class AD5791():
             clamped_voltage -= self._DAC_SIGN_BIT_MASK
 
         buffer = self._REGISTERS["dac_w"] | clamped_voltage
-
         self._spi_master.send(buffer)
 
-    def set_DAC_register_volts(self, voltage, twos_comp = True):
+    def write_DAC_register_volts(self, voltage, twos_comp = True):
         """
         Writes the specified voltage, in volts, to the DAC register.
 
@@ -115,7 +114,7 @@ class AD5791():
         voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
         lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT_MASK
 
-        self.set_DAC_register_lsb(lsb_voltage, twos_comp)
+        self.write_DAC_register_lsb(lsb_voltage, twos_comp)
 
     def read_DAC_register_lsb(self, twos_comp = True):
         """
@@ -124,7 +123,7 @@ class AD5791():
         Input -_DAC_SIGN_BIT_MASK corresponds to an output voltage of VREF_N
         Input _DAC_SIGN_BIT_MASK-1 corresponds to an output voltage of VREF_P
 
-        A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/(2**n-1)
+        A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/((2**n)-1)
         where n number of number of DAC bits (_DAC_BITS)
 
         :param twos_comp: if true, the buffer is considered to be 2s-complement

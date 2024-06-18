@@ -124,4 +124,4 @@ wired, or the clock frequency being too high.
 settingsEcho = dac.read_control_register()
 assert settingsEcho == settings, "The echoed settings did not match"
 
-dac.set_DAC_register_volts(5.0, twosCompEnabled)
+dac.write_DAC_register_volts(5.0, twosCompEnabled)
