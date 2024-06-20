@@ -115,4 +115,4 @@ settings = {
 
 dac.write_control_register(settings)
 
-dac.write_DAC_register(5.0, in_volts=True, twos_comp=twosCompEnabled)
+dac.write_DAC_register(5.0, in_volts=True)
