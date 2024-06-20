@@ -262,7 +262,7 @@ class AD5791():
 
         return decoded_registers
 
-    def write_control_register(self, **kwargs):
+    def write_control_register(self, settings, check_ctrl_register=True):
         """
         Sets the specified bits of the control register. Use caution: Any bits not 
         specified are zeroed. To avoid setting bits to 0 unintentionally, this method
@@ -270,15 +270,23 @@ class AD5791():
         any desired bits, and finally writing back to the control register. See the
         datasheet for control register names and purposes.
 
-        :return: the raw response from the DAC
+        :param check_ctrl_register: If false, the operation is write-only.
+            If true, the values in the control register are read back and 
+            compared to the expected values. If they do not match, an exception 
+            is thrown. This is helpful for verifying that the hardware is
+            configured correctly (e.g. the SPI bus is working, the data lines are
+            stable at the given clock frequency, and the DAC is powered on)
         """
 
         ctrl_buffer = self._REGISTERS["control_w"]
-        for flag, value in kwargs.items():
+        for flag, value in settings.items():
             ctrl_buffer = ctrl_buffer | (value << self._CONTROL_REG_BIT_OFFSETS[flag])
         
         response = self._spi_master.send(ctrl_buffer)
-        return response
+
+        if check_ctrl_register:
+            settingsEcho = self.read_control_register()
+            assert settingsEcho == settings, "The echoed settings did not match"
 
     def __set_sw_control_register_bit(self, bit_to_set):
         """

@@ -99,7 +99,7 @@ LIN COMP: All 0 since the evaluation board is using +-10V references through the
           ADR445 reference board
 """
 
-twosCompEnabled = False
+twosCompEnabled = True
 
 settings = {
     "RBUF": 1,
@@ -113,15 +113,6 @@ settings = {
     "LINCOMP3": 0,
 }
 
-dac.write_control_register(**settings)
-
-"""
-Checking the response from the settings register provides a sanity
-check that the hardware is configured correctly. Likely causes for
-this assertion failing include power being off, the bus being incorrectly
-wired, or the clock frequency being too high.
-""" 
-settingsEcho = dac.read_control_register()
-assert settingsEcho == settings, "The echoed settings did not match"
+dac.write_control_register(settings, check_ctrl_register=True)
 
 dac.write_DAC_register(5.0, in_volts=True, twos_comp=twosCompEnabled)
