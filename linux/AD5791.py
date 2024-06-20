@@ -298,6 +298,20 @@ class AD5791():
 
         settingsEcho = self.read_control_register()
         assert settingsEcho == settings, "The echoed settings did not match"
+    
+    def set_control_flag(self, flag, value):
+        """
+        Sets the given control flag without altering any of the flags in the
+        control register.
+        :param flag: the name of the flag to change (refer to the control register
+            page of the datasheet)
+        :param value: the value of the flag (use 0 or 1 like the datasheet)
+        :return: the control register
+        """
+        settings = self.read_control_register()
+        settings[flag] = value
+        self.write_control_register(settings)
+        return settings
 
     def __set_sw_control_register_bit(self, bit_to_set):
         """
