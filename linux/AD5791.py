@@ -81,7 +81,7 @@ class AD5791():
             # This will sign-extend with the number of bits available to the DAC
             clamped_voltage += self._DAC_ROLLOVER
         elif not twos_comp:
-            clamped_voltage -= self._DAC_SIGN_BIT_MASK
+            clamped_voltage += self._DAC_SIGN_BIT_MASK
 
         return clamped_voltage
     
@@ -115,7 +115,7 @@ class AD5791():
         # This is the ideal transfer function from the AD5791 datasheet inverted
         voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
         lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT_MASK
-        return self.signed_lsb_to_dac_lsb(lsb_voltage)
+        return self.signed_lsb_to_dac_lsb(lsb_voltage, twos_comp)
 
     def dac_lsb_to_volts(self, voltage, twos_comp = True):
         """
@@ -158,9 +158,10 @@ class AD5791():
 
         dac_voltage = self.volts_to_dac_lsb(voltage, twos_comp) \
             if in_volts \
-            else self.signed_lsb_to_dac_lsb(self, voltage, twos_comp)
+            else self.signed_lsb_to_dac_lsb(voltage, twos_comp)
 
         buffer = self._REGISTERS["dac_w"] | dac_voltage
+
         self._spi_master.send(buffer)
 
     def read_DAC_register(self, in_volts = True, twos_comp = True):

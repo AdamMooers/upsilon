@@ -99,7 +99,7 @@ LIN COMP: All 0 since the evaluation board is using +-10V references through the
           ADR445 reference board
 """
 
-twosCompEnabled = True
+twosCompEnabled = False
 
 settings = {
     "RBUF": 1,
@@ -124,4 +124,4 @@ wired, or the clock frequency being too high.
 settingsEcho = dac.read_control_register()
 assert settingsEcho == settings, "The echoed settings did not match"
 
-dac.write_DAC_register_volts(5.0, twosCompEnabled)
+dac.write_DAC_register(5.0, in_volts=True, twos_comp=twosCompEnabled)
