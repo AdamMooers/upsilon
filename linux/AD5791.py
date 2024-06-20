@@ -318,7 +318,7 @@ class AD5791():
         physical reset pin)
         """
         self.__set_sw_control_register_bit("RESET")
-        self.twos_comp = False
+        self.twos_comp = True
 
     def clear_dac(self):
         """
