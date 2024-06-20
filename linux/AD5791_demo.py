@@ -113,6 +113,6 @@ settings = {
     "LINCOMP3": 0,
 }
 
-dac.write_control_register(settings, check_ctrl_register=True)
+dac.write_control_register(settings)
 
 dac.write_DAC_register(5.0, in_volts=True, twos_comp=twosCompEnabled)

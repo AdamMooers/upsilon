@@ -65,7 +65,27 @@ class AD5791():
         self.VREF_N = VREF_N
         self.VREF_P = VREF_P
 
-    def signed_lsb_to_dac_lsb(self, voltage, twos_comp = True):
+        # Consider two's complement to be unknown until the control
+        # register sets it, the control register is read, or a reset occurs
+        self.twos_comp = None
+    
+
+    @property
+    def twos_comp(self):
+        """
+        A cached register "BIN2sC" which is true when the DAC is
+        using 2's complement formatting for the DAC register and
+        false when using binary offset coding. If the value is
+        not manually set or updated by reading the control register,
+        its value is None to indicate that it is unknown.
+        """
+        return self._twos_comp
+    
+    @twos_comp.setter
+    def twos_comp(self, value):
+        self._twos_comp = value
+
+    def signed_lsb_to_dac_lsb(self, voltage):
         """
         Converts the specified voltage from the local signed internal representation
         to the DAC's internal representation.
@@ -73,25 +93,29 @@ class AD5791():
         The voltage is clamped from VREF_N to VREF_P (-_DAC_SIGN_BIT_MASK to 
         _DAC_SIGN_BIT_MASK-1 in lsb units) to prevent unexpected outputs if 
         the voltage specified is not in bounds.
-        :return: The Python representation of the DAC voltage
+        :return: The local representation of the DAC voltage
         """
         clamped_voltage = max(-self._DAC_SIGN_BIT_MASK, min(self._DAC_SIGN_BIT_MASK-1, voltage))
 
-        if twos_comp and clamped_voltage < 0:
+        assert self.twos_comp != None, "The two's complement setting must be known to perform the conversion"
+
+        if self.twos_comp and clamped_voltage < 0:
             # This will sign-extend with the number of bits available to the DAC
             clamped_voltage += self._DAC_ROLLOVER
-        elif not twos_comp:
+        elif not self.twos_comp:
             clamped_voltage += self._DAC_SIGN_BIT_MASK
 
         return clamped_voltage
     
-    def dac_lsb_to_signed_lsb(self, voltage, twos_comp = True):
+    def dac_lsb_to_signed_lsb(self, voltage):
         """
         Converts the specified voltage to a local signed integer representation
         from the DAC's internal representation.
         :return: The DAC representation of the given voltage
         """
-        if twos_comp:
+        assert self.twos_comp != None, "The two's complement setting must be known to perform the conversion"
+
+        if self.twos_comp:
             signed_voltage = (voltage & self._DAC_MAGNITUDE_BIT_MASK) - (voltage & self._DAC_SIGN_BIT_MASK)
         else:
             # In binary offset mode, the sign bit term is implicit so we add it in here
@@ -99,7 +123,7 @@ class AD5791():
     
         return signed_voltage
 
-    def volts_to_dac_lsb(self, voltage, twos_comp = True):
+    def volts_to_dac_lsb(self, voltage):
         """
         Converts the given voltage in volts to lsb units accounting for
         2's complement formatting.
@@ -115,9 +139,9 @@ class AD5791():
         # This is the ideal transfer function from the AD5791 datasheet inverted
         voltage_as_fraction_of_range = (voltage - self.VREF_N)/(self.VREF_P - self.VREF_N)
         lsb_voltage = int(voltage_as_fraction_of_range*self._DAC_BIT_MASK) - self._DAC_SIGN_BIT_MASK
-        return self.signed_lsb_to_dac_lsb(lsb_voltage, twos_comp)
+        return self.signed_lsb_to_dac_lsb(lsb_voltage)
 
-    def dac_lsb_to_volts(self, voltage, twos_comp = True):
+    def dac_lsb_to_volts(self, voltage):
         """
         Converts the given raw DAC LSB voltage in LSB units to volts.
 
@@ -126,7 +150,7 @@ class AD5791():
         :param voltage: the voltage in raw DAC format to convert
         :return: the voltage in volts
         """
-        lsb_voltage_signed = self.dac_lsb_to_signed_lsb(voltage, twos_comp)
+        lsb_voltage_signed = self.dac_lsb_to_signed_lsb(voltage)
         lsb_voltage_offset_formatted = lsb_voltage_signed + self._DAC_SIGN_BIT_MASK
 
         voltage = (
@@ -136,7 +160,7 @@ class AD5791():
         return voltage
 
 
-    def write_DAC_register(self, voltage, in_volts = True, twos_comp = True):
+    def write_DAC_register(self, voltage, in_volts = True):
         """
         Writes the specified voltage to the DAC register.
 
@@ -150,21 +174,17 @@ class AD5791():
         :param voltage: the voltage to set the DAC output register with
         :param in_volts: if true, the input is assumed to be in volts. If false,
             the input is assumed to be in LSB units.
-        :param twos_comp: if true, the buffer is considered to be 2s-complement
-            and the sign-extended before being written. If false, the register is
-            considered to be binary offset and the offset correction is added in.
-            This setting is should follow the BIN2sC control register.
         """
 
-        dac_voltage = self.volts_to_dac_lsb(voltage, twos_comp) \
+        dac_voltage = self.volts_to_dac_lsb(voltage) \
             if in_volts \
-            else self.signed_lsb_to_dac_lsb(voltage, twos_comp)
+            else self.signed_lsb_to_dac_lsb(voltage)
 
         buffer = self._REGISTERS["dac_w"] | dac_voltage
 
         self._spi_master.send(buffer)
 
-    def read_DAC_register(self, in_volts = True, twos_comp = True):
+    def read_DAC_register(self, in_volts = True):
         """
         Reads the LSB voltage from the DAC register.
 
@@ -175,10 +195,6 @@ class AD5791():
 
         :param in_volts: if true, the output is assumed to be in volts. If false,
             the output is assumed to be in LSB units.
-        :param twos_comp: if true, the buffer is considered to be 2s-complement
-            and the sign-extended value will be returned. If false, the register is
-            considered to be binary offset and the offset correction is added in.
-            This setting is should follow the BIN2sC control register.
         :return: the raw voltage as stored in the DAC register with sign corrections
         """
         # Send read request
@@ -190,13 +206,13 @@ class AD5791():
         # Extract the bits specifying the voltage
         value = buffer & self._DAC_BIT_MASK
         
-        voltage = self.dac_lsb_to_volts(value, twos_comp) \
+        voltage = self.dac_lsb_to_volts(value) \
             if in_volts \
-            else self.dac_lsb_to_signed_lsb(value, twos_comp)
+            else self.dac_lsb_to_signed_lsb(value)
 
         return voltage
 
-    def read_DAC_register_lsb(self, twos_comp = True):
+    def read_DAC_register_lsb(self):
         """
         Reads the LSB voltage from the DAC register. 
         
@@ -206,10 +222,6 @@ class AD5791():
         A step of one LSB corresponds to a change in voltage of (VREF_P-VREF_N)/((2**n)-1)
         where n number of number of DAC bits (_DAC_BITS)
 
-        :param twos_comp: if true, the buffer is considered to be 2s-complement
-            and the sign-extended value will be returned. If false, the register is
-            considered to be binary offset and the offset correction is added in.
-            This setting is should follow the BIN2sC control register.
         :return: the raw voltage as stored in the DAC register with sign corrections
         """
         # Send read request
@@ -220,13 +232,11 @@ class AD5791():
 
         # Extract the bits specifying the voltage
         value = buffer & self._DAC_BIT_MASK
-
-        signed_value = self.dac_lsb_to_signed_lsb(value, twos_comp)
-
+        signed_value = self.dac_lsb_to_signed_lsb(value)
 
         return value
 
-    def read_DAC_register_volts(self, twos_comp = True):
+    def read_DAC_register_volts(self):
         """
         Converts the DAC register to volts using the ideal transfer function
         formula specified in the datasheet (see the DAC register page). Note 
@@ -234,7 +244,9 @@ class AD5791():
         encoded (rather than 2's complement) so we convert to binary offset
         and then apply the formula.
         """
-        lsb_voltage = self.read_DAC_register_lsb(twos_comp)
+        lsb_voltage = self.read_DAC_register_lsb()
+
+        # Convert to binaru offset
         lsb_voltage_offset_formatted = lsb_voltage + self._DAC_SIGN_BIT_MASK
 
         voltage = (
@@ -259,10 +271,12 @@ class AD5791():
 
         for reg, offset in self._CONTROL_REG_BIT_OFFSETS.items():
             decoded_registers[reg] = (buffer >> offset) & 1
+        
+        self.twos_comp = (decoded_registers["BIN2sC"] == 0)
 
         return decoded_registers
 
-    def write_control_register(self, settings, check_ctrl_register=True):
+    def write_control_register(self, settings):
         """
         Sets the specified bits of the control register. Use caution: Any bits not 
         specified are zeroed. To avoid setting bits to 0 unintentionally, this method
@@ -270,12 +284,10 @@ class AD5791():
         any desired bits, and finally writing back to the control register. See the
         datasheet for control register names and purposes.
 
-        :param check_ctrl_register: If false, the operation is write-only.
-            If true, the values in the control register are read back and 
-            compared to the expected values. If they do not match, an exception 
-            is thrown. This is helpful for verifying that the hardware is
-            configured correctly (e.g. the SPI bus is working, the data lines are
-            stable at the given clock frequency, and the DAC is powered on)
+        The values in the control register are read back and compared to the expected
+        values. If they do not match, an exception is thrown. This is helpful for 
+        verifying that the hardware is configured correctly (e.g. the SPI bus is working, 
+        the data lines are stable at the given clock frequency, and the DAC is powered on)
         """
 
         ctrl_buffer = self._REGISTERS["control_w"]
@@ -284,9 +296,8 @@ class AD5791():
         
         response = self._spi_master.send(ctrl_buffer)
 
-        if check_ctrl_register:
-            settingsEcho = self.read_control_register()
-            assert settingsEcho == settings, "The echoed settings did not match"
+        settingsEcho = self.read_control_register()
+        assert settingsEcho == settings, "The echoed settings did not match"
 
     def __set_sw_control_register_bit(self, bit_to_set):
         """
@@ -307,6 +318,7 @@ class AD5791():
         physical reset pin)
         """
         self.__set_sw_control_register_bit("RESET")
+        self.twos_comp = False
 
     def clear_dac(self):
         """
