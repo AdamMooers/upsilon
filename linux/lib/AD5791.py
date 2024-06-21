@@ -1,4 +1,3 @@
-
 # Copyright 2024 (C) Adam Mooers
 #
 # This file is a part of Upsilon, a free and open source software project.
