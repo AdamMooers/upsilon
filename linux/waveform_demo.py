@@ -39,7 +39,7 @@ dac0.PI.v = 2
 
 num_samples = 512
 
-# Generate sawtooth from 0 to 5 v
+# Generate sawtooth from 0 to 5V
 sawtooth_wf = [
     dac0_driver.volts_to_dac_lsb(t/float(num_samples)*5.0) 
     for t in range(0, num_samples)

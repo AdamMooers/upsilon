@@ -88,7 +88,8 @@ WAIT_FINISHED: if (!run) begin
 		finished <= 1;
 	end
 READ_RAM: begin
-	wb_adr <= RAM_START_ADDR + {16'b0, cntr};
+	/* The address is byte indexed so we shift left to make it word-aligned */
+	wb_adr <= RAM_START_ADDR + {16'b0, cntr << 2};
 	wb_cyc <= 1; /* Always assigned STB when CYC is */
 	wb_we <= 0;
 	state <= WAIT_RAM;
