@@ -18,7 +18,8 @@ class PicoRV32(Immutable):
         self.make_immutable()
 
     def load(self, filename, force=False):
-        """ Load file (as bytes) into PicoRV32.
+        """ 
+        Load file (as bytes) into PicoRV32.
         :param filename: File to load.
         :param force: If True, turn off the PicoRV32 even if it's running.
         """
@@ -31,12 +32,16 @@ class PicoRV32(Immutable):
             self.ram.mem8.load(f.read())
 
     def enable(self):
-        """ Start the PicoRV32. """
+        """ 
+        Start the PicoRV32. 
+        """
         self.ram_pi.v = 1
         self.params.enable.v = 1
 
     def dump(self):
-        """ Dump all status information about the PicoRV32. """
+        """ 
+        Dump all status information about the PicoRV32. 
+        """
         return self.params.dump()
 
 def test_pico(pico, filename, cl_I):

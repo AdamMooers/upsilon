@@ -195,7 +195,7 @@ class SPIMaster(Module):
     LT_ADC_PARAMS = {
         "polarity" : 1,
         "phase" : 0,
-        "spi_cycle_half_wait" : 5,
+        "spi_cycle_half_wait" : 20,
         "ss_wait" : 302,
         "enable_mosi" : 0,
     }
