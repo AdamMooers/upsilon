@@ -149,6 +149,7 @@ tftp:
 copy:
 	scp -O -r ../linux/lib/* upsilon:/usr/lib/micropython/
 	scp -O -r ../linux/demos/ upsilon:~
+	scp -O ../swic/*.bin upsilon:~/
 
 ###### External projects
 
