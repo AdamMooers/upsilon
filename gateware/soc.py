@@ -315,7 +315,7 @@ class UpsilonSoC(SoCCore):
 
         self.add_module(name, wf)
         pi = self.add_preemptive_interface_for_slave(name + "_PI",
-                wf.slavebus, wf.width, wf.public_registers, "byte")
+            wf.slavebus, wf.width, wf.public_registers, "byte")
 
         bram, bram_pi = self.add_blockram(name + "_ram", ram_len)
         wf.add_ram(bram_pi.add_master(name), ram_len)
