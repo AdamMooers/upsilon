@@ -86,12 +86,15 @@ class Accessor(Immutable):
                 raise MemoryError(f"{num}: {self[num]} != {b}")
 
     def dump(self):
-        """ Return an array containing the values in the memory region. """
+        """ 
+        :return: an array containing the values in the memory region. 
+        """
         return [self[i] for i in range(0, self.size_in_units)]
 
 class FlatArea(Immutable):
-    """ RAM region. RAM regions have no registers inside of them and can be
-        accessed at byte-level granularity.
+    """
+    RAM region. RAM regions have no registers inside of them and can be
+    accessed at byte-level granularity.
     """
 
     mem8 = None
@@ -113,7 +116,8 @@ class FlatArea(Immutable):
         self.make_immutable()
 
 class Register(Immutable):
-    """ Wraps a single register that has a maxmimum bitlength of 1 word.
+    """ 
+    Wraps a single register that has a maxmimum bitlength of 1 word.
 
     Accesses to registers are done using the ``v`` attribute. Writes to
     ``v`` will write to the underlying memory area, and reads of ``v``
