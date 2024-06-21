@@ -45,5 +45,5 @@ swic/*.bin
 swic/*.elf
 swic/*mmio.h
 linux/*mpy
-linux/mmio.py
+linux/lib/mmio.py
 build/venv
