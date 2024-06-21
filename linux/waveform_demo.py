@@ -4,10 +4,9 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
+import math
 from mmio import *
 from AD5791 import *
-
-CLK_FREQ = 100.0e6
 
 def configure_dac(dac):
     """
@@ -38,7 +37,18 @@ configure_dac(dac0_driver)
 # Transfer SPI PI to the waveform generator
 dac0.PI.v = 2
 
-# Generate sawtooth from -1 to 1 v
-sawtooth_wf = [dac0_driver.volts_to_dac_lsb(((t%2)*2.5)) for t in range(0, 128)]
+num_samples = 512
 
-wf0.start(sawtooth_wf, 1, do_loop=False)
+# Generate sawtooth from 0 to 5 v
+sawtooth_wf = [
+    dac0_driver.volts_to_dac_lsb(t/float(num_samples)*5.0) 
+    for t in range(0, num_samples)
+    ]
+
+# Generate a sine wave from -5V to 5V
+sine_wf = [
+    dac0_driver.volts_to_dac_lsb(5.0*math.sin(t/float(num_samples)*2.0*math.pi)) 
+    for t in range(0, num_samples)
+    ]
+
+wf0.start(sine_wf, 25, do_loop=True)
