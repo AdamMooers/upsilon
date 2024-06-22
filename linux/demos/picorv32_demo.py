@@ -41,4 +41,5 @@ mmio.pico0.params.cl_I.v = 0xaa
 mmio.pico0.params.cl_P.v = 0xbb
 
 # Need to fill variables and transfer output
-#mmio.pico0.load('test.bin')
+mmio.pico0.load('../test.bin')
+mmio.pico0.enable()

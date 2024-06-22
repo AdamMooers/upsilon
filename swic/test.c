@@ -1,26 +1,28 @@
 #include <stdint.h>
 #include "pico0_mmio.h"
 
+#define DELAY (uint32_t)(1000)
+#define DAC_WRITE_MASK (uint32_t)(0x100000)
+#define OUTPUT (uint32_t *)(0x10100)
+#define I (uint32_t *)(0x10104)
+
 void _start(void)
 {
-	// On python side:
-	// Reset DAC
-	// Set DAC to two's complement and enable the output
-	// Transfer SPI to pico
-	// Load PARAMS_CL_I and PARAMS_CL_P
-	// Load Pico with bin
-
-	uint32_t output = 0;
+	*OUTPUT = 0;
 
 	for (;;)
 	{
-		uint32_t output = (output + 1)%(1 << 16);
+		*OUTPUT = (*OUTPUT + 128)%(1 << 16);
+
+		*PARAMS_ZPOS = *OUTPUT;
 
 		// Wait for the DAC to become available
-		while (!*DAC0_WAIT_FINISHED_OR_READY);
+		//while (!*DAC0_WAIT_FINISHED_OR_READY);
 
-		DAC0_TO_SLAVE = 0x100000 | output;
-		DAC0_ARM = 1
-		DAC0_ARM = 0
+		*DAC0_TO_SLAVE = DAC_WRITE_MASK | *OUTPUT;
+		*DAC0_ARM = 1;
+		*DAC0_ARM = 0;
+
+		for (*I=0;*I<DELAY;(*I)++);
 	}
 }
