@@ -78,9 +78,16 @@ VREF_P = 10.0
 
 dac = AD5791(mmio.dac0, VREF_N, VREF_P)
 
+# Force control of DAC0 back to the main CPU
+mmio.dac0.PI.v = 0
+
 # Although not strictly necessary if the power up sequence is handled correctly,
 # this ensures that the DAC is in a known good state
 dac.reset()
+
+# The DAC can shoot to the negative rail after a reset if we don't reload the
+# DAC register for enabling the output
+dac.write_DAC_register(0, in_volts=True)
 
 """
 Set up the DAC with the following configuration. See the datasheet for
