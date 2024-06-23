@@ -43,6 +43,9 @@ from LTC_ADC import *
 
 adc = LTC_ADC(mmio.adc0)
 
+# Force control of ADC0 back to the main CPU
+mmio.adc0.PI.v = 0
+
 while (True):
     print(f"Voltage: {adc.read_voltage()} V")
     time.sleep(2)
