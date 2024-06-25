@@ -321,8 +321,9 @@ class SPIMaster(Module):
                             self.bus.ack.eq(1),
                             ],
                         0x10: If(finished_or_ready[0] | finished_or_ready[1],
-                            self.bus.dat_r[1:].eq(0),
-                            self.bus.dat_r.eq(finished_or_ready),
+                            self.bus.dat_r[2:].eq(0),
+                            self.bus.dat_r[0:2].eq(finished_or_ready),
+                            self.bus.ack.eq(1),
                         ),
                         "default":
                         # 0xSPI00SPI
