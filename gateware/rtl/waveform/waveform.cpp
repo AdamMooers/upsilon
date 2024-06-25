@@ -31,7 +31,15 @@ void WaveformTestbench::posedge() {
 			recv_words.push_back(mod.spi_data);
 			mod.ram_finished = 1;
 		} else if ((mod.enable & 0b01) != 0) {
-			mod.ram_data = send_words.at(mod.offset);
+			/* The address is byte aligned, but we are reading
+			 * words. send_words is word addressed.
+			 */
+			if (mod.offset >> 2 >= send_words.size()) {
+				std::cout << (mod.offset >> 2) << " overflows the buffer" << std::endl;
+				std::exit(1);
+			}
+
+			mod.ram_data = send_words.at(mod.offset >> 2);
 			mod.ram_finished = 1;
 		}
 	} else if ((mod.enable & 0b11) == 0) {
@@ -54,6 +62,11 @@ void WaveformTestbench::fill_data(int num) {
 void WaveformTestbench::check_data() {
 	auto len = send_words.size();
 	auto recv_size = recv_words.size();
+
+	if (recv_size < len && recv_size != 0) {
+		std::cout << "recv_size: " << recv_size << " != send_words: " << len << std::endl;
+		std::exit(1);
+	}
 
 	for (decltype(len) i = 0; i < recv_size; i++) {
 		/* SPI message has an extra bit to access DAC register */
