@@ -15,16 +15,18 @@ LiteX has an automatic Wishbone bus generator that has a lot of quality of life
 features, like overlap checking, relocation, multiple masters, etc.
 
 It doesn't work when the main SoC bus is also using the bus generator, so this
-module implements a basic Wishbone bus generator. All locations have to be
+Python module implements a basic Wishbone bus generator. All locations have to be
 added manually and there is no sanity checking.
 """
 
 class Register:
     """ Register describes a register in a memory region. It must have an
-        origin and a bit width.
+        "origin" and a "bitwidth" field. Other fields might be used by different
+        masters.
 
         Register stores all fields as attributes.
     """
+
     def __init__(self, origin, bitwidth, **kwargs):
         self.origin = origin
         self.bitwidth = bitwidth
@@ -38,7 +40,8 @@ class Register:
         return {k: getattr(self,k) for k in dir(self) if not k.startswith("_")}
 
 class BasicRegion:
-    """ Simple class for storing a RAM region. """
+    """ Class for storing a RAM region, which may be filled with registers. """
+
     def __init__(self, origin, size, bus=None, registers=None):
         """
         :param origin: Positive integer denoting the start location
@@ -155,7 +158,6 @@ class PeekPokeInterface(LiteXModule):
         # If an address is added, this is the next memory location
         self.next_register_loc = 0
 
-        # Register description
         self.public_registers = {}
 
         # Migen signals
@@ -164,6 +166,10 @@ class PeekPokeInterface(LiteXModule):
         self.has_pre_finalize = False
 
     def mmio(self, origin):
+        """ Returns a string that can be a keyword argument in Python
+            that describes all registers in an instance of this module.
+        """
+
         r = ""
         for name, reg in self.public_registers.items():
             can_write = True if reg.can_write == "1" else False
@@ -203,6 +209,20 @@ class PeekPokeInterface(LiteXModule):
             bitwidth -= 32
 
     def pre_finalize(self):
+        """ Verilog case statements are dictionaries in Migen.
+            Each register has an offset in the region, and is marked
+            with which bus can write to it (at most one interface).
+
+            The function loops through the interfaces and constructs
+            a dictionary for each bus, where each entry depends if the
+            bus is read-only or read-write to that register.
+
+            Then it adds the case statement to the statements of the
+            region.
+
+            TODO: Why is this pre-finalize? Is it possible to put this
+            in regular finalizer?
+        """
         second_case = {"default": self.secondbus.dat_r.eq(0xFACADE)}
         first_case = {"default": self.firstbus.dat_r.eq(0xEDACAF)}
 

@@ -15,41 +15,69 @@ class Waveform(LiteXModule):
         by reading from RAM. """
 
     public_registers = {
+            # go from 0 to 1 to run the waveform.
+            # If "do_loop" is 0, then it will run once and then stop.
+            # run needs to be set to 0 and then 1 again to run another
+            # waveform.
+            # If "do_loop" is 1, then the waveform will loop until
+            # "run" becomes 0, after which it will finish the waveform
+            # and stop.
+
             "run" : Register(
                 origin=0,
                 bitwidth=1,
                 rw=True,
             ),
+
+            # Current sample the waveform is on.
             "cntr": Register(
                 origin=0x4,
                 bitwidth=16,
                 rw=False,
             ),
+
+            # See "run".
             "do_loop": Register(
                 origin=0x8,
                 bitwidth= 1,
                 rw= True,
             ),
+
+            # Bit 0 is the "ready" bit. "Ready" means that "run" can be
+            # set to "1" to enable a waveform run.
+            #
+            # Bit 1 is the "finished" bit. "Finished" means that the
+            # waveform has finished an output and is waiting for "run"
+            # to be set back to 0. This only happens when "do_loop" is 0.
             "finished_or_ready": Register(
                 origin=0xC,
                 bitwidth= 2,
                 rw= False,
             ),
+
+            # Size of the waveform in memory, in words.
             "wform_width": Register(
                 origin=0x10,
                 bitwidth=16,
                 rw= True,
             ),
+
+            # Current value of the timer. See below.
             "timer": Register(
                 origin=0x14,
                 bitwidth= 16,
                 rw= False,
             ),
+
+            # Amount of cycles to wait in between outputting each sample.
             "timer_spacing": Register(
                 origin= 0x18,
                 bitwidth= 16,
                 rw= True,
             ),
+
+            # Forcibly stop the output of the waveform. The SPI bus may be
+            # in an unknown state after this.
             "force_stop" : Register (
                 origin=0x1C,
                 bitwidth=1,

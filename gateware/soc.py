@@ -150,7 +150,47 @@ class _CRG(Module):
             self.submodules.idelayctrl = S7IDELAYCTRL(self.cd_idelay)
 
 class UpsilonSoC(SoCCore):
+    """ This class describes the entire System on a Chip: CPU, ram, peripherals, etc.
+
+        Besides Migen/LiteX's modules, UpsilonSoC also has pre-finalizers
+        and mmio-finalizers (called ``mmio_closures``). Pre-finalizers are
+        run before code generation to make the main class more declarative.
+        Mmio-finalizers are run after generation to define a MicroPython
+        library for interacting with the memory-addressed devices attached
+        to the SoC.
+
+        Attributes:
+    
+        * ``mmio_closures``: A list of functions that take no argument.
+          Each function returns a string that is then put directly into
+          mmio.py (the MicroPython interface).
+
+          This is done to ensure that all finalization has occured before
+          generating the address interface.
+
+          They are run after the bitstream has sucessfully been generated.
+
+        * ``soc_subregions``: Dictionary where each key is a valid
+          Python identifier, and whose values are dictionaries. Each
+          dictionary inside ``soc_subregions`` has keys which are valid
+          Python identifiers and values that are instances of region.Register.
+
+        * ``pre_finalize``: A list of functions of 0 arguments that
+          are run prior to LiteX finalization. This is used when code
+          needs to add modules to the system, which cannot be done at
+          LiteX finalization time.
+
+          They are run at the end of the ``__init__`` function.
+    """
     def add_ip(self, ip_str, ip_name):
+        """ Change the IP hardcoded into the System on a Chip BIOS.
+
+            :param ip_str: IPv4 address in dot-decimal notation.
+            :param ip_name: Either "LOCALIP" (the static IP of the SoC) or
+               "REMOTEIP" (the IP address of the TFTP server that sends the
+               kernel to Upsilon).
+        """
+
         # The IP of the FPGA and the IP of the TFTP server are stored as
         # "constants" which turn into preprocessor defines.
 
@@ -160,8 +200,18 @@ class UpsilonSoC(SoCCore):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
     def add_slave_with_registers(self, name, bus, region, registers):
-        """ Add a bus slave, and also add its registers to the subregions
-        dictionary. """
+        """ Add a bus reegion connected to a slave device to the SoC's main
+            bus with a description of its registers.
+
+            :param name: Name of the region as it will appear in any generated
+               code.
+            :param bus: An instance of Wishbone.Interface connected to a
+               Wishbone slave.
+            :param region: An instance of SoCRegion.
+            :param registers: A dictionary whose values are valid Python and
+               C identifiers (start with character or _, no spaces) and whose
+               values are instsances of the Register class in region.py.
+        """
         self.bus.add_slave(name, bus, region)
         self.soc_subregions[name] = registers
 
@@ -170,8 +220,9 @@ class UpsilonSoC(SoCCore):
 
         :param name: Name of the module and the Wishbone bus region.
         :param slave_bus: Instance of Wishbone.Interface.
-        :param slave_width: Width of the region.
-        :param slave_registers: Register inside the bus region.
+        :param slave_width: Number of bytes in the region.
+        :param slave_registers: A dictionary whose values are valid Python
+           identifiers and whose values are instances of region.Register.
         :return: The PI module.
         """
         pi = PreemptiveInterface(slave_bus, addressing=addressing, name=name)
@@ -189,7 +240,11 @@ class UpsilonSoC(SoCCore):
         return pi
 
     def add_blockram(self, name, size):
-        """ Add a blockram module to the system.  """
+        """ Add a blockram module to the system. 
+            :param name: Name given to the Blockram. This name will be
+               used by the MicroPython library to access the ram.
+            :param size: Size of the blockram in bytes. Must be a multiple of 32.
+        """
         mod = SRAM(size)
         self.add_module(name, mod)
 
@@ -242,7 +297,9 @@ class UpsilonSoC(SoCCore):
 
     def picorv32_add_cl(self, name):
         """ Add a register area containing the control loop parameters to the
-            PicoRV32.
+            PicoRV32. This does not add it to the main CPU.
+
+            :param name: Name of PicoRV32 module.
         """
         pico = self.get_module(name)
         params = pico.add_cl_params()
@@ -265,6 +322,14 @@ class UpsilonSoC(SoCCore):
                     bus=pi.add_master(name), registers=registers))
 
     def add_spi_master(self, name, **kwargs):
+        """ Add a SPI master to the SoC. Unrecognized keyword arguments
+            are passed to the module constructor.
+
+            This function will also add ``{name}_PI`` as a preemptive
+            interface to control the SPI master from other cores.
+
+            :param name: Name of the SPI master module.
+        """
         spi = SPIMaster(**kwargs)
         self.add_module(name, spi)
 
@@ -280,7 +345,9 @@ class UpsilonSoC(SoCCore):
         return spi, pi
 
     def add_AD5791(self, name, **kwargs):
-        """ Adds an AD5791 SPI master to the SoC.
+        """ Adds an AD5791 SPI master to the SoC. Argmuents in kwargs will
+            override AD5791 defaults. Refer to add_spi_master() for more
+            details.
 
         :return: A tuple of the SPI master module and the PI module.
         """
@@ -290,11 +357,15 @@ class UpsilonSoC(SoCCore):
 
     def add_LT_adc(self, name, **kwargs):
         """ Adds a Linear Technologies ADC SPI master to the SoC.
+            Argmuents in kwargs will override device defaults. Refer to
+            add_spi_master() for more details.
 
         :return: A tuple of the SPI master module and the PI module.
         """
         args = SPIMaster.LT_ADC_PARAMS
         args.update(kwargs)
+
+        # MOSI is unused by ADC
         args["mosi"] = Signal()
 
         # SPI Master brings ss_L low when converting and keeps it high
@@ -307,9 +378,20 @@ class UpsilonSoC(SoCCore):
         return self.add_spi_master(name, **args)
 
     def add_waveform(self, name, ram_len, **kwargs):
-        # TODO: Either set the SPI interface at instantiation time,
-        # or allow waveform to read more than one SPI bus (either by
-        # master switching or addressing by Waveform).
+        """ Add a waveform module to the device.
+
+            Note that by default, the waveform is not attached to any
+            SPI device. You need to specify the SPI interface (usually
+            through a PreemptiveInterface) using the add_spi() method.
+
+            This function will add a PreemptiveInterface for the
+            waveform's RAM.
+
+            :param name: Name of new waveform module.
+            :param ram_len: Max number of bytes the waveform will store in
+               its own memory. This must be a multiple of 32.
+        """
+
         kwargs['counter_max_wid'] = minbits(ram_len)
         wf = Waveform(**kwargs)
 
@@ -332,6 +414,9 @@ class UpsilonSoC(SoCCore):
                  remote_ip="192.168.2.100",
                  tftp_port=6969):
         """
+        This constructor defines all the modules that the generated
+        SoC will have.
+
         :param variant: Arty A7 variant. Accepts "a7-35" or "a7-100".
         :param local_ip: The IP that the BIOS will use when transmitting.
         :param remote_ip: The IP that the BIOS will use when retreving
@@ -339,24 +424,18 @@ class UpsilonSoC(SoCCore):
         :param tftp_port: Port that the BIOS uses for TFTP.
         """
 
+        # Boilerplate
+
         sys_clk_freq = int(100e6)
         platform = board_spec.Platform(variant=variant, toolchain="f4pga")
         rst = platform.request("cpu_reset")
         self.submodules.crg = _CRG(platform, sys_clk_freq, True, rst)
 
-        # The SoC won't know the origins until LiteX sorts out all the
-        # memory regions, so they go into a dictionary directly instead
-        # of through MemoryMap.
         self.soc_subregions = {}
-
-        # The SoC generates a Python module containing information about
-        # how to access registers from Micropython. This is a list of
-        # closures that print the code that will be placed in the module.
         self.mmio_closures = []
-
-        # This is a list of closures that are run "pre-finalize", which
-        # is before the do_finalize() function is called.
         self.pre_finalize = []
+
+        # Source file reading
 
         """
         These source files need to be sorted so that modules
@@ -374,6 +453,8 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/waveform/waveform.v")
+
+        # Initialize SoC Core
 
         # SoCCore does not have sane defaults (no integrated rom)
         SoCCore.__init__(self,
@@ -424,6 +505,10 @@ class UpsilonSoC(SoCCore):
         platform.add_extension(io)
         module_reset = platform.request("module_reset")
 
+        #########################
+        # Add upsilon modules to this section
+        #########################
+
         # Add control loop DACs and ADCs.
         self.add_picorv32("pico0")
         self.picorv32_add_cl("pico0")
@@ -451,11 +536,17 @@ class UpsilonSoC(SoCCore):
         )
         self.picorv32_add_pi("pico0", "adc0", "adc0_PI", 0x300000, self.adc0.width, self.adc0.public_registers)
 
+        #######################
+        # End of Upsilon modules section
+        #######################
+
         # Run pre-finalize
         for f in self.pre_finalize:
             f()
 
     def do_finalize(self):
+        """ LiteX finalizer. """
+
         with open('soc_subregions.json', 'wt') as f:
             regions = self.soc_subregions.copy()
             for k in regions:
