@@ -176,6 +176,13 @@ class PicoRV32(LiteXModule):
     def add_cl_params(self):
         """ Add parameter region for control loop variables. Dumps the
         region information to a JSON file `dumpname`.
+
+        cl_I: the integral constant in a PI loop.
+        cl_P: the proportional constant in a PI loop.
+        deltaT: the time to wait (in whatever units)
+        setpt: setpoint value of the loop
+        zset: current value set by the output of the loop
+        zpos: current value read by ADC
         """
 
         self.params.add_register("cl_I", "1", 32)
@@ -192,6 +199,19 @@ class PicoRV32(LiteXModule):
 
         self.params = PeekPokeInterface()
         self.param_origin = param_origin
+
+        """ register documentation:
+
+            enable: 1 to start the core, 0 to reset the core.
+            trap: 0 if running fine, and a nonzero value if a trap
+              condition occurs. Check picorv32.v for trap values.
+            debug_adr: Current address being read by the core.
+            pc: Current program counter location.
+            opcode: Opcode currently being executed.
+
+            any lowercase common name of a RV32I register can be read,
+            and will give you the contents of the register.
+        """
 
         self.params.add_register("enable", "1", 1)
         self.params.add_register("trap", "", 8)
