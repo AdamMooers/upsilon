@@ -88,6 +88,9 @@ Note that Migen differs from Verilog, since all indexing is LSB-first and the
 last index is excluded. Hence ``adr[0:length]`` is equivalent to ``adr[length-1:0]``
 in generated Verilog.
 
+Some modules (the extio.py ones, for instance) output magic numbers when
+an invalid access is done.
+
 -----------------------------------
 Rules For Writing Wishbone Bus Code
 -----------------------------------
@@ -123,6 +126,8 @@ keys are names of the register shown to the programmer and
 
 are required attributes. Other attributes are ``rw``, ``direction``, that are
 explained in /doc/controller_manual.rst .
+
+``public_registers`` may be dynamically generated or static.
 
 -----------------------------
 Adding Slaves to the Main CPU
@@ -180,6 +185,12 @@ to generate code with the correct offsets.
 Note that the ``csr.json`` file casefolds the memory locations into lowercase
 but keeps CSR registers as-is.
 
+The order of calls is:
+
+1. ``pre_finalize``
+2. ``do_finalize()`` (LiteX Finalization)
+3. ``mmio_closures``
+
 ====================
 System Within a Chip
 ====================
@@ -195,8 +206,8 @@ removed.) There are three ways the main CPU interacts with the SWiC:
 
 1. Direct control. The main CPU can start and reset the SWiC CPU. It can
    also inspect the SWiC CPU's registers and program counter.
-2. Exclusive registers. Small data can be transfered in the Main -> SWiC and
-   SWiC -> Main direction using *Special Registers*. They are small registers
+2. *Peek Poke Interfaces*. Small data can be transfered in the Main -> SWiC and
+   SWiC -> Main direction. It consists of small registers (at most 32 bits)
    that can be read by both CPUs but only one CPU can write to them.  This is
    used for sending parameters to programs without having to recompile them.
 3. *Preemptive Interfaces* (PI), which connect a Wishbone slave to two or more

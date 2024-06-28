@@ -19,7 +19,7 @@ class PreemptiveInterface(LiteXModule):
     single slave. A master controls which master (or interconnect) has access
     to the slave. This is to avoid bus contention by having multiple buses.
 
-    To use this module, instantiate it. Then connect the controlling master
+    To use this module, instantiate it. Then connect the default master
     to ``self.buses[0]``. Connect the other masters to ``self.buses[1]``, etc.
     Since the buses are seperate, origins don't have to be the same, but the
     size of the region will be the same as the slave interface.
@@ -60,15 +60,13 @@ class PreemptiveInterface(LiteXModule):
         return iface
 
     def pre_finalize(self, dump_name):
-        # NOTE: DUMB HACK! CSR bus logic is NOT generated when inserted at do_finalize time!
-
         if self.pre_finalize_done:
             raise Exception(self.name + ": Cannot pre-finalize twice")
         self.pre_finalize_done = True
 
         masters_len = len(self.buses)
         if masters_len > 1:
-            self.master_select = CSRStorage(masters_len, name='master_select', description='RW bitstring of which master interconnect to connect to')
+            self.master_select = Signal(masters_len)
 
         # FIXME: Implement PreemptiveInterfaceController module to limit proliferation
         # of JSON files
@@ -178,6 +176,13 @@ class PicoRV32(LiteXModule):
     def add_cl_params(self):
         """ Add parameter region for control loop variables. Dumps the
         region information to a JSON file `dumpname`.
+
+        cl_I: the integral constant in a PI loop.
+        cl_P: the proportional constant in a PI loop.
+        deltaT: the time to wait (in whatever units)
+        setpt: setpoint value of the loop
+        zset: current value set by the output of the loop
+        zpos: current value read by ADC
         """
 
         self.params.add_register("cl_I", "1", 32)
@@ -194,6 +199,19 @@ class PicoRV32(LiteXModule):
 
         self.params = PeekPokeInterface()
         self.param_origin = param_origin
+
+        """ register documentation:
+
+            enable: 1 to start the core, 0 to reset the core.
+            trap: 0 if running fine, and a nonzero value if a trap
+              condition occurs. Check picorv32.v for trap values.
+            debug_adr: Current address being read by the core.
+            pc: Current program counter location.
+            opcode: Opcode currently being executed.
+
+            any lowercase common name of a RV32I register can be read,
+            and will give you the contents of the register.
+        """
 
         self.params.add_register("enable", "1", 1)
         self.params.add_register("trap", "", 8)
