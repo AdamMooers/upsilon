@@ -334,12 +334,18 @@ class UpsilonSoC(SoCCore):
         # Attach registers to main CPU at pre-finalize time.
         def pre_finalize():
             pico.params.pre_finalize()
-            self.add_slave_with_registers(name + "_params", pico.params.first,
+
+            self.add_slave_with_registers(
+                name + "_params", 
+                pico.params.first.bus,
                 SoCRegion(origin=None, size=pico.params.width, cached=False),
                 pico.params.public_registers)
-            pico.mmap.add_region("params",
-                BasicRegion(origin=pico.param_origin, size=pico.params.width, bus=pico.params.secondbus,
-                    registers=pico.params.public_registers))
+    
+            pico.mmap.add_region(
+                "params",
+                BasicRegion(origin=pico.param_origin, size=pico.params.width, bus=pico.params.second.bus,
+                registers=pico.params.public_registers))
+    
         self.pre_finalize.append(pre_finalize)
 
         # Add a Block RAM for the PicoRV32 toexecute from.
@@ -631,7 +637,7 @@ class UpsilonSoC(SoCCore):
             f()
 
         for name, pi in self.interface_list:
-            master_selector.add_register(name + "_master_selector", false, pi.master_select)
+            master_selector.add_register(name + "_master_selector", False, pi.master_select)
 
         # Finalize preemptive interface controller.
         master_selector.pre_finalize()
