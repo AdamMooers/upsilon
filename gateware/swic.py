@@ -19,7 +19,7 @@ class PreemptiveInterface(LiteXModule):
     single slave. A master controls which master (or interconnect) has access
     to the slave. This is to avoid bus contention by having multiple buses.
 
-    To use this module, instantiate it. Then connect the controlling master
+    To use this module, instantiate it. Then connect the default master
     to ``self.buses[0]``. Connect the other masters to ``self.buses[1]``, etc.
     Since the buses are seperate, origins don't have to be the same, but the
     size of the region will be the same as the slave interface.
@@ -66,7 +66,7 @@ class PreemptiveInterface(LiteXModule):
 
         masters_len = len(self.buses)
         if masters_len > 1:
-            self.master_select = CSRStorage(masters_len, name='master_select', description='RW bitstring of which master interconnect to connect to')
+            self.master_select = Signal(masters_len)
 
         # FIXME: Implement PreemptiveInterfaceController module to limit proliferation
         # of JSON files

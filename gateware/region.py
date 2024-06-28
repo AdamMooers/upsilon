@@ -141,28 +141,18 @@ class MemoryMap(LiteXModule):
                 for n in self.regions]
         # TODO: timeout using InterconnectShared?
         self.submodules.decoder = Decoder(self.masterbus, slaves, register=True)
- 
-class PeekPokeInterface(LiteXModule):
-    """ Module that exposes registers to two Wishbone masters.
-        Registers can be written to by at most one CPU. Some of them are
-        read-only for both.
 
-        NOTE: The interface only accepts up to 32 bit registers and does not
-        respect wstrb. All writes will be interpreted as word writes.
+class RegisterInterface(LiteXModule):
+    """ A single memory region filled with 32 bit registers. Each register
+        can be read-write or read only.
     """
 
     def __init__(self):
-        self.firstbus = Interface(data_width = 32, address_width = 32, addressing="byte")
-        self.secondbus = Interface(data_width = 32, address_width = 32, addressing="byte")
+        self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
 
-        # If an address is added, this is the next memory location
         self.next_register_loc = 0
-
         self.public_registers = {}
-
-        # Migen signals
         self.signals = {}
-
         self.has_pre_finalize = False
 
     def mmio(self, origin):
@@ -172,9 +162,82 @@ class PeekPokeInterface(LiteXModule):
 
         r = ""
         for name, reg in self.public_registers.items():
-            can_write = True if reg.can_write == "1" else False
-            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={can_write}),'
+            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={reg.read_only}),'
         return r
+
+    def add_register(self, name, read_only, bitwidth_or_sig):
+        assert not self.has_pre_finalize
+
+        if type(bitwidth_or_sig) is int:
+            sig = Signal(bitwidth_or_sig)
+            bitwidth = bitwidth_or_sig
+        else:
+            sig = bitwidth_or_sig
+            bitwidth = sig.nbits
+
+        assert bitwidth <= 32
+
+        assert name not in self.public_registers
+
+        self.public_registers[name] = Register(
+            origin=self.next_register_loc,
+            bitwidth=bitwidth,
+            read_only = read_only
+        )
+
+        # Each location is padded in memory space to 32 bits.
+        # Push every 32 bits to a new memory location.
+        while bitwidth > 0:
+            self.next_register_loc += 0x4
+            bitwidth -= 32
+
+    def pre_finalize(self):
+        """ Loop through each register and build a Verilog case statement
+            implementing the bus.
+
+            NOTE: The interface only accepts up to 32 bit registers and
+            does not respect wstrb. All writes will be interpreted as
+            word writes.
+        """
+        assert not self.has_pre_finalize
+        self.has_pre_finalize = True
+
+        b = self.bus
+
+        cases = {}
+        for reg in self.public_registers:
+            sig = self.signals[name]
+            reg = self.public_registers[name]
+
+            cases[reg.origin] = \
+                b.dat_r.eq(sig) \
+                if reg.read_only else
+                If(bus.we,
+                    sig.eq(bus.dat_w)
+                ).Else(
+                    bus.dat_r.eq(sig)
+                )
+
+        self.width = round_up_to_pow_2(self.next_register_loc)
+
+        # The width is a power of 2 (0b1000...). This bitlen is the
+        # number of bits to read, starting from 0.
+        bitlen = (self.width - 1).bit_length()
+        self.sync += If(b.cyc & b.stb & ~b.ack,
+                        Case(bus.adr[0:bitlen], cases)
+                     )
+ 
+class PeekPokeInterface(LiteXModule):
+    """ Module that exposes registers to two Wishbone masters.
+        Registers can be written to by at most one CPU. Some of them are
+        read-only for both.
+    """
+
+    def __init__(self):
+        self.submodules.first = RegisterInterface()
+        self.submodules.second = RegisterInterface()
+    def mmio(self, origin):
+        return self.first.mmio(origin)
 
     def add_register(self, name, can_write, bitwidth, sig=None):
         """ Add a register to the memory area.
@@ -185,95 +248,31 @@ class PeekPokeInterface(LiteXModule):
            empty (none).
         """
 
-        if self.has_pre_finalize:
-            raise Exception("Cannot add register after pre finalization")
-
-        if sig is None:
+        first = self.get_module("first")
+        second = self.get_module("second")
+        if sig is not None:
             sig = Signal(bitwidth)
+        if can_write == "1":
+            first.add_register(name, False, sig)
+            second.add_register(name, True, sig)
+        elif can_write == "2":
+            second.add_register(name, False, sig)
+            first.add_register(name, True, sig)
+        else:
+            second.add_register(name, True, sig)
+            first.add_register(name, True, sig)
 
-        if name in self.public_registers:
-            raise NameError(f"Register {name} already allocated")
-
-        self.public_registers[name] = Register(
-            origin=self.next_register_loc,
-            bitwidth=bitwidth,
-            can_write=can_write,
-        )
-
-        self.signals[name] = sig
-
-        # Each location is padded in memory space to 32 bits.
-        # Push every 32 bits to a new memory location.
-        while bitwidth > 0:
-            self.next_register_loc += 0x4
-            bitwidth -= 32
+        self.public_registers = first.public_registers
 
     def pre_finalize(self):
-        """ Verilog case statements are dictionaries in Migen.
-            Each register has an offset in the region, and is marked
-            with which bus can write to it (at most one interface).
+        first = self.get_module("first")
+        second = self.get_module("second")
 
-            The function loops through the interfaces and constructs
-            a dictionary for each bus, where each entry depends if the
-            bus is read-only or read-write to that register.
+        first.pre_finalize()
+        second.pre_finalize()
 
-            Then it adds the case statement to the statements of the
-            region.
-
-            TODO: Why is this pre-finalize? Is it possible to put this
-            in regular finalizer?
-        """
-        second_case = {"default": self.secondbus.dat_r.eq(0xFACADE)}
-        first_case = {"default": self.firstbus.dat_r.eq(0xEDACAF)}
-
-        if self.has_pre_finalize:
-            raise Exception("Cannot pre_finalize twice")
-        self.has_pre_finalize = True
-
-        for name in self.public_registers:
-            sig = self.signals[name]
-            reg = self.public_registers[name]
-
-            if reg.bitwidth > 32:
-                raise Exception("Registers larger than 32 bits are not supported")
-
-            def write_case(bus):
-                return If(bus.we,
-                            sig.eq(bus.dat_w),
-                        ).Else(
-                            bus.dat_r.eq(sig)
-                        )
-            def read_case(bus):
-                return bus.dat_r.eq(sig)
-
-            if reg.can_write == "2":
-                second_case[reg.origin] = write_case(self.secondbus)
-                first_case[reg.origin] = read_case(self.firstbus)
-            elif reg.can_write == "1":
-                second_case[reg.origin] = read_case(self.secondbus)
-                first_case[reg.origin] = write_case(self.firstbus)
-            elif reg.can_write == "":
-                second_case[reg.origin] = read_case(self.secondbus)
-                first_case[reg.origin] = read_case(self.firstbus)
-            else:
-                raise Exception("Invalid can_write: ", reg.can_write)
-
-        self.width = round_up_to_pow_2(self.next_register_loc)
-
-        # The width is a power of 2 (0b1000...). This bitlen is the
-        # number of bits to read, starting from 0.
-        bitlen = (self.width - 1).bit_length()
-
-        def bus_logic(bus, cases):
-            self.sync += If(bus.cyc & bus.stb & ~bus.ack,
-                            Case(bus.adr[0:bitlen], cases),
-                            bus.ack.eq(1)
-                    ).Elif(~bus.cyc,
-                            bus.ack.eq(0))
-
-        bus_logic(self.firstbus, first_case)
-        bus_logic(self.secondbus, second_case)
+        self.width = first.width
 
     def do_finalize(self):
-        if not self.has_pre_finalize:
-            raise Exception("pre_finalize required")
+        assert first.has_pre_finalize
+        assert second.has_pre_finalize

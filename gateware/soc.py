@@ -295,6 +295,7 @@ class UpsilonSoC(SoCCore):
 
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi.pre_finalize(name + "_main_PI.json"))
+        self.interface_list.append(pi)
         return pi
 
     def add_blockram(self, name, size):
@@ -563,6 +564,19 @@ class UpsilonSoC(SoCCore):
         platform.add_extension(io)
         module_reset = platform.request("module_reset")
 
+        # Before any other Upsilon module is added, the global preemptive
+        # interface controller is added. This allows the controlling CPU
+        # to control masters on the PreemptiveInterface.
+        #
+        # When this code adds a preemptive interface, it adds a reference
+        # to the interface module to "interface_list", which is then run
+        # at the end of pre-finalize after all other preemptive interfaces
+        # have finished (post-pre-finalize).
+
+        master_selector = RegisterInterface()
+        self.add_module("master_selector", master_selector)
+        self.interface_list = []
+
         #########################
         # Add upsilon modules to this section
         #########################
@@ -607,6 +621,15 @@ class UpsilonSoC(SoCCore):
         # Run pre-finalize
         for f in self.pre_finalize:
             f()
+
+        # Finalize preemptive interface controller.
+        master_selector.pre_finalize()
+        self.add_slave_with_registers(
+            "preemptive_interface_controller",
+            master_selector.bus,
+            SoCRegion(origin=None, size=master_selector.width, cached=False),
+            master_selector.public_registers
+        )
 
     def do_finalize(self):
         """ LiteX finalizer. """
