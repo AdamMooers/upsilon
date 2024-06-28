@@ -191,6 +191,8 @@ class RegisterInterface(LiteXModule):
             self.next_register_loc += 0x4
             bitwidth -= 32
 
+        self.signals[name] = sig
+
     def pre_finalize(self):
         """ Loop through each register and build a Verilog case statement
             implementing the bus.
@@ -205,18 +207,18 @@ class RegisterInterface(LiteXModule):
         b = self.bus
 
         cases = {}
-        for reg in self.public_registers:
+        for name in self.public_registers:
             sig = self.signals[name]
             reg = self.public_registers[name]
 
             cases[reg.origin] = \
                 b.dat_r.eq(sig) \
-                if reg.read_only else
-                If(bus.we,
-                    sig.eq(bus.dat_w)
-                ).Else(
-                    bus.dat_r.eq(sig)
-                )
+                if reg.read_only else \
+                    If(b.we,
+                        sig.eq(b.dat_w)
+                    ).Else(
+                        b.dat_r.eq(sig)
+                    )
 
         self.width = round_up_to_pow_2(self.next_register_loc)
 
@@ -224,7 +226,7 @@ class RegisterInterface(LiteXModule):
         # number of bits to read, starting from 0.
         bitlen = (self.width - 1).bit_length()
         self.sync += If(b.cyc & b.stb & ~b.ack,
-                        Case(bus.adr[0:bitlen], cases)
+                        Case(b.adr[0:bitlen], cases)
                      )
  
 class PeekPokeInterface(LiteXModule):
@@ -239,30 +241,30 @@ class PeekPokeInterface(LiteXModule):
     def mmio(self, origin):
         return self.first.mmio(origin)
 
-    def add_register(self, name, can_write, bitwidth, sig=None):
+    def add_register(self, name, can_write, bitwidth_or_sig, sig=None):
         """ Add a register to the memory area.
 
         :param name: Name of the register in the description.
-        :param bitwidth: Width of the register in bits.
         :param can_write: Which CPU can write to it. One of "1", "2" or
            empty (none).
+        :param bitwidth_or_sig: Width of the register in bits or pre-existing signal
         """
 
         first = self.get_module("first")
         second = self.get_module("second")
-        if sig is not None:
-            sig = Signal(bitwidth)
+
         if can_write == "1":
-            first.add_register(name, False, sig)
-            second.add_register(name, True, sig)
+            first.add_register(name, False, bitwidth_or_sig)
+            second.add_register(name, True, bitwidth_or_sig)
         elif can_write == "2":
-            second.add_register(name, False, sig)
-            first.add_register(name, True, sig)
+            second.add_register(name, False, bitwidth_or_sig)
+            first.add_register(name, True, bitwidth_or_sig)
         else:
-            second.add_register(name, True, sig)
-            first.add_register(name, True, sig)
+            second.add_register(name, True, bitwidth_or_sig)
+            first.add_register(name, True, bitwidth_or_sig)
 
         self.public_registers = first.public_registers
+        self.signals = first.signals
 
     def pre_finalize(self):
         first = self.get_module("first")

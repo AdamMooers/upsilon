@@ -334,7 +334,7 @@ class UpsilonSoC(SoCCore):
         # Attach registers to main CPU at pre-finalize time.
         def pre_finalize():
             pico.params.pre_finalize()
-            self.add_slave_with_registers(name + "_params", pico.params.firstbus,
+            self.add_slave_with_registers(name + "_params", pico.params.first,
                 SoCRegion(origin=None, size=pico.params.width, cached=False),
                 pico.params.public_registers)
             pico.mmap.add_region("params",
@@ -668,7 +668,7 @@ def generate_main_cpu_include(closures, csr_file):
 
 from config import config
 soc =UpsilonSoC(**config)
-builder = Builder(soc, csr_json="csr.json", compile_software=True, compile_gateware=True)
+builder = Builder(soc, csr_json="csr.json", compile_software=False, compile_gateware=False)
 builder.build()
 
 generate_main_cpu_include(soc.mmio_closures, "csr.json")
