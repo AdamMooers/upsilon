@@ -41,6 +41,7 @@ build/f4pga/
 build/litex/
 build/opensbi/
 build/upsilon/
+build/config.py
 swic/*.bin
 swic/*.elf
 swic/*mmio.h

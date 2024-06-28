@@ -97,21 +97,79 @@ name will be a vector of pins.
 TODO: generate declaratively from constraints file.
 """
 io = [
-#    ("differntial_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
+#    ("differential_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
     ("dac_ss_L_0", 0, Pins("G13"), IOStandard("LVCMOS33")),
     ("dac_mosi_0", 0, Pins("B11"), IOStandard("LVCMOS33")),
     ("dac_miso_0", 0, Pins("A11"), IOStandard("LVCMOS33")),
     ("dac_sck_0", 0, Pins("D12"), IOStandard("LVCMOS33")),
-#    ("dac_ss_L", 0, Pins("G13 D13 E15 F5 U12 D7 D4 E2"), IOStandard("LVCMOS33")),
-#    ("dac_mosi", 0, Pins("B11 B18 E16 D8 V12 D5 D3 D2"), IOStandard("LVCMOS33")),
-#    ("dac_miso", 0, Pins("A11 A18 D15 C7 V10 B7 F4 H2"), IOStandard("LVCMOS33")),
-#    ("dac_sck", 0, Pins("D12 K16 C15 E7 V11 E6 F3 G2"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_1", 0, Pins("D13"), IOStandard("LVCMOS33")),
+    ("dac_mosi_1", 0, Pins("B18"), IOStandard("LVCMOS33")),
+    ("dac_miso_1", 0, Pins("A18"), IOStandard("LVCMOS33")),
+    ("dac_sck_1", 0, Pins("K16"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_2", 0, Pins("E15"), IOStandard("LVCMOS33")),
+    ("dac_mosi_2", 0, Pins("E16"), IOStandard("LVCMOS33")),
+    ("dac_miso_2", 0, Pins("D15"), IOStandard("LVCMOS33")),
+    ("dac_sck_2", 0, Pins("C15"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_3", 0, Pins("F5"), IOStandard("LVCMOS33")),
+    ("dac_mosi_3", 0, Pins("D8"), IOStandard("LVCMOS33")),
+    ("dac_miso_3", 0, Pins("C7"), IOStandard("LVCMOS33")),
+    ("dac_sck_3", 0, Pins("E7"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_4", 0, Pins("U12"), IOStandard("LVCMOS33")),
+    ("dac_mosi_4", 0, Pins("V12"), IOStandard("LVCMOS33")),
+    ("dac_miso_4", 0, Pins("V10"), IOStandard("LVCMOS33")),
+    ("dac_sck_4", 0, Pins("V11"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_5", 0, Pins("D7"), IOStandard("LVCMOS33")),
+    ("dac_mosi_5", 0, Pins("D5"), IOStandard("LVCMOS33")),
+    ("dac_miso_5", 0, Pins("B7"), IOStandard("LVCMOS33")),
+    ("dac_sck_5", 0, Pins("E6"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_6", 0, Pins("D4"), IOStandard("LVCMOS33")),
+    ("dac_mosi_6", 0, Pins("D3"), IOStandard("LVCMOS33")),
+    ("dac_miso_6", 0, Pins("F4"), IOStandard("LVCMOS33")),
+    ("dac_sck_6", 0, Pins("F3"), IOStandard("LVCMOS33")),
+
+    ("dac_ss_L_7", 0, Pins("E2"), IOStandard("LVCMOS33")),
+    ("dac_mosi_7", 0, Pins("D2"), IOStandard("LVCMOS33")),
+    ("dac_miso_7", 0, Pins("H2"), IOStandard("LVCMOS33")),
+    ("dac_sck_7", 0, Pins("G2"), IOStandard("LVCMOS33")),
+
     ("adc_conv_0", 0, Pins("V15"), IOStandard("LVCMOS33")),
     ("adc_sck_0", 0, Pins("U16"), IOStandard("LVCMOS33")),
     ("adc_sdo_0", 0, Pins("P14"), IOStandard("LVCMOS33")),
-#    ("adc_conv", 0, Pins("V15 T11 N15 U18 U11 R10 R16 U17"), IOStandard("LVCMOS33")),
-#    ("adc_sck", 0, Pins("U16 R12 M16 R17 V16 R11 N16 T18"), IOStandard("LVCMOS33")),
-#    ("adc_sdo", 0, Pins("P14 T14 V17 P17 M13 R13 N14 R18"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_1", 0, Pins("T11"), IOStandard("LVCMOS33")),
+    ("adc_sck_1", 0, Pins("R12"), IOStandard("LVCMOS33")),
+    ("adc_sdo_1", 0, Pins("T14"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_2", 0, Pins("N15"), IOStandard("LVCMOS33")),
+    ("adc_sck_2", 0, Pins("M16"), IOStandard("LVCMOS33")),
+    ("adc_sdo_2", 0, Pins("V17"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_3", 0, Pins("U18"), IOStandard("LVCMOS33")),
+    ("adc_sck_3", 0, Pins("R17"), IOStandard("LVCMOS33")),
+    ("adc_sdo_3", 0, Pins("P17"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_4", 0, Pins("U11"), IOStandard("LVCMOS33")),
+    ("adc_sck_4", 0, Pins("V16"), IOStandard("LVCMOS33")),
+    ("adc_sdo_4", 0, Pins("M13"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_5", 0, Pins("R10"), IOStandard("LVCMOS33")),
+    ("adc_sck_5", 0, Pins("R11"), IOStandard("LVCMOS33")),
+    ("adc_sdo_5", 0, Pins("R13"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_6", 0, Pins("R16"), IOStandard("LVCMOS33")),
+    ("adc_sck_6", 0, Pins("N16"), IOStandard("LVCMOS33")),
+    ("adc_sdo_6", 0, Pins("N14"), IOStandard("LVCMOS33")),
+
+    ("adc_conv_7", 0, Pins("U17"), IOStandard("LVCMOS33")),
+    ("adc_sck_7", 0, Pins("T18"), IOStandard("LVCMOS33")),
+    ("adc_sdo_7", 0, Pins("R18"), IOStandard("LVCMOS33")),
+
     ("module_reset", 0, Pins("D9"), IOStandard("LVCMOS33")),
 #    ("test_clock", 0, Pins("P18"), IOStandard("LVCMOS33"))
 ]
@@ -509,32 +567,38 @@ class UpsilonSoC(SoCCore):
         # Add upsilon modules to this section
         #########################
 
-        # Add control loop DACs and ADCs.
-        self.add_picorv32("pico0")
-        self.picorv32_add_cl("pico0")
+        for i in range(0,1):
+            swic_name = f"pico{i}"
+            wf_name = f"wf{i}"
+            dac_name = f"dac{i}"
+            adc_name = f"adc{i}"
 
-        # Add waveform generator.
-        self.add_waveform("wf0", 4096)
-        self.picorv32_add_pi("pico0", "wf0", "wf0_PI", 0x400000, self.wf0.width, self.wf0.public_registers)
+            # Add control loop DACs and ADCs.
+            self.add_picorv32(swic_name)
+            self.picorv32_add_cl(swic_name)
 
-        self.add_AD5791("dac0",
+            # Add waveform generator.
+            wf, wf_pi = self.add_waveform(wf_name, 4096)
+            self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x400000, wf.width, wf.public_registers)
+
+            dac, dac_pi = self.add_AD5791(dac_name,
                 rst=module_reset,
-                miso=platform.request("dac_miso_0"),
-                mosi=platform.request("dac_mosi_0"),
-                sck=platform.request("dac_sck_0"),
-                ss_L=platform.request("dac_ss_L_0"),
-        )
-        self.picorv32_add_pi("pico0", "dac0", "dac0_PI", 0x200000, self.dac0.width, self.dac0.public_registers)
-        self.wf0.add_spi(self.dac0_PI.add_master("wf0"))
+                miso=platform.request(f"dac_miso_{i}"),
+                mosi=platform.request(f"dac_mosi_{i}"),
+                sck=platform.request(f"dac_sck_{i}"),
+                ss_L=platform.request(f"dac_ss_L_{i}"),
+            )
+            self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
+            wf.add_spi(dac_pi.add_master(wf_name))
 
-        self.add_LT_adc("adc0",
+            adc, adc_pi = self.add_LT_adc(adc_name,
                 rst=module_reset,
-                miso=platform.request("adc_sdo_0"),
-                sck=platform.request("adc_sck_0"),
-                ss_L=platform.request("adc_conv_0"),
+                miso=platform.request(f"adc_sdo_{i}"),
+                sck=platform.request(f"adc_sck_{i}"),
+                ss_L=platform.request(f"adc_conv_{i}"),
                 spi_wid=18,
-        )
-        self.picorv32_add_pi("pico0", "adc0", "adc0_PI", 0x300000, self.adc0.width, self.adc0.public_registers)
+            )
+            self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
 
         #######################
         # End of Upsilon modules section
