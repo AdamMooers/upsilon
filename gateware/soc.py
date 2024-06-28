@@ -577,6 +577,12 @@ class UpsilonSoC(SoCCore):
         self.add_module("master_selector", master_selector)
         self.interface_list = []
 
+        def tmp(csrs):
+            origin = csrs["memories"]['master_selector']['base']
+            vals = master_selector.mmio(origin)
+            return f'master_selector = RegisterRegion({origin}, {vals})\n'
+        self.mmio_closures.append(tmp)
+
         #########################
         # Add upsilon modules to this section
         #########################
@@ -623,12 +629,12 @@ class UpsilonSoC(SoCCore):
             f()
 
         for name, pi in self.interface_list:
-            master_selector.add_register(name + "_selector", false, pi.master_select)
+            master_selector.add_register(name + "_master_selector", false, pi.master_select)
 
         # Finalize preemptive interface controller.
         master_selector.pre_finalize()
         self.add_slave_with_registers(
-            "preemptive_interface_controller",
+            "master_selector",
             master_selector.bus,
             SoCRegion(origin=None, size=master_selector.width, cached=False),
             master_selector.public_registers
