@@ -219,7 +219,9 @@ class UpsilonSoC(SoCCore):
 
         Attributes:
     
-        * ``mmio_closures``: A list of functions that take no argument.
+        * ``mmio_closures``: A list of functions that take one argument, the
+          CSR definition.
+
           Each function returns a string that is then put directly into
           mmio.py (the MicroPython interface).
 
