@@ -295,7 +295,7 @@ class UpsilonSoC(SoCCore):
 
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi.pre_finalize(name + "_main_PI.json"))
-        self.interface_list.append(pi)
+        self.interface_list.append((name, pi))
         return pi
 
     def add_blockram(self, name, size):
@@ -621,6 +621,9 @@ class UpsilonSoC(SoCCore):
         # Run pre-finalize
         for f in self.pre_finalize:
             f()
+
+        for name, pi in self.interface_list:
+            master_selector.add_register(name + "_selector", false, pi.master_select)
 
         # Finalize preemptive interface controller.
         master_selector.pre_finalize()
