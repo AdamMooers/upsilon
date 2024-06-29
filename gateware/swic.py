@@ -145,7 +145,7 @@ class PreemptiveInterface(LiteXModule):
         if masters_len == 1:
             self.comb += cases["default"]
         else:
-            self.comb += Case(self.master_select.storage, cases)
+            self.comb += Case(self.master_select, cases)
 
 def gen_pico_header(pico_name):
     """ Generate PicoRV32 C header for this CPU from JSON file. """
