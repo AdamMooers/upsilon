@@ -68,7 +68,7 @@ class PreemptiveInterface(LiteXModule):
 
         masters_len = len(self.buses)
         if masters_len > 1:
-            self.master_select = CSRStorage(masters_len, name='master_select', description='RW bitstring of which master interconnect to connect to')
+            self.master_select = Signal(masters_len)
 
         # FIXME: Implement PreemptiveInterfaceController module to limit proliferation
         # of JSON files
