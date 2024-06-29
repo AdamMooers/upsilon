@@ -61,7 +61,6 @@ class PreemptiveInterface(LiteXModule):
 
     def pre_finalize(self, dump_name):
         # NOTE: DUMB HACK! CSR bus logic is NOT generated when inserted at do_finalize time!
-
         if self.pre_finalize_done:
             raise Exception(self.name + ": Cannot pre-finalize twice")
         self.pre_finalize_done = True

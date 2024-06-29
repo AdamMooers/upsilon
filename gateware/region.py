@@ -149,7 +149,6 @@ class RegisterInterface(LiteXModule):
 
     def __init__(self):
         self.bus = Interface(data_width = 32, address_width = 32, addressing="byte")
-
         self.next_register_loc = 0
         self.public_registers = {}
         self.signals = {}
@@ -267,14 +266,10 @@ class PeekPokeInterface(LiteXModule):
         self.signals = first.signals
 
     def pre_finalize(self):
-        first = self.get_module("first")
-        second = self.get_module("second")
-
-        first.pre_finalize()
-        second.pre_finalize()
-
-        self.width = first.width
+        self.first.pre_finalize()
+        self.second.pre_finalize()
+        self.width = self.first.width
 
     def do_finalize(self):
-        assert first.has_pre_finalize
-        assert second.has_pre_finalize
+        assert self.first.has_pre_finalize
+        assert self.second.has_pre_finalize
