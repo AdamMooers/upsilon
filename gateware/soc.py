@@ -291,11 +291,6 @@ class UpsilonSoC(SoCCore):
                 SoCRegion(origin=None, size=slave_width, cached=False),
                 slave_registers)
 
-        def f(csrs):
-            # CSRs are not case-folded, but Wishbone memory regions are!!
-            return f'{name} = Register({csrs["csr_registers"][name + "_master_select"]["addr"]})'
-
-        self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi.pre_finalize(name + "_main_PI.json"))
         self.interface_list.append((name, pi))
         return pi
@@ -673,7 +668,7 @@ def generate_main_cpu_include(closures, csr_file):
             print(f(csrs), file=out)
 
 from config import config
-soc =UpsilonSoC(**config)
+soc = UpsilonSoC(**config)
 builder = Builder(soc, csr_json="csr.json", compile_software=False, compile_gateware=False)
 builder.build()
 
