@@ -225,8 +225,10 @@ class RegisterInterface(LiteXModule):
         # number of bits to read, starting from 0.
         bitlen = (self.width - 1).bit_length()
         self.sync += If(b.cyc & b.stb & ~b.ack,
-                        Case(b.adr[0:bitlen], cases)
-                     )
+                        Case(b.adr[0:bitlen], cases),
+                        b.ack.eq(1)
+                     ).Elif(~b.cyc,
+                        b.ack.eq(0))
  
 class PeekPokeInterface(LiteXModule):
     """ Module that exposes registers to two Wishbone masters.
