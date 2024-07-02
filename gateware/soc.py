@@ -598,13 +598,6 @@ class UpsilonSoC(SoCCore):
             adc_name = f"adc{i}"
 
             # Add control loop DACs and ADCs.
-            self.add_picorv32(swic_name)
-            self.picorv32_add_cl(swic_name)
-
-            # Add waveform generator.
-            wf, wf_pi = self.add_waveform(wf_name, 4096)
-            self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x400000, wf.width, wf.public_registers)
-
             dac, dac_pi = self.add_AD5791(dac_name,
                 rst=module_reset,
                 miso=platform.request(f"dac_miso_{i}"),
@@ -612,8 +605,6 @@ class UpsilonSoC(SoCCore):
                 sck=platform.request(f"dac_sck_{i}"),
                 ss_L=platform.request(f"dac_ss_L_{i}"),
             )
-            self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
-            wf.add_spi(dac_pi.add_master(wf_name))
 
             adc, adc_pi = self.add_LT_adc(adc_name,
                 rst=module_reset,
@@ -622,8 +613,18 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request(f"adc_conv_{i}"),
                 spi_wid=18,
             )
-            self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
 
+            # Add waveform generator.
+            wf, wf_pi = self.add_waveform(wf_name, 4096)
+            wf.add_spi(dac_pi.add_master(wf_name))
+
+            # Add SWIC
+            self.add_picorv32(swic_name)
+            self.picorv32_add_cl(swic_name)
+            self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
+            self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
+            self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x400000, wf.width, wf.public_registers)
+            
         #######################
         # End of Upsilon modules section
         #######################
