@@ -350,7 +350,7 @@ class UpsilonSoC(SoCCore):
         def f(csrs):
             param_origin = csrs["memories"][f'{name.lower()}_params']["base"]
             return f'{name}_params = RegisterRegion({param_origin}, {pico.params.mmio(param_origin)})\n' \
-                    + f'{name} = PicoRV32({name}_ram, {name}_params, {name}_ram_PI)'
+                    + f'{name} = PicoRV32({name}_ram, {name}_params, master_selector.{name}_ram_PI_master_selector)'
         self.mmio_closures.append(f)
 
         # Allow access from the PicoRV32 to the Block RAM.
@@ -401,7 +401,7 @@ class UpsilonSoC(SoCCore):
         def f(csrs):
             wid = kwargs["spi_wid"]
             origin = csrs["memories"][name.lower() + "_pi"]['base']
-            return f'{name} = SPI({wid}, {name}_PI, {origin}, {spi.mmio(origin)})'
+            return f'{name} = SPI({wid}, master_selector.{name}_PI_master_selector, {origin}, {spi.mmio(origin)})'
         self.mmio_closures.append(f)
 
         return spi, pi
@@ -466,7 +466,8 @@ class UpsilonSoC(SoCCore):
 
         def f(csrs):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
-            return f'{name} = Waveform({name}_ram, {name}_PI, {name}_ram_PI, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
+            return f'{name} = Waveform({name}_ram, master_selector.{name}_PI_master_selector,'+ \
+            f' master_selector.{name}_ram_PI_master_selector, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
         self.mmio_closures.append(f)
         return wf, pi
 
@@ -669,7 +670,7 @@ def generate_main_cpu_include(closures, csr_file):
 
 from config import config
 soc = UpsilonSoC(**config)
-builder = Builder(soc, csr_json="csr.json", compile_software=False, compile_gateware=False)
+builder = Builder(soc, csr_json="csr.json", compile_software=True, compile_gateware=True)
 builder.build()
 
 generate_main_cpu_include(soc.mmio_closures, "csr.json")
