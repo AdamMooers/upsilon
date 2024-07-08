@@ -591,13 +591,14 @@ class UpsilonSoC(SoCCore):
         # Add upsilon modules to this section
         #########################
 
-        for i in range(0,4):
+        for i in range(0,8):
             swic_name = f"pico{i}"
             wf_name = f"wf{i}"
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
-            add_wf = i < 1
+            add_wf = i < 2
+            add_swic = i < 2
 
             # Add control loop DACs and ADCs.
             dac, dac_pi = self.add_AD5791(dac_name,
@@ -621,10 +622,11 @@ class UpsilonSoC(SoCCore):
                 wf, wf_pi = self.add_waveform(wf_name, 4096)
 
             # Add SWIC
-            self.add_picorv32(swic_name)
-            self.picorv32_add_cl(swic_name)
-            self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
-            self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
+            if add_swic:
+                self.add_picorv32(swic_name)
+                self.picorv32_add_cl(swic_name)
+                self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
+                self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
 
             if add_wf:
                 self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x400000, wf.width, wf.public_registers)
@@ -639,7 +641,8 @@ class UpsilonSoC(SoCCore):
             f()
 
         for name, pi in self.interface_list:
-            master_selector.add_register(name + "_master_selector", False, pi.master_select)
+            if hasattr(pi, "master_select"):
+                master_selector.add_register(name + "_master_selector", False, pi.master_select)
 
         # Finalize preemptive interface controller.
         master_selector.pre_finalize()
