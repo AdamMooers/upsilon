@@ -10,8 +10,8 @@
 CPP_FILE=pd_pipeline.cpp
 VERILOG=pd_pipeline.v
 
-test: obj_dir/pd_pipeline
-	obj_dir/pd_pipeline
+test: obj_dir/Vpd_pipeline
+	obj_dir/Vpd_pipeline
 
 clean:
 	rm -rf obj_dir
