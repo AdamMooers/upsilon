@@ -56,7 +56,7 @@ void cleanup() {
 }
 
 
-#define NUM_INCRS 10000
+#define NUM_INCRS 100000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -68,6 +68,8 @@ int main(int argc, char *argv[]) {
 	auto engine = std::default_random_engine{};
 
 	auto adc_dist = std::uniform_int_distribution<int32_t>(-(1 << 17),(1 << 17) - 1);
+
+	// We limit these to 14 bits to ensure we don't overflow o_pd
 	auto pd_dist = std::uniform_int_distribution<int32_t>(-(1 << 14),(1 << 14) - 1);
 
 	for (int i = 1; i < NUM_INCRS; i++) {
