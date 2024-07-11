@@ -55,7 +55,6 @@ void cleanup() {
 	delete tb;
 }
 
-
 #define NUM_INCRS 100000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
