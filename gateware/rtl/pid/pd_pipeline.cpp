@@ -56,7 +56,7 @@ void cleanup() {
 }
 
 
-#define NUM_INCRS 1000
+#define NUM_INCRS 10000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 	tb = new PDPipelineTestbench();
 	atexit(cleanup);
 
-	std::cout << "Checking pipeline math with random inputs" << std::endl;
+	std::cout << "Checking pipeline math with" << NUM_INCRS << "random inputs" << std::endl;
 	auto engine = std::default_random_engine{};
 
 	auto adc_dist = std::uniform_int_distribution<int32_t>(-(1 << 17),(1 << 17) - 1);
@@ -84,16 +84,24 @@ int main(int argc, char *argv[]) {
 			tb->run_clock();
 		}
 
-		// TODO: Dump input parameters
-		// TODO: Check PD output
 		int32_t expected_error = i_actual - i_setpoint;
 		int32_t expected_o_integral = i_integral + expected_error;
-		if (static_cast<int32_t>(tb->mod.o_integral) != i_integral + expected_error) {
+		int32_t expected_o_pd_out =  i_kp*expected_error + i_ki*expected_o_integral;
+
+		if (static_cast<int32_t>(tb->mod.o_integral) != expected_o_integral) {
 			tb->dump_inputs();
 			tb->dump_outputs();
 			throw std::logic_error(
-				"Output integral calculation did not have the expected value. (expected mod.o_integral = "+
+				"Output integral calculation did yield the expected value. (expected mod.o_integral = "+
 				std::to_string(expected_o_integral)+")");
+		}
+
+		if (static_cast<int32_t>(tb->mod.o_pd_out) != expected_o_pd_out) {
+			tb->dump_inputs();
+			tb->dump_outputs();
+			throw std::logic_error(
+				"PD calculation did not yield the expected value. (expected mod.o_pd_out = "+
+				std::to_string(expected_o_pd_out)+")");
 		}
 	}
 
