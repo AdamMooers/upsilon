@@ -19,7 +19,7 @@ module pd_pipeline #(
 	input signed [OUTPUT_WIDTH-1:0] i_integral,
 
 	output signed [OUTPUT_WIDTH-1:0] o_integral,
-	output reg signed [OUTPUT_WIDTH-1:0] o_pd_out
+	output reg signed [OUTPUT_WIDTH-1:0] o_pd
 );
 
 	reg [OUTPUT_WIDTH-1:0] error;
@@ -46,7 +46,7 @@ module pd_pipeline #(
 
 	// Stage 3
 	always @(posedge clk) begin
-		o_pd_out <= weighted_integral + weighted_proportional;
+		o_pd <= weighted_integral + weighted_proportional;
 	end
 
 	assign o_integral = updated_integral;

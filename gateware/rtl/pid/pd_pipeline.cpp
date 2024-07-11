@@ -37,7 +37,7 @@ void PDPipelineTestbench::start_test(
 void PDPipelineTestbench::dump_outputs() {
 	std::cout 
 	<< "o_integral: " << static_cast<int32_t>(mod.o_integral) << std::endl
-	<< "o_pd_out: " << static_cast<int32_t>(mod.o_pd_out) << std::endl;
+	<< "o_pd: " << static_cast<int32_t>(mod.o_pd) << std::endl;
 }
 
 void PDPipelineTestbench::dump_inputs() {
@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
 
 		int32_t expected_error = i_actual - i_setpoint;
 		int32_t expected_o_integral = i_integral + expected_error;
-		int32_t expected_o_pd_out =  i_kp*expected_error + i_ki*expected_o_integral;
+		int32_t expected_o_pd =  i_kp*expected_error + i_ki*expected_o_integral;
 
 		if (static_cast<int32_t>(tb->mod.o_integral) != expected_o_integral) {
 			tb->dump_inputs();
@@ -96,12 +96,12 @@ int main(int argc, char *argv[]) {
 				std::to_string(expected_o_integral)+")");
 		}
 
-		if (static_cast<int32_t>(tb->mod.o_pd_out) != expected_o_pd_out) {
+		if (static_cast<int32_t>(tb->mod.o_pd) != expected_o_pd) {
 			tb->dump_inputs();
 			tb->dump_outputs();
 			throw std::logic_error(
-				"PD calculation did not yield the expected value. (expected mod.o_pd_out = "+
-				std::to_string(expected_o_pd_out)+")");
+				"PD calculation did not yield the expected value. (expected mod.o_pd = "+
+				std::to_string(expected_o_pd)+")");
 		}
 	}
 
