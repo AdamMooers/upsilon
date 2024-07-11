@@ -16,9 +16,9 @@ test: obj_dir/pd_pipeline
 clean:
 	rm -rf obj_dir
 
-obj_dir/Vwaveform_sim.mk:  ${VERILOG} ${CPP_FILE}
+obj_dir/Vpd_pipeline.mk:  ${VERILOG} ${CPP_FILE}
 	verilator --cc --exe -Wall --trace --trace-fst \
 		${VERILOG} ${CPP_FILE}
 
-#obj_dir/Vwaveform_sim: obj_dir/Vwaveform_sim.mk
-#	cd obj_dir && make -f Vwaveform_sim.mk
+obj_dir/Vpd_pipeline: obj_dir/Vpd_pipeline.mk
+	cd obj_dir && make -f Vpd_pipeline.mk
