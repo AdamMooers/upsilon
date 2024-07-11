@@ -22,19 +22,20 @@ module pd_pipeline #(
 	output reg signed [OUTPUT_WIDTH-1:0] o_pd_out
 );
 
-	reg [INPUT_WIDTH-1:0] error;
+	reg [OUTPUT_WIDTH-1:0] error;
 	reg [OUTPUT_WIDTH-1:0] updated_integral;
 	reg [OUTPUT_WIDTH-1:0] weighted_integral;
 	reg [OUTPUT_WIDTH-1:0] weighted_proportional;
 
 	// Stage 0
 	always @(posedge clk) begin
-		error <= i_actual - i_setpoint;
+		error <= {{OUTPUT_WIDTH-INPUT_WIDTH{i_actual[INPUT_WIDTH-1]}},i_actual} -
+		{{OUTPUT_WIDTH-INPUT_WIDTH{i_setpoint[INPUT_WIDTH-1]}},i_setpoint};
 	end
 
 	// Stage 1
 	always @(posedge clk) begin
-		updated_integral <= i_integral + {{OUTPUT_WIDTH-INPUT_WIDTH{error[INPUT_WIDTH-1]}},error};
+		updated_integral <= i_integral + error;
 	end
 
 	// Stage 2
