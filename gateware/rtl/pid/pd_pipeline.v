@@ -10,7 +10,7 @@ module pd_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32
 ) (
-	input i_clk,
+	input clk, // clk instead of i_clk for verilog testbench compatibility
 
 	input signed [INPUT_WIDTH-1:0] i_kp,
 	input signed [INPUT_WIDTH-1:0] i_ki,
@@ -28,23 +28,23 @@ module pd_pipeline #(
 	reg [OUTPUT_WIDTH-1:0] weighted_proportional;
 
 	// Stage 0
-	always @(posedge i_clk) begin
+	always @(posedge clk) begin
 		error <= i_actual - i_setpoint;
 	end
 
 	// Stage 1
-	always @(posedge i_clk) begin
+	always @(posedge clk) begin
 		updated_integral <= i_integral + {{OUTPUT_WIDTH-INPUT_WIDTH{error[INPUT_WIDTH-1]}},error};
 	end
 
 	// Stage 2
-	always @(posedge i_clk) begin
+	always @(posedge clk) begin
 		weighted_integral <= updated_integral * i_ki;
 		weighted_proportional <= error * i_kp;
 	end
 
 	// Stage 3
-	always @(posedge i_clk) begin
+	always @(posedge clk) begin
 		o_pd_out <= weighted_integral + weighted_proportional;
 	end
 
