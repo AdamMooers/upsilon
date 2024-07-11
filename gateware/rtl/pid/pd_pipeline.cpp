@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
 	tb = new PDPipelineTestbench();
 	atexit(cleanup);
 
-	std::cout << "Checking pipeline math with" << NUM_INCRS << "random inputs" << std::endl;
+	std::cout << "Checking pipeline math with " << NUM_INCRS << " random inputs" << std::endl;
 	auto engine = std::default_random_engine{};
 
 	auto adc_dist = std::uniform_int_distribution<int32_t>(-(1 << 17),(1 << 17) - 1);
