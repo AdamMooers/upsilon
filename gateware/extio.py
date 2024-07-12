@@ -399,37 +399,37 @@ class PDPipeline(Module):
         self.registers = RegisterInterface()
 
         # The kp term input for the PD calculation
-        registers.add_register("kp", False, bitwidth_or_sig) # input_width
+        self.registers.add_register("kp", False, input_width)
 
         # The ki term input for the PD calculation
-        registers.add_register("ki", False, bitwidth_or_sig) # input_width
+        self.registers.add_register("ki", False, input_width)
 
         # The setpoint input for the PD calculation
-        registers.add_register("setpoint", False, bitwidth_or_sig) # input_width
+        self.registers.add_register("setpoint", False, input_width)
 
         # The actual measured input for the PD calculation
-        registers.add_register("actual", False, bitwidth_or_sig) # input_width
+        self.registers.add_register("actual", False, input_width)
 
         # The current integral input for the PD calculation
-        registers.add_register("integral_input", False, bitwidth_or_sig) # output_width
+        self.registers.add_register("integral_input", False, output_width)
 
         # The integral + error output from the PD pipeline 
-        registers.add_register("integral_result", True, bitwidth_or_sig) # output_width
+        self.registers.add_register("integral_result", True, output_width)
 
         # The updated pd output from the PD pipeline
-        registers.add_register("pd_result", True, bitwidth_or_sig) # output_width
+        self.registers.add_register("pd_result", True, output_width)
 
         self.specials += Instance("pd_pipeline",
             p_INPUT_WIDTH = input_width,
             p_OUTPUT_WIDTH = output_width,
 
             i_clk = ClockSignal(),
-            i_kp = registers.signals["kp"],
-            i_ki = registers.signals["ki"],
-            i_setpoint = registers.signals["setpoint"],
-            i_actual = registers.signals["actual"],
-            i_integral_input = registers.signals["integral_input"],
+            i_kp = self.registers.signals["kp"],
+            i_ki = self.registers.signals["ki"],
+            i_setpoint = self.registers.signals["setpoint"],
+            i_actual = self.registers.signals["actual"],
+            i_integral_input = self.registers.signals["integral_input"],
 
-            o_integral_result = registers.signals["integral_result"],
-            o_pd_result = registers.signals["pd_result"],
+            o_integral_result = self.registers.signals["integral_result"],
+            o_pd_result = self.registers.signals["pd_result"],
         )

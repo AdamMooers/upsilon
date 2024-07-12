@@ -502,7 +502,7 @@ class UpsilonSoC(SoCCore):
             return f'{name} = PDPipeline(master_selector.{name}_PI_master_selector,'+ \
             f' RegisterRegion({param_origin}, {pd_pipeline.registers.mmio(param_origin)}))'
         self.mmio_closures.append(f)
-        return wf, pi
+        return pd_pipeline, pi
 
     def __init__(self,
                  variant="a7-100",
