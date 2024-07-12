@@ -12,14 +12,14 @@ module pd_pipeline #(
 ) (
 	input clk, // clk instead of i_clk for verilog testbench compatibility
 
-	input signed [INPUT_WIDTH-1:0] i_kp,
-	input signed [INPUT_WIDTH-1:0] i_ki,
-	input signed [INPUT_WIDTH-1:0] i_setpoint,
-	input signed [INPUT_WIDTH-1:0] i_actual,
-	input signed [OUTPUT_WIDTH-1:0] i_integral,
+	input signed [INPUT_WIDTH-1:0] kp,
+	input signed [INPUT_WIDTH-1:0] ki,
+	input signed [INPUT_WIDTH-1:0] setpoint,
+	input signed [INPUT_WIDTH-1:0] actual,
+	input signed [OUTPUT_WIDTH-1:0] integral_input,
 
-	output signed [OUTPUT_WIDTH-1:0] o_integral,
-	output reg signed [OUTPUT_WIDTH-1:0] o_pd
+	output signed [OUTPUT_WIDTH-1:0] integral_result,
+	output reg signed [OUTPUT_WIDTH-1:0] pd_result
 );
 
 	reg [OUTPUT_WIDTH-1:0] error;
@@ -29,35 +29,26 @@ module pd_pipeline #(
 
 	// Stage 0
 	always @(posedge clk) begin
-		error <= {{OUTPUT_WIDTH-INPUT_WIDTH{i_actual[INPUT_WIDTH-1]}},i_actual} -
-		{{OUTPUT_WIDTH-INPUT_WIDTH{i_setpoint[INPUT_WIDTH-1]}},i_setpoint};
+		error <= {{OUTPUT_WIDTH-INPUT_WIDTH{actual[INPUT_WIDTH-1]}},actual} -
+		{{OUTPUT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
 	end
 
 	// Stage 1
 	always @(posedge clk) begin
-		updated_integral <= i_integral + error;
+		updated_integral <= integral_input + error;
 	end
 
 	// Stage 2
 	always @(posedge clk) begin
-		weighted_integral <= updated_integral * i_ki;
-		weighted_proportional <= error * i_kp;
+		weighted_integral <= updated_integral * ki;
+		weighted_proportional <= error * kp;
 	end
 
 	// Stage 3
 	always @(posedge clk) begin
-		o_pd <= weighted_integral + weighted_proportional;
+		pd_result <= weighted_integral + weighted_proportional;
 	end
 
-	assign o_integral = updated_integral;
-
-// Request ADC output
-
-// Wait for ADC output
-// Update actual
-// Update integral
-// Wait for pipeline to propagate result
-// Request ADC output (maybe add update&arm?)
-// Set DAC to result (maybe add update&arm?)
+	assign integral_result = updated_integral;
 
 endmodule
