@@ -419,11 +419,6 @@ class PDPipeline(Module):
         # The updated pd output from the PD pipeline
         registers.add_register("pd_result", True, bitwidth_or_sig) # output_width
 
-        from_slave = Signal(spi_wid)
-        to_slave = Signal(spi_wid)
-        finished_or_ready = Signal(2)
-        arm = Signal()
-
         self.specials += Instance("pd_pipeline",
             p_INPUT_WIDTH = input_width,
             p_OUTPUT_WIDTH = output_width,

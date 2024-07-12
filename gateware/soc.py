@@ -95,6 +95,7 @@ If there is more than one pin in the Pins string, the resulting
 name will be a vector of pins.
 
 TODO: generate declaratively from constraints file.
+TODO: Move IO to its own file
 """
 io = [
 #    ("differential_output_low", 0, Pins("J17 J18 K15 J15 U14 V14 T13 U13 B6 E5 A3"), IOStandard("LVCMOS33")),
@@ -440,26 +441,31 @@ class UpsilonSoC(SoCCore):
         return self.add_spi_master(name, **args)
 
     def add_waveform(self, name, ram_len, **kwargs):
-        """ Add a waveform module to the device.
+        """ 
+        Add a waveform module to the device.
 
-            Note that by default, the waveform is not attached to any
-            SPI device. You need to specify the SPI interface (usually
-            through a PreemptiveInterface) using the add_spi() method.
+        Note that by default, the waveform is not attached to any
+        SPI device. You need to specify the SPI interface (usually
+        through a PreemptiveInterface) using the add_spi() method.
 
-            This function will add a PreemptiveInterface for the
-            waveform's RAM.
+        This function will add a PreemptiveInterface for the
+        waveform's RAM.
 
-            :param name: Name of new waveform module.
-            :param ram_len: Max number of bytes the waveform will store in
-               its own memory. This must be a multiple of 32.
+        :param name: Name of new waveform module.
+        :param ram_len: Max number of bytes the waveform will store in
+            its own memory. This must be a multiple of 32.
         """
 
         kwargs['counter_max_wid'] = minbits(ram_len)
         wf = Waveform(**kwargs)
 
         self.add_module(name, wf)
-        pi = self.add_preemptive_interface_for_slave(name + "_PI",
-            wf.slavebus, wf.width, wf.public_registers, "byte")
+        pi = self.add_preemptive_interface_for_slave(
+            name + "_PI",
+            wf.slavebus, 
+            wf.width, 
+            wf.public_registers, 
+            "byte")
 
         bram, bram_pi = self.add_blockram(name + "_ram", ram_len)
         wf.add_ram(bram_pi.add_master(name), ram_len)
@@ -468,6 +474,33 @@ class UpsilonSoC(SoCCore):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
             return f'{name} = Waveform({name}_ram, master_selector.{name}_PI_master_selector,'+ \
             f' master_selector.{name}_ram_PI_master_selector, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
+        self.mmio_closures.append(f)
+        return wf, pi
+    
+    def add_pd_pipeline(self, name, **kwargs):
+        """
+        Adds a pd pipeline to the device.
+
+        :param name: Name of new pd pipeline module.
+        """
+        pd_pipeline = PDPipeline(**kwargs)
+        self.add_module(name, pd_pipeline)
+
+        pi = self.add_preemptive_interface_for_slave(
+            name + "_PI",
+            pd_pipeline.registers.bus,
+            # Normally pulling the width before pre-finalization would risk 
+            # missing registers, but registers for the pipeline are not
+            # altered after initialization.
+            pd_pipeline.registers.width,
+            pd_pipeline.registers.public_registers, 
+            "byte")
+
+        # Need to figure out register region
+        def f(csrs):
+            param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
+            return f'{name} = PDPipeline(master_selector.{name}_PI_master_selector,'+ \
+            f' RegisterRegion({param_origin}, {pd_pipeline.registers.mmio(param_origin)}))'
         self.mmio_closures.append(f)
         return wf, pi
 
@@ -593,9 +626,11 @@ class UpsilonSoC(SoCCore):
         for i in range(0,8):
             swic_name = f"pico{i}"
             wf_name = f"wf{i}"
+            pd_pipeline_name = f"pd_pipeline{i}"
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
+            add_pd_pipeline = i < 1
             add_wf = i < 2
             add_swic = i < 2
 
@@ -619,6 +654,10 @@ class UpsilonSoC(SoCCore):
             # Add waveform generator.
             if add_wf:
                 wf, wf_pi = self.add_waveform(wf_name, 4096)
+            
+            # Add pd pipeline
+            if add_pd_pipeline:
+                pd_pipeline, pd_piepline_pi = self.add_pd_pipeline(pd_pipeline_name, input_width=18, output_width=32)
 
             # Add SWIC
             if add_swic:
@@ -626,9 +665,19 @@ class UpsilonSoC(SoCCore):
                 self.picorv32_add_cl(swic_name)
                 self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
                 self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
+            
+            # Connect hardware to swics if it is being generated
+            if add_pd_pipeline:
+                self.picorv32_add_pi(
+                    swic_name, 
+                    pd_pipeline_name, 
+                    f"{pd_pipeline_name}_PI", 
+                    0x400000, 
+                    pd_pipeline.registers.width, 
+                    pd_pipeline.registers.public_registers)
 
             if add_wf:
-                self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x400000, wf.width, wf.public_registers)
+                self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.width, wf.public_registers)
                 wf.add_spi(dac_pi.add_master(wf_name))
             
         #######################

@@ -153,6 +153,10 @@ class RegisterInterface(LiteXModule):
         self.public_registers = {}
         self.signals = {}
         self.has_pre_finalize = False
+    
+    @property
+    def width(self):
+        return round_up_to_pow_2(self.next_register_loc)
 
     def mmio(self, origin):
         """ Returns a string that can be a keyword argument in Python
@@ -192,6 +196,7 @@ class RegisterInterface(LiteXModule):
 
         self.signals[name] = sig
 
+
     def pre_finalize(self):
         """ Loop through each register and build a Verilog case statement
             implementing the bus.
@@ -218,8 +223,6 @@ class RegisterInterface(LiteXModule):
                     ).Else(
                         b.dat_r.eq(sig)
                     )
-
-        self.width = round_up_to_pow_2(self.next_register_loc)
 
         # The width is a power of 2 (0b1000...). This bitlen is the
         # number of bits to read, starting from 0.
