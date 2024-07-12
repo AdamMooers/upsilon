@@ -66,8 +66,7 @@ class PreemptiveInterface(LiteXModule):
         self.pre_finalize_done = True
 
         masters_len = len(self.buses)
-        if masters_len > 1:
-            self.master_select = Signal(masters_len)
+        self.master_select = Signal(masters_len)
 
         # FIXME: Implement PreemptiveInterfaceController module to limit proliferation
         # of JSON files
