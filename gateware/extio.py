@@ -1,4 +1,4 @@
-# Copyright 2023-2024 (C) Peter McGoron
+# Copyright 2023-2024 (C) Peter McGoron, Adam Mooers
 #
 # This file is a part of Upsilon, a free and open source software project.
 # For license terms, refer to the files in `doc/copying` in the Upsilon
@@ -387,4 +387,54 @@ class SPIMaster(Module):
             o_finished = finished_or_ready[1],
             o_ready_to_arm = finished_or_ready[0],
             i_arm = arm,
+        )
+
+class PDPipeline(Module):
+    def __init__(self, input_width = 18, output_width = 32):
+        """
+        :param input_width: Width of input signals
+        :param output_width: Width of output signals
+        """
+
+        self.registers = RegisterInterface()
+
+        # The kp term input for the PD calculation
+        registers.add_register("kp", False, bitwidth_or_sig) # input_width
+
+        # The ki term input for the PD calculation
+        registers.add_register("ki", False, bitwidth_or_sig) # input_width
+
+        # The setpoint input for the PD calculation
+        registers.add_register("setpoint", False, bitwidth_or_sig) # input_width
+
+        # The actual measured input for the PD calculation
+        registers.add_register("actual", False, bitwidth_or_sig) # input_width
+
+        # The current integral input for the PD calculation
+        registers.add_register("integral_input", False, bitwidth_or_sig) # output_width
+
+        # The integral + error output from the PD pipeline 
+        registers.add_register("integral_result", True, bitwidth_or_sig) # output_width
+
+        # The updated pd output from the PD pipeline
+        registers.add_register("pd_result", True, bitwidth_or_sig) # output_width
+
+        from_slave = Signal(spi_wid)
+        to_slave = Signal(spi_wid)
+        finished_or_ready = Signal(2)
+        arm = Signal()
+
+        self.specials += Instance("pd_pipeline",
+            p_INPUT_WIDTH = input_width,
+            p_OUTPUT_WIDTH = output_width,
+
+            i_clk = ClockSignal(),
+            i_kp = registers.signals["kp"],
+            i_ki = registers.signals["ki"],
+            i_setpoint = registers.signals["setpoint"],
+            i_actual = registers.signals["actual"],
+            i_integral_input = registers.signals["integral_input"],
+
+            o_integral_result = registers.signals["integral_result"],
+            o_pd_result = registers.signals["pd_result"],
         )

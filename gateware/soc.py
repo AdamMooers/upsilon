@@ -343,7 +343,7 @@ class UpsilonSoC(SoCCore):
     
         self.pre_finalize.append(pre_finalize)
 
-        # Add a Block RAM for the PicoRV32 toexecute from.
+        # Add a Block RAM for the PicoRV32 to execute from.
         ram, ram_pi = self.add_blockram(name + "_ram", size=size)
 
         # Add this at the end so the Blockram declaration comes before this one
@@ -501,10 +501,8 @@ class UpsilonSoC(SoCCore):
         # Source file reading
 
         """
-        These source files need to be sorted so that modules
-        that rely on another module come later. For instance,
-        `control_loop` depends on `control_loop_math`, so
-        control_loop_math.v comes before control_loop.v
+        These source files need to be arranged such that modules
+        that rely on another module come later.
 
         If you want to add a new verilog file to the design, look at the
         modules that it refers to and place it the files with those modules.
@@ -516,6 +514,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/waveform/waveform.v")
+        platform.add_source("rtl/pd/pd_pipeline.v")
 
         # Initialize SoC Core
 
