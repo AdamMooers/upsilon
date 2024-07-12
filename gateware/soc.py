@@ -718,6 +718,7 @@ def generate_main_cpu_include(closures, csr_file):
         print("from registers import *", file=out)
         print("from waveform import *", file=out)
         print("from picorv32 import *", file=out)
+        print("from pd_pipeline import PDPipeline", file=out)
         print("from spi import *", file=out)
         with open(csr_file, 'rt') as f:
             csrs = json.load(f)
