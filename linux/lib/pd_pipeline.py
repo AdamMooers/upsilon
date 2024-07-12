@@ -1,3 +1,8 @@
+# Copyright 2024 (C) Adam Mooers
+#
+# This file is a part of Upsilon, a free and open source software project.
+# For license terms, refer to the files in `doc/copying` in the Upsilon
+# source distribution.
 from registers import *
 
 class PDPipeline(Immutable):
