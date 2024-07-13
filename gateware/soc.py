@@ -261,26 +261,28 @@ class UpsilonSoC(SoCCore):
             self.add_constant(f"{ip_name}{seg_num}", int(ip_byte))
 
     def add_slave_with_registers(self, name, bus, region, registers):
-        """ Add a bus reegion connected to a slave device to the SoC's main
-            bus with a description of its registers.
+        """ 
+        Add a bus reegion connected to a slave device to the SoC's main
+        bus with a description of its registers.
 
-            :param name: Name of the region as it will appear in any generated
-               code.
-            :param bus: An instance of Wishbone.Interface connected to a
-               Wishbone slave.
-            :param region: An instance of SoCRegion.
-            :param registers: A dictionary whose values are valid Python and
-               C identifiers (start with character or _, no spaces) and whose
-               values are instsances of the Register class in region.py.
+        :param name: Name of the region as it will appear in any generated
+            code.
+        :param bus: An instance of Wishbone.Interface connected to a
+            Wishbone slave.
+        :param region: An instance of SoCRegion.
+        :param registers: A dictionary whose values are valid Python and
+            C identifiers (start with character or _, no spaces) and whose
+            values are instsances of the Register class in region.py.
         """
         self.bus.add_slave(name, bus, region)
         self.soc_subregions[name] = registers
 
     def add_preemptive_interface_for_slave(self, name, slave_bus, slave_width, slave_registers, addressing="word"):
-        """ Add a PreemptiveInterface in front of a Wishbone Slave interface.
+        """ 
+        Add a PreemptiveInterface in front of a Wishbone Slave interface.
 
         :param name: Name of the module and the Wishbone bus region.
-        :param slave_bus: Instance of Wishbone.Interface.
+        :param slave_bus: Instance of Wishbone Interface.
         :param slave_width: Number of bytes in the region.
         :param slave_registers: A dictionary whose values are valid Python
            identifiers and whose values are instances of region.Register.
@@ -297,10 +299,11 @@ class UpsilonSoC(SoCCore):
         return pi
 
     def add_blockram(self, name, size):
-        """ Add a blockram module to the system. 
-            :param name: Name given to the Blockram. This name will be
-               used by the MicroPython library to access the ram.
-            :param size: Size of the blockram in bytes. Must be a multiple of 32.
+        """ 
+        Add a blockram module to the system. 
+        :param name: Name given to the Blockram. This name will be
+            used by the MicroPython library to access the ram.
+        :param size: Size of the blockram in bytes. Must be a multiple of 32.
         """
         mod = SRAM(size)
         self.add_module(name, mod)
@@ -489,9 +492,6 @@ class UpsilonSoC(SoCCore):
         pi = self.add_preemptive_interface_for_slave(
             name + "_PI",
             pd_pipeline.registers.bus,
-            # Normally pulling the width before pre-finalization would risk 
-            # missing registers, but registers for the pipeline are not
-            # altered after initialization.
             pd_pipeline.registers.width,
             pd_pipeline.registers.public_registers, 
             "byte")
@@ -502,6 +502,7 @@ class UpsilonSoC(SoCCore):
             return f'{name} = PDPipeline(master_selector.{name}_PI_master_selector,'+ \
             f' RegisterRegion({param_origin}, {pd_pipeline.registers.mmio(param_origin)}))'
         self.mmio_closures.append(f)
+        self.pre_finalize.append(lambda : pd_pipeline.pre_finalize())
         return pd_pipeline, pi
 
     def __init__(self,
@@ -623,15 +624,14 @@ class UpsilonSoC(SoCCore):
         # Add upsilon modules to this section
         #########################
 
-        for i in range(0,8):
+        for i in range(0,1):
             swic_name = f"pico{i}"
             wf_name = f"wf{i}"
-            pd_pipeline_name = f"pd_pipeline{i}"
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
             add_pd_pipeline = i < 1
-            add_wf = i < 2
+            add_wf = False
             add_swic = i < 2
 
             # Add control loop DACs and ADCs.
@@ -643,6 +643,7 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request(f"dac_ss_L_{i}"),
             )
 
+            '''
             adc, adc_pi = self.add_LT_adc(adc_name,
                 rst=module_reset,
                 miso=platform.request(f"adc_sdo_{i}"),
@@ -650,15 +651,18 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request(f"adc_conv_{i}"),
                 spi_wid=18,
             )
+            '''
 
             # Add waveform generator.
             if add_wf:
                 wf, wf_pi = self.add_waveform(wf_name, 4096)
-            
+
             # Add pd pipeline
             if add_pd_pipeline:
+                pd_pipeline_name = f"pd_pipeline{i}"
                 pd_pipeline, pd_piepline_pi = self.add_pd_pipeline(pd_pipeline_name, input_width=18, output_width=32)
 
+            '''
             # Add SWIC
             if add_swic:
                 self.add_picorv32(swic_name)
@@ -675,9 +679,9 @@ class UpsilonSoC(SoCCore):
                     0x400000, 
                     pd_pipeline.registers.width, 
                     pd_pipeline.registers.public_registers)
-
+            '''
             if add_wf:
-                self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.width, wf.public_registers)
+                #self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.width, wf.public_registers)
                 wf.add_spi(dac_pi.add_master(wf_name))
             
         #######################
@@ -689,8 +693,7 @@ class UpsilonSoC(SoCCore):
             f()
 
         for name, pi in self.interface_list:
-            if hasattr(pi, "master_select"):
-                master_selector.add_register(name + "_master_selector", False, pi.master_select)
+            master_selector.add_register(name + "_master_selector", False, pi.master_select)
 
         # Finalize preemptive interface controller.
         master_selector.pre_finalize()

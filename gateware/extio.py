@@ -396,28 +396,25 @@ class PDPipeline(Module):
         :param output_width: Width of output signals
         """
 
-        self.registers = RegisterInterface()
+        self.submodules.registers = RegisterInterface()
 
-        # The kp term input for the PD calculation
-        self.registers.add_register("kp", False, input_width)
-
-        # The ki term input for the PD calculation
-        self.registers.add_register("ki", False, input_width)
-
-        # The setpoint input for the PD calculation
-        self.registers.add_register("setpoint", False, input_width)
-
-        # The actual measured input for the PD calculation
-        self.registers.add_register("actual", False, input_width)
-
-        # The current integral input for the PD calculation
-        self.registers.add_register("integral_input", False, output_width)
-
-        # The integral + error output from the PD pipeline 
-        self.registers.add_register("integral_result", True, output_width)
-
-        # The updated pd output from the PD pipeline
-        self.registers.add_register("pd_result", True, output_width)
+        # Add the following registers:
+        # kp: the kp input term for the PD calculation
+        # ki: the ki term input for the PD calculation
+        # setpoint: the setpoint input for the PD calculation
+        # actual: the actual measured input for the PD calculation
+        # integral_input: the current integral input for the PD calculation
+        # integral_result: the integral + error output from the PD pipeline
+        # pd_result: The updated pd output from the PD pipeline
+        self.registers.add_registers([
+            ("kp", False, input_width),
+            ("ki", False, input_width),
+            ("setpoint", False, input_width),
+            ("actual", False, input_width),
+            ("integral_input", False, output_width),
+            ("integral_result", True, output_width),
+            ("pd_result", True, output_width)
+        ])
 
         self.specials += Instance("pd_pipeline",
             p_INPUT_WIDTH = input_width,
@@ -433,3 +430,6 @@ class PDPipeline(Module):
             o_integral_result = self.registers.signals["integral_result"],
             o_pd_result = self.registers.signals["pd_result"],
         )
+
+    def pre_finalize(self):
+        self.registers.pre_finalize()

@@ -143,8 +143,9 @@ class MemoryMap(LiteXModule):
         self.submodules.decoder = Decoder(self.masterbus, slaves, register=True)
 
 class RegisterInterface(LiteXModule):
-    """ A single memory region filled with 32 bit registers. Each register
-        can be read-write or read only.
+    """ 
+    A single memory region filled with 32 bit registers. Each register
+    can be read-write or read only.
     """
 
     def __init__(self):
@@ -159,27 +160,33 @@ class RegisterInterface(LiteXModule):
         return round_up_to_pow_2(self.next_register_loc)
 
     def mmio(self, origin):
-        """ Returns a string that can be a keyword argument in Python
-            that describes all registers in an instance of this module.
+        """ 
+        Returns a string that can be a keyword argument in Python
+        that describes all registers in an instance of this module.
         """
 
         r = ""
         for name, reg in self.public_registers.items():
-            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={reg.read_only}),'
+            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={not reg.read_only}),'
         return r
 
     def add_register(self, name, read_only, bitwidth_or_sig):
+        """
+        :param name: name of the register
+        :param read_only: True if register is read-only, False if register is read-write
+        :param bitwidth_or_sig: Creates a new signal for the register if a width is given
+            or uses the provided signal as the register
+        """
         assert not self.has_pre_finalize
 
         if type(bitwidth_or_sig) is int:
             sig = Signal(bitwidth_or_sig)
-            bitwidth = bitwidth_or_sig
         else:
             sig = bitwidth_or_sig
-            bitwidth = sig.nbits
+        
+        bitwidth = sig.nbits
 
         assert bitwidth <= 32
-
         assert name not in self.public_registers
 
         self.public_registers[name] = Register(
@@ -196,6 +203,14 @@ class RegisterInterface(LiteXModule):
 
         self.signals[name] = sig
 
+    def add_registers(self, registers):
+        """
+        Often more than one register is created at a time. This method provides
+        a clean way to add them in bulk.
+        :param registers: A list of tuples containing the args to create the registers
+        """
+        for reg_args in registers:
+            self.add_register(*reg_args)
 
     def pre_finalize(self):
         """ Loop through each register and build a Verilog case statement
@@ -215,17 +230,26 @@ class RegisterInterface(LiteXModule):
             sig = self.signals[name]
             reg = self.public_registers[name]
 
-            cases[reg.origin] = \
-                b.dat_r.eq(sig) \
-                if reg.read_only else \
+            # Format dat_r explicitly, padding out any 
+            # unused bits with 0s
+            dat_r_bits = [b.dat_r[0:sig.nbits].eq(sig)]
+            if (sig.nbits < 32):
+                dat_r_bits.append(b.dat_r[sig.nbits:].eq(0))
+
+
+            if reg.read_only:
+                cases[reg.origin] = dat_r_bits
+            else:
+                cases[reg.origin] = \
                     If(b.we,
-                        sig.eq(b.dat_w)
+                        sig.eq(b.dat_w[0:sig.nbits])
                     ).Else(
-                        b.dat_r.eq(sig)
+                        *dat_r_bits
                     )
 
         # The width is a power of 2 (0b1000...). This bitlen is the
         # number of bits to read, starting from 0.
+        print("Next reg loc " + str(self.next_register_loc))
         bitlen = (self.width - 1).bit_length()
         self.sync += If(b.cyc & b.stb & ~b.ack,
                         Case(b.adr[0:bitlen], cases),
@@ -245,7 +269,7 @@ class PeekPokeInterface(LiteXModule):
     def mmio(self, origin):
         return self.first.mmio(origin)
 
-    def add_register(self, name, can_write, bitwidth_or_sig, sig=None):
+    def add_register(self, name, can_write, bitwidth_or_sig):
         """ Add a register to the memory area.
 
         :param name: Name of the register in the description.
@@ -253,6 +277,10 @@ class PeekPokeInterface(LiteXModule):
            empty (none).
         :param bitwidth_or_sig: Width of the register in bits or pre-existing signal
         """
+
+        # TODO: I believe there is a bug here where the two register interfaces
+        # are not sharing a signal if bitwidth_or_sig is an int. Simple solution
+        # is the pass the signal created in first to second
 
         first = self.get_module("first")
         second = self.get_module("second")
