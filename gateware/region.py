@@ -243,7 +243,7 @@ class RegisterInterface(LiteXModule):
         for name in self.public_registers:
             sig = self.signals[name]
             reg = self.public_registers[name]
-            ack_signal = self.ack_signals[name] or 1
+            ack_signal = 1 if self.ack_signals[name] is None else self.ack_signals[name]
 
             # Format dat_r explicitly, padding out any 
             # unused bits with 0s
