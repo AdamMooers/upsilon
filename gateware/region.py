@@ -278,22 +278,18 @@ class PeekPokeInterface(LiteXModule):
         :param bitwidth_or_sig: Width of the register in bits or pre-existing signal
         """
 
-        # TODO: I believe there is a bug here where the two register interfaces
-        # are not sharing a signal if bitwidth_or_sig is an int. Simple solution
-        # is the pass the signal created in first to second
-
         first = self.get_module("first")
         second = self.get_module("second")
 
         if can_write == "1":
             first.add_register(name, False, bitwidth_or_sig)
-            second.add_register(name, True, bitwidth_or_sig)
+            second.add_register(name, True, first.signals[name])
         elif can_write == "2":
-            second.add_register(name, False, bitwidth_or_sig)
             first.add_register(name, True, bitwidth_or_sig)
+            second.add_register(name, False, first.signals[name])
         else:
-            second.add_register(name, True, bitwidth_or_sig)
             first.add_register(name, True, bitwidth_or_sig)
+            second.add_register(name, True, first.signals[name])
 
         self.public_registers = first.public_registers
         self.signals = first.signals
