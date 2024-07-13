@@ -399,15 +399,20 @@ class UpsilonSoC(SoCCore):
         spi = SPIMaster(**kwargs)
         self.add_module(name, spi)
 
-        pi = self.add_preemptive_interface_for_slave(name + "_PI", spi.bus,
-                spi.width, spi.public_registers, "byte")
+        pi = self.add_preemptive_interface_for_slave(
+            name + "_PI",
+            spi.registers.bus,
+            spi.registers.width,
+            spi.registers.public_registers, 
+            "byte")
 
         def f(csrs):
             wid = kwargs["spi_wid"]
             origin = csrs["memories"][name.lower() + "_pi"]['base']
-            return f'{name} = SPI({wid}, master_selector.{name}_PI_master_selector, {origin}, {spi.mmio(origin)})'
+            return f'{name} = SPI({wid}, master_selector.{name}_PI_master_selector, {origin}, {spi.registers.mmio(origin)})'
+        
         self.mmio_closures.append(f)
-
+        self.pre_finalize.append(lambda : spi.pre_finalize())
         return spi, pi
 
     def add_AD5791(self, name, **kwargs):
@@ -501,6 +506,7 @@ class UpsilonSoC(SoCCore):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
             return f'{name} = PDPipeline(master_selector.{name}_PI_master_selector,'+ \
             f' RegisterRegion({param_origin}, {pd_pipeline.registers.mmio(param_origin)}))'
+        
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pd_pipeline.pre_finalize())
         return pd_pipeline, pi
@@ -667,8 +673,8 @@ class UpsilonSoC(SoCCore):
             if add_swic:
                 self.add_picorv32(swic_name)
                 self.picorv32_add_cl(swic_name)
-                self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.width, dac.public_registers)
-                self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.width, adc.public_registers)
+                self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.registers.width, dac.registers.public_registers)
+                self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.registers.width, adc.registers.public_registers)
             
             # Connect hardware to swics if it is being generated
             if add_pd_pipeline:

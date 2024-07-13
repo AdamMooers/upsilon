@@ -153,6 +153,7 @@ class RegisterInterface(LiteXModule):
         self.next_register_loc = 0
         self.public_registers = {}
         self.signals = {}
+        self.ack_signals = {}
         self.has_pre_finalize = False
     
     @property
@@ -170,12 +171,16 @@ class RegisterInterface(LiteXModule):
             r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={not reg.read_only}),'
         return r
 
-    def add_register(self, name, read_only, bitwidth_or_sig):
+    def add_register(self, name, read_only, bitwidth_or_sig, ack_signal=None):
         """
         :param name: name of the register
         :param read_only: True if register is read-only, False if register is read-write
         :param bitwidth_or_sig: Creates a new signal for the register if a width is given
             or uses the provided signal as the register
+        :param ack_signal: optional ack signal to use when the register is selected. The
+            bus will wait until the provided signal goes high befire the data is considered
+            valid. If no signal is provided, then by default ack will go high immediately
+            (the most common option).
         """
         assert not self.has_pre_finalize
 
@@ -202,15 +207,24 @@ class RegisterInterface(LiteXModule):
             bitwidth -= 32
 
         self.signals[name] = sig
+        self.ack_signals[name] = ack_signal
 
     def add_registers(self, registers):
         """
         Often more than one register is created at a time. This method provides
-        a clean way to add them in bulk.
-        :param registers: A list of tuples containing the args to create the registers
+        a convenient way to add them in bulk.
+        :param registers: A list of kwargs dictionaries with arguments 
+            for each register to create
+
+        Example Usage:
+
+        add_registers([
+            {'name':'regA', 'read_only':False, 'bitwidth_or_sig':32},
+            {'name':'regB', 'read_only':True, 'bitwidth_or_sig':Signal()},
+        ])
         """
         for reg_args in registers:
-            self.add_register(*reg_args)
+            self.add_register(**reg_args)
 
     def pre_finalize(self):
         """ Loop through each register and build a Verilog case statement
@@ -229,6 +243,7 @@ class RegisterInterface(LiteXModule):
         for name in self.public_registers:
             sig = self.signals[name]
             reg = self.public_registers[name]
+            ack_signal = self.ack_signals[name] or 1
 
             # Format dat_r explicitly, padding out any 
             # unused bits with 0s
@@ -236,26 +251,33 @@ class RegisterInterface(LiteXModule):
             if (sig.nbits < 32):
                 dat_r_bits.append(b.dat_r[sig.nbits:].eq(0))
 
-
             if reg.read_only:
                 cases[reg.origin] = dat_r_bits
             else:
-                cases[reg.origin] = \
+                cases[reg.origin] = [
                     If(b.we,
                         sig.eq(b.dat_w[0:sig.nbits])
                     ).Else(
                         *dat_r_bits
                     )
+                ]
+
+            cases[reg.origin].append(b.ack.eq(ack_signal))
 
         # The width is a power of 2 (0b1000...). This bitlen is the
         # number of bits to read, starting from 0.
         print("Next reg loc " + str(self.next_register_loc))
         bitlen = (self.width - 1).bit_length()
         self.sync += If(b.cyc & b.stb & ~b.ack,
-                        Case(b.adr[0:bitlen], cases),
-                        b.ack.eq(1)
+                        Case(b.adr[0:bitlen], cases)
                      ).Elif(~b.cyc,
                         b.ack.eq(0))
+
+        # For now, the bus does not support errors, but
+        # support can be added here if needed
+        self.comb += [
+            b.err.eq(0)
+        ]
  
 class PeekPokeInterface(LiteXModule):
     """ Module that exposes registers to two Wishbone masters.

@@ -228,56 +228,6 @@ class SPIMaster(Module):
         "enable_mosi" : 0,
     }
 
-    width = 0x20
-
-    public_registers = {
-            # The first bit is the "ready" bit, when the master is
-            # not armed and ready to be armed.
-            # The second bit is the "finished" bit, when the master is
-            # armed and finished with a transmission.
-            "finished_or_ready": Register(
-                origin= 0,
-                bitwidth= 2,
-                rw=False,
-            ),
-
-            # One bit to initiate a transmission cycle. Transmission
-            # cycles CANNOT be interrupted.
-            "arm" : Register(
-                origin=4,
-                bitwidth=1,
-                rw=True,
-            ),
-
-            # Data sent from the SPI slave.
-            "from_slave": Register(
-                origin=8,
-                bitwidth=32,
-                rw=False,
-            ),
-
-            # Data sent to the SPI slave.
-            "to_slave": Register(
-                origin=0xC,
-                bitwidth=32,
-                rw=True
-            ),
-
-            # Same as ready_or_finished, but halts until ready or finished
-            # goes high. Dangerous, might cause cores to hang!
-            "wait_finished_or_ready": Register(
-                origin=0x10,
-                bitwidth=2,
-                rw= False,
-            ),
-    }
-
-    def mmio(self, origin):
-        r = ""
-        for name, reg in self.public_registers.items():
-            r += f'{name} = Register(loc={origin + reg.origin},bitwidth={reg.bitwidth},rw={reg.rw}),'
-        return r
-
     """ Wrapper for the SPI master verilog code. """
     def __init__(self, rst, miso, mosi, sck, ss_L,
                 polarity = 0,
@@ -306,61 +256,59 @@ class SPIMaster(Module):
         :param spi_cycle_half_wait: Verilog parameter: see file.
         """
 
-        self.bus = Interface(data_width = 32, address_width=32, addressing="byte")
+        self.submodules.registers = RegisterInterface()
 
-        from_slave = Signal(spi_wid)
-        to_slave = Signal(spi_wid)
-        finished_or_ready = Signal(2)
-        arm = Signal()
+        # finished_or_ready: 
+        #   The first bit is the "ready" bit, when the master is
+        #   not armed and ready to be armed.
+        #   The second bit is the "finished" bit, when the master is
+        #   armed and finished with a transmission.
+        # arm: 
+        #   One bit to initiate a transmission cycle. Transmission
+        #   cycles CANNOT be interrupted.
+        # from_slave:
+        #   Data sent from the SPI slave.
+        # to_slave:
+        #   Data sent to the SPI slave.
+        # wait_finished_or_ready:
+        #   Same as ready_or_finished, but halts until ready or finished
+        #   goes high. Dangerous, might cause cores to hang!
+        self.registers.add_registers([
+            {
+                'name':'finished_or_ready', 
+                'read_only':True, 
+                'bitwidth_or_sig':2
+            },
+            {
+                'name':'arm', 
+                'read_only':False, 
+                'bitwidth_or_sig':1
+            },
+            {
+                'name':'from_slave', 
+                'read_only':True, 
+                'bitwidth_or_sig':spi_wid
+            },
+            {
+                'name':'to_slave', 
+                'read_only':False, 
+                'bitwidth_or_sig':spi_wid
+            },
+            {
+                'name':'wait_finished_or_ready', 
+                'read_only':True, 
+                'bitwidth_or_sig':output_width, 
+                'ack_signal':finished_or_ready
+            },
+        ])
 
-        self.comb += [
-                self.bus.err.eq(0),
-        ]
+        finished = Signal()
+        ready = Signal()
+        finished_or_ready = Signal()
 
         self.sync += [
-                If(self.bus.cyc & self.bus.stb & ~self.bus.ack,
-                    Case(self.bus.adr[0:5], {
-                        0x0: [
-                            self.bus.dat_r[2:].eq(0),
-                            self.bus.dat_r[0:2].eq(finished_or_ready),
-                            self.bus.ack.eq(1),
-                        ],
-                        0x4: [
-                            If(self.bus.we,
-                                arm.eq(self.bus.dat_w[0]),
-                            ).Else(
-                                self.bus.dat_r[1:].eq(0),
-                                self.bus.dat_r[0].eq(arm),
-                            ),
-                            self.bus.ack.eq(1),
-                            ],
-                        0x8: [
-                            self.bus.dat_r[spi_wid:].eq(0),
-                            self.bus.dat_r[0:spi_wid].eq(from_slave),
-                            self.bus.ack.eq(1),
-                            ],
-                        0xC: [
-                            If(self.bus.we,
-                                to_slave.eq(self.bus.dat_w[0:spi_wid]),
-                            ).Else(
-                                self.bus.dat_r[spi_wid:].eq(0),
-                                self.bus.dat_r[0:spi_wid].eq(to_slave),
-                            ),
-                            self.bus.ack.eq(1),
-                            ],
-                        0x10: If(finished_or_ready[0] | finished_or_ready[1],
-                            self.bus.dat_r[2:].eq(0),
-                            self.bus.dat_r[0:2].eq(finished_or_ready),
-                            self.bus.ack.eq(1),
-                        ),
-                        "default":
-                        # 0xSPI00SPI
-                            self.bus.dat_r.eq(0x57100571),
-                    }),
-                ).Elif(~self.bus.cyc,
-                    self.bus.ack.eq(0)
-                )
-            ]
+            self.finished_or_ready.eq(self.finished | self.ready)
+        ]
 
         self.specials += Instance("spi_master_ss",
             p_SS_WAIT = ss_wait,
@@ -382,12 +330,15 @@ class SPIMaster(Module):
             o_sck_wire = sck,
             o_ss_L = ss_L,
 
-            o_from_slave = from_slave,
-            i_to_slave = to_slave,
-            o_finished = finished_or_ready[1],
-            o_ready_to_arm = finished_or_ready[0],
-            i_arm = arm,
+            o_from_slave = self.registers.signals["from_slave"],
+            i_to_slave = self.registers.signals["to_slave"],
+            o_finished = self.finished,
+            o_ready_to_arm = self.ready,
+            i_arm = self.registers.signals["arm"],
         )
+
+    def pre_finalize(self):
+        self.registers.pre_finalize()
 
 class PDPipeline(Module):
     def __init__(self, input_width = 18, output_width = 32):
@@ -407,13 +358,13 @@ class PDPipeline(Module):
         # integral_result: the integral + error output from the PD pipeline
         # pd_result: The updated pd output from the PD pipeline
         self.registers.add_registers([
-            ("kp", False, input_width),
-            ("ki", False, input_width),
-            ("setpoint", False, input_width),
-            ("actual", False, input_width),
-            ("integral_input", False, output_width),
-            ("integral_result", True, output_width),
-            ("pd_result", True, output_width)
+            {'name':'kp', 'read_only':False, 'bitwidth_or_sig':input_width},
+            {'name':'ki', 'read_only':False, 'bitwidth_or_sig':input_width},
+            {'name':'setpoint', 'read_only':False, 'bitwidth_or_sig':input_width},
+            {'name':'actual', 'read_only':False, 'bitwidth_or_sig':input_width},
+            {'name':'integral_input', 'read_only':False, 'bitwidth_or_sig':output_width},
+            {'name':'integral_result', 'read_only':True, 'bitwidth_or_sig':output_width},
+            {'name':'pd_result', 'read_only':True, 'bitwidth_or_sig':output_width}
         ])
 
         self.specials += Instance("pd_pipeline",
