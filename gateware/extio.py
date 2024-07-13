@@ -260,9 +260,7 @@ class SPIMaster(Module):
         finished_or_ready_flag = Signal()
 
         self.sync += [
-            self.finished_or_ready_flag.eq(
-                self.finished_or_ready[0] | self.finished_or_ready[1]
-            )
+            finished_or_ready_flag.eq(finished_or_ready[0] | finished_or_ready[1])
         ]
 
         self.submodules.registers = RegisterInterface()
@@ -286,7 +284,7 @@ class SPIMaster(Module):
             {
                 'name':'finished_or_ready', 
                 'read_only':True, 
-                'bitwidth_or_sig':self.finished_or_ready
+                'bitwidth_or_sig':finished_or_ready
             },
             {
                 'name':'arm', 
@@ -306,8 +304,8 @@ class SPIMaster(Module):
             {
                 'name':'wait_finished_or_ready', 
                 'read_only':True, 
-                'bitwidth_or_sig':self.finished_or_ready, 
-                'ack_signal':self.finished_or_ready_flag
+                'bitwidth_or_sig':finished_or_ready, 
+                'ack_signal':finished_or_ready_flag
             },
         ])
 
@@ -333,8 +331,8 @@ class SPIMaster(Module):
 
             o_from_slave = self.registers.signals["from_slave"],
             i_to_slave = self.registers.signals["to_slave"],
-            o_finished = self.finished_or_ready[0],
-            o_ready_to_arm = self.finished_or_ready[1],
+            o_finished = finished_or_ready[0],
+            o_ready_to_arm = finished_or_ready[1],
             i_arm = self.registers.signals["arm"],
         )
 
