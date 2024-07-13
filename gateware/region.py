@@ -302,3 +302,136 @@ class PeekPokeInterface(LiteXModule):
     def do_finalize(self):
         assert self.first.has_pre_finalize
         assert self.second.has_pre_finalize
+
+class PreemptiveInterface(LiteXModule):
+    """ A preemptive interface is a manually controlled Wishbone interface
+    that stands between multiple masters (potentially interconnects) and a
+    single slave. A master controls which master (or interconnect) has access
+    to the slave. This is to avoid bus contention by having multiple buses.
+
+    To use this module, instantiate it. Then connect the controlling master
+    to ``self.buses[0]``. Connect the other masters to ``self.buses[1]``, etc.
+    Since the buses are seperate, origins don't have to be the same, but the
+    size of the region will be the same as the slave interface.
+    """
+
+    def __init__(self, slave_bus, addressing="word", name=None):
+        """
+        :param slave_bus: Instance of Wishbone.Interface that connects to the
+          slave's bus.
+        :param addressing: Addressing style of the slave. Default is "word". Note
+          that masters may have to convert when selecting self.buses. This conversion
+          is not done in this module.
+        :param name: Name for debugging purposes.
+        """
+
+        self.slave_bus = slave_bus
+        self.addressing=addressing
+        self.buses = []
+        self.name = name
+
+        self.master_names = []
+
+        self.pre_finalize_done = False
+
+    def add_master(self, name):
+        """ Adds a new master bus to the PI.
+
+        :return: The interface to the bus.
+        :param name: Name associated with this master.
+        """
+        if self.pre_finalize_done:
+            raise Exception(self.name + ": Attempted to modify PreemptiveInterface after pre-finalize")
+
+        self.master_names.append(name)
+
+        iface = Interface(data_width=32, address_width=32, addressing=self.addressing)
+        self.buses.append(iface)
+        return iface
+
+    def pre_finalize(self, dump_name):
+        # NOTE: DUMB HACK! CSR bus logic is NOT generated when inserted at do_finalize time!
+        if self.pre_finalize_done:
+            raise Exception(self.name + ": Cannot pre-finalize twice")
+        self.pre_finalize_done = True
+
+        masters_len = len(self.buses)
+        self.master_select = Signal(masters_len)
+
+        # FIXME: Implement PreemptiveInterfaceController module to limit proliferation
+        # of JSON files
+        with open(dump_name, 'wt') as f:
+            import json
+            json.dump(self.master_names, f)
+ 
+    def do_finalize(self):
+        if not self.pre_finalize_done:
+            raise Exception(self.name + ": PreemptiveInterface needs a manual call to pre_finalize()")
+
+        masters_len = len(self.buses)
+        if masters_len == 0:
+            return None
+
+        """
+        Construct a combinatorial case statement. In verilog, the case
+        statment would look like
+ 
+           always @ (*) case (master_select)
+              1: begin
+                 // Assign slave to master 1,
+                 // Assign all other masters to dummy ports
+              end
+              2: begin
+                 // Assign slave to master 2,
+                 // Assign all other masters to dummy ports
+              end
+              // more cases:
+              default: begin
+                 // assign slave to master 0
+                 // Assign all other masters to dummy ports
+              end
+ 
+        Case statement is a dictionary, where each key is either the
+        number to match or "default", which is the default case.
+
+        Avoiding latches:
+        Left hand sign (assignment) is always an input.
+        """
+ 
+        def assign_for_case(current_case):
+           asn = [ ]
+ 
+           for j in range(masters_len):
+              if current_case == j:
+                 """ Assign all inputs (for example, slave reads addr
+                    from master) to outputs. """
+                 asn += [
+                    self.slave_bus.adr.eq(self.buses[j].adr),
+                    self.slave_bus.dat_w.eq(self.buses[j].dat_w),
+                    self.slave_bus.cyc.eq(self.buses[j].cyc),
+                    self.slave_bus.stb.eq(self.buses[j].stb),
+                    self.slave_bus.we.eq(self.buses[j].we),
+                    self.slave_bus.sel.eq(self.buses[j].sel),
+                    self.buses[j].dat_r.eq(self.slave_bus.dat_r),
+                    self.buses[j].ack.eq(self.slave_bus.ack),
+                 ]
+              else:
+                 """ Master bus will always read 0 when they are not
+                    selected, and writes are ignored. They will still
+                    get a response to avoid timeouts. """
+                 asn += [
+                    self.buses[j].dat_r.eq(0),
+                    self.buses[j].ack.eq(self.buses[j].cyc & self.buses[j].stb),
+                 ]
+           return asn
+ 
+        cases = {"default": assign_for_case(0)}
+        # This loop only executes cases when there is more than one master.
+        for i in range(1, masters_len):
+           cases[i] = assign_for_case(i)
+ 
+        # If there is only one case, just connect the two interfaces as usual.
+        if masters_len == 1:
+            self.comb += cases["default"]
+        else:
+            self.comb += Case(self.master_select, cases)
