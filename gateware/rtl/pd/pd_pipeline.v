@@ -40,8 +40,8 @@ module pd_pipeline #(
 
 	// Stage 2
 	always @(posedge clk) begin
-		weighted_integral <= updated_integral * ki;
-		weighted_proportional <= error * kp;
+		weighted_integral <= updated_integral * {{OUTPUT_WIDTH-INPUT_WIDTH{ki[INPUT_WIDTH-1]}},ki};
+		weighted_proportional <= error * {{OUTPUT_WIDTH-INPUT_WIDTH{kp[INPUT_WIDTH-1]}},kp};
 	end
 
 	// Stage 3
