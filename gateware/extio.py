@@ -256,6 +256,15 @@ class SPIMaster(Module):
         :param spi_cycle_half_wait: Verilog parameter: see file.
         """
 
+        finished_or_ready = Signal(2)
+        finished_or_ready_flag = Signal()
+
+        self.sync += [
+            self.finished_or_ready_flag.eq(
+                self.finished_or_ready[0] | self.finished_or_ready[1]
+            )
+        ]
+
         self.submodules.registers = RegisterInterface()
 
         # finished_or_ready: 
@@ -277,7 +286,7 @@ class SPIMaster(Module):
             {
                 'name':'finished_or_ready', 
                 'read_only':True, 
-                'bitwidth_or_sig':2
+                'bitwidth_or_sig':self.finished_or_ready
             },
             {
                 'name':'arm', 
@@ -297,18 +306,10 @@ class SPIMaster(Module):
             {
                 'name':'wait_finished_or_ready', 
                 'read_only':True, 
-                'bitwidth_or_sig':output_width, 
-                'ack_signal':finished_or_ready
+                'bitwidth_or_sig':self.finished_or_ready, 
+                'ack_signal':self.finished_or_ready_flag
             },
         ])
-
-        finished = Signal()
-        ready = Signal()
-        finished_or_ready = Signal()
-
-        self.sync += [
-            self.finished_or_ready.eq(self.finished | self.ready)
-        ]
 
         self.specials += Instance("spi_master_ss",
             p_SS_WAIT = ss_wait,
@@ -332,8 +333,8 @@ class SPIMaster(Module):
 
             o_from_slave = self.registers.signals["from_slave"],
             i_to_slave = self.registers.signals["to_slave"],
-            o_finished = self.finished,
-            o_ready_to_arm = self.ready,
+            o_finished = self.finished_or_ready[0],
+            o_ready_to_arm = self.finished_or_ready[1],
             i_arm = self.registers.signals["arm"],
         )
 
