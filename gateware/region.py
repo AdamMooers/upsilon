@@ -271,7 +271,6 @@ class RegisterInterface(LiteXModule):
 
         # The width is a power of 2 (0b1000...). This bitlen is the
         # number of bits to read, starting from 0.
-        print("Next reg loc " + str(self.next_register_loc))
         bitlen = (self.width - 1).bit_length()
         self.sync += If(b.cyc & b.stb & ~b.ack,
                         Case(b.adr[0:bitlen], cases)
