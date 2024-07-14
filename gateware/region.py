@@ -1,4 +1,4 @@
-# Copyright 2023-2024 (C) Peter McGoron
+# Copyright 2023-2024 (C) Peter McGoron, Adam Mooers
 #
 # This file is a part of Upsilon, a free and open source software project.
 # For license terms, refer to the files in `doc/copying` in the Upsilon
