@@ -4,6 +4,8 @@
 # For license terms, refer to the files in `doc/copying` in the Upsilon
 # source distribution.
 
+from litex.build.generic_platform import IOStandard, Pins
+
 """
 Keep this diagram up to date! This is the wiring diagram from the ADC to
 the named Verilog pins.
