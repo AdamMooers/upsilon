@@ -470,7 +470,7 @@ class UpsilonSoC(SoCCore):
         self.add_module(name, wf)
         pi = self.add_preemptive_interface_for_slave(
             name + "_PI",
-            wf.registers.slavebus, 
+            wf.registers.bus, 
             wf.registers.width, 
             wf.registers.public_registers, 
             "byte")
@@ -631,17 +631,11 @@ class UpsilonSoC(SoCCore):
         # Add upsilon modules to this section
         #########################
 
-        for i in range(0,1):
-            swic_name = f"pico{i}"
-            wf_name = f"wf{i}"
+        # Add control loop DACs and ADCs.
+        for i in range(0,8):
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
-            add_pd_pipeline = i < 1
-            add_wf = False
-            add_swic = i < 2
-
-            # Add control loop DACs and ADCs.
             dac, dac_pi = self.add_AD5791(dac_name,
                 rst=module_reset,
                 miso=platform.request(f"dac_miso_{i}"),
@@ -650,7 +644,6 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request(f"dac_ss_L_{i}"),
             )
 
-            '''
             adc, adc_pi = self.add_LT_adc(adc_name,
                 rst=module_reset,
                 miso=platform.request(f"adc_sdo_{i}"),
@@ -658,38 +651,46 @@ class UpsilonSoC(SoCCore):
                 ss_L=platform.request(f"adc_conv_{i}"),
                 spi_wid=18,
             )
-            '''
 
-            # Add waveform generator.
-            if add_wf:
-                wf, wf_pi = self.add_waveform(wf_name, 4096)
+        # Add waveform generator.
+        wf0, wf0_pi = self.add_waveform("wf0", 4096)
 
-            # Add pd pipeline
-            if add_pd_pipeline:
-                pd_pipeline_name = f"pd_pipeline{i}"
-                pd_pipeline, pd_piepline_pi = self.add_pd_pipeline(pd_pipeline_name, input_width=18, output_width=32)
+        # Add pd pipeline
+        pd_pipeline0, pd_pipeline0_pi = self.add_pd_pipeline("pd_pipeline0", input_width=18, output_width=32)
 
-            '''
-            # Add SWIC
-            if add_swic:
-                self.add_picorv32(swic_name)
-                self.picorv32_add_cl(swic_name)
-                self.picorv32_add_pi(swic_name, dac_name, f"{dac_name}_PI", 0x200000, dac.registers.width, dac.registers.public_registers)
-                self.picorv32_add_pi(swic_name, adc_name, f"{adc_name}_PI", 0x300000, adc.registers.width, adc.registers.public_registers)
-            
-            # Connect hardware to swics if it is being generated
-            if add_pd_pipeline:
-                self.picorv32_add_pi(
-                    swic_name, 
-                    pd_pipeline_name, 
-                    f"{pd_pipeline_name}_PI", 
-                    0x400000, 
-                    pd_pipeline.registers.width, 
-                    pd_pipeline.registers.public_registers)
-            '''
-            if add_wf:
-                #self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.registers.width, wf.registers.public_registers)
-                wf.add_spi(dac_pi.add_master(wf_name))
+        # Add swic for handling control loop
+        self.add_picorv32("swic0")
+        self.picorv32_add_cl("swic0")
+        self.picorv32_add_pi(
+            "swic0", 
+            "dac0", 
+            "dac0_PI", 
+            0x200000, 
+            self.dac0.registers.width, 
+            self.dac0.registers.public_registers)
+        self.picorv32_add_pi(
+            "swic0", 
+            "adc0", 
+            "adc0_PI", 
+            0x300000, 
+            self.adc0.registers.width,
+            self.adc0.registers.public_registers)
+        self.picorv32_add_pi(
+            "swic0", 
+            "pd_pipeline0", 
+            "pd_pipeline0_PI", 
+            0x400000, 
+            pd_pipeline.registers.width, 
+            pd_pipeline.registers.public_registers)
+        self.picorv32_add_pi(
+            "swic0", 
+            "wf0", 
+            "wf0_PI", 
+            0x500000, 
+            wf0.registers.width, 
+            wf0.registers.public_registers)
+        
+        wf0.add_spi(dac0_pi.add_master("wf0"))
             
         #######################
         # End of Upsilon modules section
