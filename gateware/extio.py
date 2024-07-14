@@ -21,7 +21,6 @@ class Waveform(LiteXModule):
         counter_max_wid = 16,
         timer_wid = 16,
     ):
-    
         # This is Waveform's bus to control SPI and RAM devices it owns.
         self.masterbus = Interface(address_width=32, data_width=32, addressing="byte")
         self.mmap = MemoryMap(self.masterbus)
@@ -135,11 +134,11 @@ class Waveform(LiteXModule):
         self.mmap.regions['ram'].bus = bus
         self.mmap.regions['ram'].size = size
 
-    def add_spi(self, bus):
+    def add_spi(self, bus, width):
         # Waveform code has the SPI hardcoded in, because it is a Verilog
         # module.
         self.mmap.regions['spi'].bus = bus
-        self.mmap.regions['spi'].size = SPIMaster.width
+        self.mmap.regions['spi'].size = width
 
     def pre_finalize(self):
         self.registers.pre_finalize()

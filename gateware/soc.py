@@ -680,8 +680,8 @@ class UpsilonSoC(SoCCore):
             "pd_pipeline0", 
             "pd_pipeline0_PI", 
             0x400000, 
-            pd_pipeline.registers.width, 
-            pd_pipeline.registers.public_registers)
+            pd_pipeline0.registers.width, 
+            pd_pipeline0.registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 
@@ -690,7 +690,7 @@ class UpsilonSoC(SoCCore):
             wf0.registers.width, 
             wf0.registers.public_registers)
         
-        wf0.add_spi(dac0_pi.add_master("wf0"))
+        wf0.add_spi(self.dac0_PI.add_master("wf0"), self.dac0.registers.width)
             
         #######################
         # End of Upsilon modules section
