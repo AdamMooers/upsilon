@@ -470,9 +470,9 @@ class UpsilonSoC(SoCCore):
         self.add_module(name, wf)
         pi = self.add_preemptive_interface_for_slave(
             name + "_PI",
-            wf.slavebus, 
-            wf.width, 
-            wf.public_registers, 
+            wf.registers.slavebus, 
+            wf.registers.width, 
+            wf.registers.public_registers, 
             "byte")
 
         bram, bram_pi = self.add_blockram(name + "_ram", ram_len)
@@ -481,8 +481,9 @@ class UpsilonSoC(SoCCore):
         def f(csrs):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
             return f'{name} = Waveform({name}_ram, master_selector.{name}_PI_master_selector,'+ \
-            f' master_selector.{name}_ram_PI_master_selector, RegisterRegion({param_origin}, {wf.mmio(param_origin)}))'
+            f' master_selector.{name}_ram_PI_master_selector, RegisterRegion({param_origin}, {wf.registers.mmio(param_origin)}))'
         self.mmio_closures.append(f)
+        self.pre_finalize.append(lambda : wf.pre_finalize())
         return wf, pi
     
     def add_pd_pipeline(self, name, **kwargs):
@@ -687,7 +688,7 @@ class UpsilonSoC(SoCCore):
                     pd_pipeline.registers.public_registers)
             '''
             if add_wf:
-                #self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.width, wf.public_registers)
+                #self.picorv32_add_pi(swic_name, wf_name, f"{wf_name}_PI", 0x500000, wf.registers.width, wf.registers.public_registers)
                 wf.add_spi(dac_pi.add_master(wf_name))
             
         #######################

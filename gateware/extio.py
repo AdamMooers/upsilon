@@ -14,156 +14,94 @@ class Waveform(LiteXModule):
     """ A Wishbone bus master that sends a waveform to a SPI master
         by reading from RAM. """
 
-    public_registers = {
-            # go from 0 to 1 to run the waveform.
-            # If "do_loop" is 0, then it will run once and then stop.
-            # run needs to be set to 0 and then 1 again to run another
-            # waveform.
-            # If "do_loop" is 1, then the waveform will loop until
-            # "run" becomes 0, after which it will finish the waveform
-            # and stop.
-
-            "run" : Register(
-                origin=0,
-                bitwidth=1,
-                rw=True,
-            ),
-
-            # Current sample the waveform is on.
-            "cntr": Register(
-                origin=0x4,
-                bitwidth=16,
-                rw=False,
-            ),
-
-            # See "run".
-            "do_loop": Register(
-                origin=0x8,
-                bitwidth= 1,
-                rw= True,
-            ),
-
-            # Bit 0 is the "ready" bit. "Ready" means that "run" can be
-            # set to "1" to enable a waveform run.
-            #
-            # Bit 1 is the "finished" bit. "Finished" means that the
-            # waveform has finished an output and is waiting for "run"
-            # to be set back to 0. This only happens when "do_loop" is 0.
-            "finished_or_ready": Register(
-                origin=0xC,
-                bitwidth= 2,
-                rw= False,
-            ),
-
-            # Size of the waveform in memory, in words.
-            "wform_width": Register(
-                origin=0x10,
-                bitwidth=16,
-                rw= True,
-            ),
-
-            # Current value of the timer. See below.
-            "timer": Register(
-                origin=0x14,
-                bitwidth= 16,
-                rw= False,
-            ),
-
-            # Amount of cycles to wait in between outputting each sample.
-            "timer_spacing": Register(
-                origin= 0x18,
-                bitwidth= 16,
-                rw= True,
-            ),
-
-            # Forcibly stop the output of the waveform. The SPI bus may be
-            # in an unknown state after this.
-            "force_stop" : Register (
-                origin=0x1C,
-                bitwidth=1,
-                rw=True,
-            ),
-    }
-
-    width = 0x20
-
-    def mmio(self, origin):
-        r = ""
-        for name, reg in self.public_registers.items():
-            r += f'{name} = Register(loc={origin + reg.origin}, bitwidth={reg.bitwidth}, rw={reg.rw}),'
-        return r
-
-    def __init__(self,
-            ram_start_addr = 0,
-            spi_start_addr = 0x10000000,
-            counter_max_wid = 16,
-            timer_wid = 16,
+    def __init__(
+        self,
+        ram_start_addr = 0,
+        spi_start_addr = 0x10000000,
+        counter_max_wid = 16,
+        timer_wid = 16,
     ):
+    
         # This is Waveform's bus to control SPI and RAM devices it owns.
         self.masterbus = Interface(address_width=32, data_width=32, addressing="byte")
-        # This is the Waveform's interface that is controlled by the Main CPU.
-        self.slavebus = b = Interface(address_width=32, data_width=32, addressing="byte")
-
         self.mmap = MemoryMap(self.masterbus)
         self.mmap.add_region("ram",
                 BasicRegion(ram_start_addr, None))
         self.mmap.add_region("spi",
                 BasicRegion(spi_start_addr, None))
 
-        run = Signal()
-        cntr = Signal(counter_max_wid)
-        do_loop = Signal()
-        ready = Signal()
-        finished = Signal()
-        wform_size = Signal(counter_max_wid)
-        timer = Signal(timer_wid)
-        timer_spacing = Signal(timer_wid)
-        force_stop = Signal()
+        self.submodules.registers = RegisterInterface()
 
-        self.sync += If(b.cyc & b.stb & ~b.ack,
-                Case(b.adr[0:5], {
-                    0x0: If(b.we,
-                           run.eq(b.dat_w[0]),
-                         ).Else(
-                           b.dat_r.eq(run)
-                         ),
-                    0x4: [
-                        b.dat_r.eq(cntr),
-                    ],
-                    0x8: [
-                        If(b.we,
-                            do_loop.eq(b.dat_w[0]),
-                        ).Else(
-                            b.dat_r.eq(do_loop),
-                        )
-                    ],
-                    0xC: [
-                        b.dat_r.eq(finished << 1 | ready),
-                    ],
-                    0x10: If(b.we,
-                            wform_size.eq(b.dat_w[0:counter_max_wid]),
-                        ).Else(
-                            b.dat_r.eq(wform_size)
-                        ),
-                    0x14: b.dat_r.eq(timer),
-                    0x18: If(b.we,
-                            timer_spacing.eq(b.dat_w[0:timer_wid]),
-                        ).Else(
-                            b.dat_r.eq(timer_spacing),
-                        ),
-                    0x1C: If(b.we,
-                            force_stop.eq(b.dat_w[0]),
-                        ).Else(
-                            b.dat_r.eq(force_stop),
-                        ),
-                        # (W)A(V)EFO(RM)
-                    "default": b.dat_r.eq(0xAEF0AEF0),
-                    }
-                ),
-                b.ack.eq(1),
-            ).Elif(~b.cyc,
-                    b.ack.eq(0),
-            )
+        # run: 
+        #   go from 0 to 1 to run the waveform.
+        #   If "do_loop" is 0, then it will run once and then stop.
+        #   run needs to be set to 0 and then 1 again to run another
+        #   waveform.
+        #   If "do_loop" is 1, then the waveform will loop until
+        #   "run" becomes 0, after which it will finish the waveform
+        #   and stop.
+        # cntr: 
+        #   Current sample the waveform is on.
+        # do_loop:
+        #   See "run".
+        # finished_or_ready:
+        #   Bit 0 is the "ready" bit. "Ready" means that "run" can be
+        #   set to "1" to enable a waveform run.
+        #
+        #   Bit 1 is the "finished" bit. "Finished" means that the
+        #   waveform has finished an output and is waiting for "run"
+        #   to be set back to 0. This only happens when "do_loop" is 0.
+        # wform_width:
+        #   Size of the waveform in memory, in words.
+        # timer:
+        #   Current value of the timer. See below.
+        # timer_spacing:
+        #   Amount of cycles to wait in between outputting each sample.
+        # force_stop:
+        #   Forcibly stop the output of the waveform. The SPI bus may be
+        #   in an unknown state after this.
+        self.registers.add_registers([
+            {
+                'name':'run', 
+                'read_only':False, 
+                'bitwidth_or_sig':1
+            },
+            {
+                'name':'cntr', 
+                'read_only':True, 
+                'bitwidth_or_sig':counter_max_wid
+            },
+            {
+                'name':'do_loop', 
+                'read_only':False, 
+                'bitwidth_or_sig':1
+            },
+            {
+                'name':'finished_or_ready', 
+                'read_only':True, 
+                'bitwidth_or_sig':2
+            },
+            {
+                'name':'wform_width', 
+                'read_only':False, 
+                'bitwidth_or_sig':counter_max_wid
+            },
+            {
+                'name':'timer', 
+                'read_only':True, 
+                'bitwidth_or_sig':timer_wid
+            },
+            {
+                'name':'timer_spacing', 
+                'read_only':False, 
+                'bitwidth_or_sig':timer_wid
+            },
+            {
+                'name':'force_stop', 
+                'read_only':False, 
+                'bitwidth_or_sig':1
+            },
+        ])
 
         self.specials += Instance("waveform",
                 p_RAM_START_ADDR = ram_start_addr,
@@ -173,15 +111,15 @@ class Waveform(LiteXModule):
 
                 i_clk = ClockSignal(),
 
-                i_run = run,
-                i_force_stop = force_stop,
-                o_cntr = cntr,
-                i_do_loop = do_loop,
-                o_finished = finished,
-                o_ready = ready,
-                i_wform_size = wform_size,
-                o_timer = timer,
-                i_timer_spacing = timer_spacing,
+                i_run = self.registers.signals["run"],
+                i_force_stop = self.registers.signals["force_stop"],
+                o_cntr = self.registers.signals["cntr"],
+                i_do_loop = self.registers.signals["do_loop"],
+                o_finished = self.registers.signals["finished_or_ready"][1],
+                o_ready = self.registers.signals["finished_or_ready"][0],
+                i_wform_size = self.registers.signals["wform_width"],
+                o_timer = self.registers.signals["timer"],
+                i_timer_spacing = self.registers.signals["timer_spacing"],
 
                 o_wb_adr = self.masterbus.adr,
                 o_wb_cyc = self.masterbus.cyc,
@@ -202,6 +140,9 @@ class Waveform(LiteXModule):
         # module.
         self.mmap.regions['spi'].bus = bus
         self.mmap.regions['spi'].size = SPIMaster.width
+
+    def pre_finalize(self):
+        self.registers.pre_finalize()
 
     def do_finalize(self):
         self.mmap.finalize()
@@ -229,15 +170,21 @@ class SPIMaster(Module):
     }
 
     """ Wrapper for the SPI master verilog code. """
-    def __init__(self, rst, miso, mosi, sck, ss_L,
-                polarity = 0,
-                phase = 0,
-                ss_wait = 1,
-                enable_miso = 1,
-                enable_mosi = 1,
-                spi_wid = 24,
-                spi_cycle_half_wait = 1,
-        ):
+    def __init__(
+        self, 
+        rst, 
+        miso, 
+        mosi, 
+        sck, 
+        ss_L,
+        polarity = 0,
+        phase = 0,
+        ss_wait = 1,
+        enable_miso = 1,
+        enable_mosi = 1,
+        spi_wid = 24,
+        spi_cycle_half_wait = 1,
+    ):
         """
         :param rst: Reset signal.
         :param miso: MISO signal.
