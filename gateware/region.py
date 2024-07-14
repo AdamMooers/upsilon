@@ -243,26 +243,31 @@ class RegisterInterface(LiteXModule):
         for name in self.public_registers:
             sig = self.signals[name]
             reg = self.public_registers[name]
-            ack_signal = 1 if self.ack_signals[name] is None else self.ack_signals[name]
 
-            # Format dat_r explicitly, padding out any 
-            # unused bits with 0s
-            dat_r_bits = [b.dat_r[0:sig.nbits].eq(sig)]
+            current_case = []
+
+            # Specify dat_r explicitly, padding out any unused bits with 0s
             if (sig.nbits < 32):
-                dat_r_bits.append(b.dat_r[sig.nbits:].eq(0))
+                dat_r_config = b.dat_r.eq(Cat(sig, Replicate(0, 32 - sig.nbits)))
+            else:
+                dat_r_config = b.dat_r.eq(sig)
 
             if reg.read_only:
-                cases[reg.origin] = dat_r_bits
+                current_case.append(dat_r_config)
             else:
-                cases[reg.origin] = [
+                current_case.append([
                     If(b.we,
                         sig.eq(b.dat_w[0:sig.nbits])
                     ).Else(
-                        *dat_r_bits
+                        dat_r_config
                     )
-                ]
+                ])
 
-            cases[reg.origin].append(b.ack.eq(ack_signal))
+            # Add ack handling (including handling default case)
+            ack_signal = 1 if self.ack_signals[name] is None else self.ack_signals[name]
+            current_case.append(b.ack.eq(ack_signal))
+
+            cases[reg.origin] = current_case
 
         # The width is a power of 2 (0b1000...). This bitlen is the
         # number of bits to read, starting from 0.
