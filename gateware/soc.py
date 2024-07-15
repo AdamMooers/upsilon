@@ -499,6 +499,9 @@ class UpsilonSoC(SoCCore):
         platform.add_extension(io)
         module_reset = platform.request("module_reset")
 
+        # We are using some differential pins in single-ended mode so we must ground their counterparts
+        self.comb += platform.request("differential_output_low").eq(0)
+
         # Before any other Upsilon module is added, the global preemptive
         # interface controller is added. This allows the controlling CPU
         # to control masters on the PreemptiveInterface.
