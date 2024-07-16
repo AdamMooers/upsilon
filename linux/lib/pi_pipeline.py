@@ -5,7 +5,7 @@
 # source distribution.
 from registers import *
 
-class PDPipeline(Immutable):
+class PIPipeline(Immutable):
     def __init__(self, pi_pipeline_pi, regs):
         super().__init__()
 
@@ -34,7 +34,7 @@ class PDPipeline(Immutable):
         """
         if self.pi_pipeline_pi.v != 0:
             if not force_control:
-                raise Exception("PD Pipeline is not controlled by master")
+                raise Exception("PI Pipeline is not controlled by master")
             self.pi_pipeline_pi.v = 0
 
         self.regs.kp.v = kp
