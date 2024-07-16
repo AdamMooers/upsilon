@@ -25,10 +25,10 @@ class PDPipeline(Immutable):
         Whenever a new iteration of the loop is to be run, the output must be
         copied back to the input.
 
-        :param kp: kp parameter of the pd control loop
-        :param ki: ki parameter of the pd control loop
-        :param setpoint: the desired value of the pd control input
-        :param actual: the current value of the pd control input
+        :param kp: kp parameter of the pi control loop
+        :param ki: ki parameter of the pi control loop
+        :param setpoint: the desired value of the pi control input
+        :param actual: the current value of the pi control input
         :param integral_input: the current integral value
         :return: the output variables of the pipeline
         """
