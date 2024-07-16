@@ -377,31 +377,31 @@ class UpsilonSoC(SoCCore):
         self.pre_finalize.append(lambda : wf.pre_finalize())
         return wf, pi
     
-    def add_pd_pipeline(self, name, **kwargs):
+    def add_pi_pipeline(self, name, **kwargs):
         """
         Adds a pd pipeline to the device.
 
         :param name: Name of new pd pipeline module.
         """
-        pd_pipeline = PDPipeline(**kwargs)
-        self.add_module(name, pd_pipeline)
+        pi_pipeline = PIPipeline(**kwargs)
+        self.add_module(name, pi_pipeline)
 
         pi = self.add_preemptive_interface_for_slave(
             name + "_PI",
-            pd_pipeline.registers.bus,
-            pd_pipeline.registers.width,
-            pd_pipeline.registers.public_registers, 
+            pi_pipeline.registers.bus,
+            pi_pipeline.registers.width,
+            pi_pipeline.registers.public_registers, 
             "byte")
 
         # Need to figure out register region
         def f(csrs):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
-            return f'{name} = PDPipeline(master_selector.{name}_PI_master_selector,'+ \
-            f' RegisterRegion({param_origin}, {pd_pipeline.registers.mmio(param_origin)}))'
+            return f'{name} = PIPipeline(master_selector.{name}_PI_master_selector,'+ \
+            f' RegisterRegion({param_origin}, {pi_pipeline.registers.mmio(param_origin)}))'
         
         self.mmio_closures.append(f)
-        self.pre_finalize.append(lambda : pd_pipeline.pre_finalize())
-        return pd_pipeline, pi
+        self.pre_finalize.append(lambda : pi_pipeline.pre_finalize())
+        return pi_pipeline, pi
 
     def __init__(self,
                  variant="a7-100",
@@ -446,7 +446,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/waveform/waveform.v")
-        platform.add_source("rtl/pd/pd_pipeline.v")
+        platform.add_source("rtl/pd/pi_pipeline.v")
 
         # Initialize SoC Core
 
@@ -550,7 +550,7 @@ class UpsilonSoC(SoCCore):
         wf0, wf0_pi = self.add_waveform("wf0", 4096)
 
         # Add pd pipeline
-        pd_pipeline0, pd_pipeline0_pi = self.add_pd_pipeline("pd_pipeline0", input_width=18, output_width=32)
+        pi_pipeline0, pi_pipeline0_pi = self.add_pi_pipeline("pi_pipeline0", input_width=18, output_width=32)
 
         # Add swic for handling control loop
         self.add_picorv32("swic0")
@@ -571,11 +571,11 @@ class UpsilonSoC(SoCCore):
             self.adc0.registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
-            "pd_pipeline0", 
-            "pd_pipeline0_PI", 
+            "pi_pipeline0", 
+            "pi_pipeline0_PI", 
             0x400000, 
-            pd_pipeline0.registers.width, 
-            pd_pipeline0.registers.public_registers)
+            pi_pipeline0.registers.width, 
+            pi_pipeline0.registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 
@@ -623,7 +623,7 @@ def generate_main_cpu_include(closures, csr_file):
         print("from registers import *", file=out)
         print("from waveform import *", file=out)
         print("from picorv32 import *", file=out)
-        print("from pd_pipeline import PDPipeline", file=out)
+        print("from pi_pipeline import PIPipeline", file=out)
         print("from spi import *", file=out)
         with open(csr_file, 'rt') as f:
             csrs = json.load(f)

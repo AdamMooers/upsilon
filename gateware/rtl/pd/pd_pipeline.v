@@ -6,7 +6,7 @@
  *
  */
 
-module pd_pipeline #(
+module pi_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32
 ) (
@@ -19,7 +19,7 @@ module pd_pipeline #(
 	input signed [OUTPUT_WIDTH-1:0] integral_input,
 
 	output signed [OUTPUT_WIDTH-1:0] integral_result,
-	output reg signed [OUTPUT_WIDTH-1:0] pd_result
+	output reg signed [OUTPUT_WIDTH-1:0] pi_result
 );
 
 	reg [OUTPUT_WIDTH-1:0] error;
@@ -46,7 +46,7 @@ module pd_pipeline #(
 
 	// Stage 3
 	always @(posedge clk) begin
-		pd_result <= weighted_integral + weighted_proportional;
+		pi_result <= weighted_integral + weighted_proportional;
 	end
 
 	assign integral_result = updated_integral;

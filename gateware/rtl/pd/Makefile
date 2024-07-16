@@ -7,18 +7,18 @@
 
 .PHONY: test clean codegen all
 
-CPP_FILE=pd_pipeline.cpp
-VERILOG=pd_pipeline.v
+CPP_FILE=pi_pipeline.cpp
+VERILOG=pi_pipeline.v
 
-test: obj_dir/Vpd_pipeline
-	obj_dir/Vpd_pipeline
+test: obj_dir/Vpi_pipeline
+	obj_dir/Vpi_pipeline
 
 clean:
 	rm -rf obj_dir
 
-obj_dir/Vpd_pipeline.mk:  ${VERILOG} ${CPP_FILE}
+obj_dir/Vpi_pipeline.mk:  ${VERILOG} ${CPP_FILE}
 	verilator --cc --exe -Wall --trace --trace-fst \
 		${VERILOG} ${CPP_FILE}
 
-obj_dir/Vpd_pipeline: obj_dir/Vpd_pipeline.mk
-	cd obj_dir && make -f Vpd_pipeline.mk
+obj_dir/Vpi_pipeline: obj_dir/Vpi_pipeline.mk
+	cd obj_dir && make -f Vpi_pipeline.mk

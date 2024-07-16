@@ -285,7 +285,7 @@ class SPIMaster(Module):
     def pre_finalize(self):
         self.registers.pre_finalize()
 
-class PDPipeline(Module):
+class PIPipeline(Module):
     def __init__(self, input_width = 18, output_width = 32):
         """
         :param input_width: Width of input signals
@@ -295,13 +295,13 @@ class PDPipeline(Module):
         self.submodules.registers = RegisterInterface()
 
         # Add the following registers:
-        # kp: the kp input term for the PD calculation
-        # ki: the ki term input for the PD calculation
-        # setpoint: the setpoint input for the PD calculation
-        # actual: the actual measured input for the PD calculation
-        # integral_input: the current integral input for the PD calculation
-        # integral_result: the integral + error output from the PD pipeline
-        # pd_result: The updated pd output from the PD pipeline
+        # kp: the kp input term for the PI calculation
+        # ki: the ki term input for the PI calculation
+        # setpoint: the setpoint input for the PI calculation
+        # actual: the actual measured input for the PI calculation
+        # integral_input: the current integral input for the PI calculation
+        # integral_result: the integral + error output from the PI pipeline
+        # pi_result: The updated pd output from the PI pipeline
         self.registers.add_registers([
             {'name':'kp', 'read_only':False, 'bitwidth_or_sig':input_width},
             {'name':'ki', 'read_only':False, 'bitwidth_or_sig':input_width},
@@ -309,10 +309,10 @@ class PDPipeline(Module):
             {'name':'actual', 'read_only':False, 'bitwidth_or_sig':input_width},
             {'name':'integral_input', 'read_only':False, 'bitwidth_or_sig':output_width},
             {'name':'integral_result', 'read_only':True, 'bitwidth_or_sig':output_width},
-            {'name':'pd_result', 'read_only':True, 'bitwidth_or_sig':output_width}
+            {'name':'pi_result', 'read_only':True, 'bitwidth_or_sig':output_width}
         ])
 
-        self.specials += Instance("pd_pipeline",
+        self.specials += Instance("pi_pipeline",
             p_INPUT_WIDTH = input_width,
             p_OUTPUT_WIDTH = output_width,
 
@@ -324,7 +324,7 @@ class PDPipeline(Module):
             i_integral_input = self.registers.signals["integral_input"],
 
             o_integral_result = self.registers.signals["integral_result"],
-            o_pd_result = self.registers.signals["pd_result"],
+            o_pi_result = self.registers.signals["pi_result"],
         )
 
     def pre_finalize(self):
