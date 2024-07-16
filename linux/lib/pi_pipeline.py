@@ -6,15 +6,15 @@
 from registers import *
 
 class PDPipeline(Immutable):
-    def __init__(self, pd_pipeline_pi, regs):
+    def __init__(self, pi_pipeline_pi, regs):
         super().__init__()
 
-        self.pd_pipeline_pi = pd_pipeline_pi
+        self.pi_pipeline_pi = pi_pipeline_pi
         self.regs = regs
 
         self.make_immutable()
 
-    def run_pd_pipeline(self, kp, ki, setpoint, actual, integral_input):
+    def run_pi_pipeline(self, kp, ki, setpoint, actual, integral_input):
         """
         A simple helper function which loads the inputs and returns the outputs
         to document how the pipeline is used. All values are signed (refer to the
@@ -32,10 +32,10 @@ class PDPipeline(Immutable):
         :param integral_input: the current integral value
         :return: the output variables of the pipeline
         """
-        if self.pd_pipeline_pi.v != 0:
+        if self.pi_pipeline_pi.v != 0:
             if not force_control:
                 raise Exception("PD Pipeline is not controlled by master")
-            self.pd_pipeline_pi.v = 0
+            self.pi_pipeline_pi.v = 0
 
         self.regs.kp.v = kp
         self.regs.ki.v = ki
@@ -51,7 +51,7 @@ class PDPipeline(Immutable):
 
         return {
             'integral_result':self.regs.integral_result.v,
-            'pd_result':self.regs.pd_result.v}
+            'pi_result':self.regs.pi_result.v}
 
     def dump(self):
         """ Dump contents of control registers. """

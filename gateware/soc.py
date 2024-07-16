@@ -379,9 +379,9 @@ class UpsilonSoC(SoCCore):
     
     def add_pi_pipeline(self, name, **kwargs):
         """
-        Adds a pd pipeline to the device.
+        Adds a PI pipeline to the device.
 
-        :param name: Name of new pd pipeline module.
+        :param name: Name of new PI pipeline module.
         """
         pi_pipeline = PIPipeline(**kwargs)
         self.add_module(name, pi_pipeline)
@@ -446,7 +446,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_preprocessed.v")
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/waveform/waveform.v")
-        platform.add_source("rtl/pd/pi_pipeline.v")
+        platform.add_source("rtl/pi/pi_pipeline.v")
 
         # Initialize SoC Core
 
@@ -549,7 +549,7 @@ class UpsilonSoC(SoCCore):
         # Add waveform generator.
         wf0, wf0_pi = self.add_waveform("wf0", 4096)
 
-        # Add pd pipeline
+        # Add pi pipeline
         pi_pipeline0, pi_pipeline0_pi = self.add_pi_pipeline("pi_pipeline0", input_width=18, output_width=32)
 
         # Add swic for handling control loop

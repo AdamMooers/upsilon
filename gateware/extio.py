@@ -301,7 +301,7 @@ class PIPipeline(Module):
         # actual: the actual measured input for the PI calculation
         # integral_input: the current integral input for the PI calculation
         # integral_result: the integral + error output from the PI pipeline
-        # pi_result: The updated pd output from the PI pipeline
+        # pi_result: The updated PI output from the PI pipeline
         self.registers.add_registers([
             {'name':'kp', 'read_only':False, 'bitwidth_or_sig':input_width},
             {'name':'ki', 'read_only':False, 'bitwidth_or_sig':input_width},
