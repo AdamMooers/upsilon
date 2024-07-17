@@ -144,7 +144,8 @@ flash:
 	$$OPENFPGALOADER -c digilent ../boot/digilent_arty.bit
 
 tftp:
-	cd ../boot && py3tftp --host 192.168.2.100 -p 6969 -v
+	LOCAL_IP=$$(cd ../gateware/ && python3 -c "import config; print(config.config['local_ip'])"); \
+	cd ../boot && py3tftp --host $$LOCAL_IP -p 6969 -v
 
 copy:
 	scp -O -r ../linux/lib/* upsilon:/usr/lib/micropython/
