@@ -405,8 +405,6 @@ class UpsilonSoC(SoCCore):
 
     def __init__(self,
                  variant="a7-100",
-                 local_ip="192.168.2.50",
-                 remote_ip="192.168.2.100",
                  tftp_port=6969):
         """
         This constructor defines all the modules that the generated
