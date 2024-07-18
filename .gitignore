@@ -42,6 +42,7 @@ build/litex/
 build/opensbi/
 build/upsilon/
 build/config.py
+build/openFPGALoader/
 swic/*.bin
 swic/*.elf
 swic/*mmio.h
