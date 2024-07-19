@@ -43,10 +43,10 @@ class PIPipeline(Immutable):
         self.regs.actual.v = actual
         self.regs.integral_input.v = integral_input
 
-        # Now we need to wait 4 clock cycles for the registers to propagate
+        # Now we need to wait 5 clock cycles for the registers to propagate
         # The below loop is not necessary since micropython is slow but helps
         # document the quirk
-        for i in range(0,4):
+        for i in range(0,5):
             pass
 
         return {
