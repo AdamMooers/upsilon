@@ -23,7 +23,7 @@ module pi_pipeline #(
 	output signed [OUTPUT_WIDTH-1:0] integral_result,
 	output reg signed [OUTPUT_WIDTH-1:0] pi_result
 );
-	localparam int UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
+	localparam integer UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
 
 	reg signed [OUTPUT_WIDTH-1:0] error;
 	reg signed [OUTPUT_WIDTH-1:0] updated_integral;

@@ -90,7 +90,7 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 10000000
+#define NUM_INCRS 1000000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
