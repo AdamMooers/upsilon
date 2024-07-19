@@ -42,15 +42,15 @@ void PIPipelineTestbench::run_test(
 	int32_t expected_error = actual - setpoint;
 	int32_t expected_integral_result = integral_input + expected_error;
 	int64_t expected_unsaturated_pi_result = 
-		kp*static_cast<int64_t>expected_error + 
-		ki*static_cast<int64_t>expected_integral_result;
+		kp*static_cast<int64_t>(expected_error) + 
+		ki*static_cast<int64_t>(expected_integral_result);
 	
 	//TODO: Remove the magic numbers
-	int32_t expected_pi_result = static_cast<int32_t>std::clamp(
+	int32_t expected_pi_result = static_cast<int32_t>(std::clamp(
 		expected_unsaturated_pi_result,
-		static_cast<int64_t>(-1^20),
-		static_cast<int64_t>(1^20-1)
-	);
+		static_cast<int64_t>(-(1 << 19)),
+		static_cast<int64_t>((1 << 19)-1)
+	));
 
 	if (static_cast<int32_t>(mod.integral_result) != expected_integral_result) {
 		this->dump_inputs();
@@ -90,7 +90,7 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 100000
+#define NUM_INCRS 10000000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);

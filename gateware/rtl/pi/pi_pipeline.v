@@ -9,7 +9,8 @@
 module pi_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32,
-	parameter OUTPUT_SATURATION_BITS = 20
+	parameter signed PI_SATURATION_LOWER_BOUND /*verilator public*/ = -64'sh80000,
+	parameter signed PI_SATURATION_UPPER_BOUND /*verilator public*/ = 64'sh7FFFF
 ) (
 	input clk, 
 
@@ -22,15 +23,16 @@ module pi_pipeline #(
 	output signed [OUTPUT_WIDTH-1:0] integral_result,
 	output reg signed [OUTPUT_WIDTH-1:0] pi_result
 );
-	localparam integer UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
-	localparam integer PI_SATURATION_LOWER_BOUND = -(1 << OUTPUT_SATURATION_BITS);
-	localparam integer PI_SATURATION_UPPER_BOUND = (1 << OUTPUT_SATURATION_BITS) - 1;
+	localparam int UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
 
 	reg signed [OUTPUT_WIDTH-1:0] error;
 	reg signed [OUTPUT_WIDTH-1:0] updated_integral;
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_integral;
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_proportional;
+
+	/* verilator lint_off UNUSEDSIGNAL */
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] pi_result_unclamped;
+	/* verilator lint_on UNUSEDSIGNAL */
 
 	// Stage 1
 	always @(posedge clk) begin
@@ -45,8 +47,8 @@ module pi_pipeline #(
 
 	// Stage 3
 	always @(posedge clk) begin
-		weighted_integral <= updated_integral * {{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{ki[OUTPUT_WIDTH-1]}},ki};
-		weighted_proportional <= error * {{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{kp[OUTPUT_WIDTH-1]}},kp};
+		weighted_integral <= updated_integral * $signed({{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{ki[OUTPUT_WIDTH-1]}},ki});
+		weighted_proportional <= error * $signed({{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{kp[OUTPUT_WIDTH-1]}},kp});
 	end
 
 	// Stage 4
@@ -56,17 +58,16 @@ module pi_pipeline #(
 
 	// Stage 5
 	always @(posedge clk) begin
-		if (weighted_integral > PI_SATURATION_UPPER_BOUND) begin
-			pi_result <= PI_SATURATION_UPPER_BOUND;
+		if (pi_result_unclamped > PI_SATURATION_UPPER_BOUND) begin
+			pi_result <= PI_SATURATION_UPPER_BOUND[OUTPUT_WIDTH-1:0];
 		end
-		else if (weighted_integral < PI_SATURATION_LOWER_BOUND) begin
-			pi_result <= PI_SATURATION_LOWER_BOUND;
+		else if (pi_result_unclamped < PI_SATURATION_LOWER_BOUND) begin
+			pi_result <= PI_SATURATION_LOWER_BOUND[OUTPUT_WIDTH-1:0];
 		end
 		else begin
 			pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
 		end
 	end
-
 
 	assign integral_result = updated_integral;
 
