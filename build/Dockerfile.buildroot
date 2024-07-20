@@ -11,7 +11,7 @@ RUN apt-get update \
     && apt-get install -y git wget xz-utils build-essential gcc g++ sed \
        make binutils diffutils bash patch gzip bzip2 perl tar cpio unzip \
        rsync bc findutils wget python3 libncurses5-dev libncurses-dev file \
-       which \
+       which vim silversearcher-ag\
     && adduser --quiet --disabled-password user
 
 USER user:user

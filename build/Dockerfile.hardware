@@ -12,7 +12,7 @@ ENV F4PGA_INSTALL_DIR=/home/user/conda
 RUN apt-get update \
     && apt-get -y upgrade \
     && apt-get install -y git wget python3 xz-utils bash verilator \
-       m4 device-tree-compiler make gcc-riscv64-unknown-elf \
+       m4 device-tree-compiler make gcc-riscv64-unknown-elf vim silversearcher-ag \
     && adduser --quiet --disabled-password user
 
 USER user:user
