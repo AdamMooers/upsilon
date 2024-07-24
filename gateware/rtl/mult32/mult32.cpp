@@ -17,7 +17,7 @@
 
 class Mult32Testbench : public TB<Vmult32> {
 	public:
-		void run_test(int32_t, int32_t);
+		void run_test(uint32_t, uint32_t);
 		void dump_inputs();
 		void dump_outputs();
 		Mult32Testbench(int _bailout = 0) : TB<Vmult32>(_bailout) {}
@@ -33,13 +33,13 @@ void Mult32Testbench::run_test(uint32_t multiplicand, uint32_t multiplier) {
 	mod.multiplier = multiplier;
 
 	// Let the pipeline run through all 3 stages
-	for (int j = 0; j<3; j++) {
+	for (int j = 0; j<4; j++) {
 		this->run_clock();
 	}
 
-	uint32_t expected_product = multiplicand*multiplier;
+	uint64_t expected_product = static_cast<uint64_t>(multiplicand)*static_cast<uint64_t>(multiplier);
 
-	if (static_cast<int32_t>(mod.product) != expected_product) {
+	if (static_cast<uint64_t>(mod.product) != expected_product) {
 		this->dump_inputs();
 		this->dump_outputs();
 		throw std::logic_error(
@@ -50,13 +50,13 @@ void Mult32Testbench::run_test(uint32_t multiplicand, uint32_t multiplier) {
 
 void Mult32Testbench::dump_inputs() {
 	std::cout 
-	<< "multiplicand: " <<  static_cast<int32_t>(mod.multiplicand) << std::endl
-	<< "multiplier: " << static_cast<int32_t>(mod.multiplier) << std::endl;
+	<< "multiplicand: " << static_cast<uint32_t>(mod.multiplicand) << std::endl
+	<< "multiplier: " << static_cast<uint32_t>(mod.multiplier) << std::endl;
 }
 
 void Mult32Testbench::dump_outputs() {
 	std::cout 
-	<< "product: " << static_cast<int32_t>(mod.product) << std::endl;
+	<< "product: " << static_cast<uint64_t>(mod.product) << std::endl;
 }
 
 Mult32Testbench *tb;
@@ -65,7 +65,7 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 1000000
+#define NUM_INCRS 1000000000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -75,9 +75,9 @@ int main(int argc, char *argv[]) {
 
 	std::cout << "Checking product math with " << NUM_INCRS << " random inputs." << std::endl;
 	auto engine = std::default_random_engine{};
-	auto term_dist = std::uniform_int_distribution<int32_t>(-(1 << 19),(1 << 19) - 1);
+	auto term_dist = std::uniform_int_distribution<uint32_t>(-(1 << 19),(1 << 19) - 1);
 
-	for (int i = 1; i < NUM_INCRS; i++) {
+	for (int i = 0; i < NUM_INCRS; i++) {
 		uint32_t multiplicand = term_dist(engine);
 		uint32_t multiplier = term_dist(engine);
 
