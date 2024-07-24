@@ -34,27 +34,28 @@
 
 	output reg signed [64-1:0] product
 );
-
     reg [32-1:0] p0;
     reg [32-1:0] p1;
     reg [32-1:0] p2;
     reg [32-1:0] p3;
-    reg [32-1:0] sump1p2;
+    reg [33-1:0] sump1p2;
 
 	// Stage 1
 	always @(posedge clk) begin
-		p0 <= multiplicand[16-1:0]*multiplier[16-1:0];
-        p1 <= multiplicand[16-1:0]*multiplier[32-1:16];
-        p2 <= multiplicand[32-1:16]*multiplier[16-1:0];
-        p3 <= multiplicand[32-1:16]*multiplier[32-1:16];
+		p0 <= multiplicand[15:0]*multiplier[15:0];
+        p1 <= multiplicand[15:0]*multiplier[31:16];
+        p2 <= multiplicand[31:16]*multiplier[15:0];
+        p3 <= multiplicand[31:16]*multiplier[31:16];
 	end
 
 	// Stage 2
 	always @(posedge clk) begin
-        sump1p2 = p1+p2;
+        sump1p2 <= p1+p2;
     end
 
     // Stage 3
 	always @(posedge clk) begin
-        product = {p3, p0} + {{16{0}},sump1p2,{16{0}}};
+        product <= {p3, p0} + {{15{1'b0}},sump1p2,{16{1'b0}}};
     end
+
+endmodule
