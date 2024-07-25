@@ -12,8 +12,6 @@
  *  limit the multiplication to 25x18. This happened without warning during testing.
  */
 
- `define MULT32_V
-
  module mult32 (
 	input clk, 
 

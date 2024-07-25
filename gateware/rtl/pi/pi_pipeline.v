@@ -6,10 +6,6 @@
  *
  */
 
-`ifndef MULT32_V
-	`include "../mult32/mult32.v"
-`endif
-
 module pi_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32,
