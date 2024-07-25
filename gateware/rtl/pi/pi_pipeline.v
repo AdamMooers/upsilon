@@ -6,6 +6,10 @@
  *
  */
 
+`ifndef MULT32_V
+	`include "../mult32/mult32.v"
+`endif
+
 module pi_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32,
@@ -27,6 +31,7 @@ module pi_pipeline #(
 
 	reg signed [OUTPUT_WIDTH-1:0] error;
 	reg signed [OUTPUT_WIDTH-1:0] updated_integral;
+
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_integral;
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_proportional;
 
@@ -34,10 +39,15 @@ module pi_pipeline #(
 	reg signed [UNCLAMPED_PI_RESULT_WIDTH-1:0] pi_result_unclamped;
 	/* verilator lint_on UNUSEDSIGNAL */
 
+	wire signed [OUTPUT_WIDTH-1:0] actual_sign_extended;
+	wire signed [OUTPUT_WIDTH-1:0] setpoint_sign_extended;
+
+	assign actual_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{actual[INPUT_WIDTH-1]}},actual};
+	assign setpoint_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
+
 	// Stage 1
 	always @(posedge clk) begin
-		error <= {{OUTPUT_WIDTH-INPUT_WIDTH{actual[INPUT_WIDTH-1]}},actual} -
-		{{OUTPUT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
+		error <= actual_sign_extended - setpoint_sign_extended;
 	end
 
 	// Stage 2
@@ -45,18 +55,27 @@ module pi_pipeline #(
 		updated_integral <= integral_input + error;
 	end
 
-	// Stage 3
-	always @(posedge clk) begin
-		weighted_integral <= updated_integral * $signed({{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{ki[OUTPUT_WIDTH-1]}},ki});
-		weighted_proportional <= error * $signed({{UNCLAMPED_PI_RESULT_WIDTH-OUTPUT_WIDTH{kp[OUTPUT_WIDTH-1]}},kp});
-	end
+	// Stages 3,4
+	mult32 mul_updated_integral_by_ki (
+		.clk(clk),
+		.multiplier(updated_integral),
+		.multiplicand(ki),
+		.product(weighted_integral)
+	);
 
-	// Stage 4
+	mult32 mul_error_by_kp (
+		.clk(clk),
+		.multiplier(error),
+		.multiplicand(kp),
+		.product(weighted_proportional)
+	);
+
+	// Stage 5
 	always @(posedge clk) begin
 		pi_result_unclamped <= weighted_integral + weighted_proportional;
 	end
 
-	// Stage 5
+	// Stage 6
 	always @(posedge clk) begin
 		if (pi_result_unclamped > PI_SATURATION_UPPER_BOUND) begin
 			pi_result <= PI_SATURATION_UPPER_BOUND[OUTPUT_WIDTH-1:0];

@@ -41,7 +41,7 @@ void PIPipelineTestbench::run_test(
 	mod.integral_input = integral_input;
 
 	// Let the pipeline run through all 5 stages
-	for (int j = 0; j<5+1; j++) {
+	for (int j = 0; j<6; j++) {
 		this->run_clock();
 	}
 
@@ -96,7 +96,7 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 1000000
+#define NUM_INCRS 100000000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
