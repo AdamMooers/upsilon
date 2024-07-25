@@ -1,30 +1,18 @@
-/* Copyright 2024 (C) Adam Mooers
+/*
+ *  Copyright 2024 (C) Adam Mooers
  *
- * This file is a part of Upsilon, a free and open source software project.
- * For license terms, refer to the files in `doc/copying` in the Upsilon
- * source distribution.
+ *  This file is a part of Upsilon, a free and open source software project.
+ *  For license terms, refer to the files in `doc/copying` in the Upsilon
+ *  source distribution.
  *
- * F4PGA + Yosys does not infer DSP48E1 blocks correctly for multiplication. Results
- * on the 18-bit input are truncated. This module uses 16x16bit partial products to 
- * bypass the issue.
- *
- * The module uses the following math:
- * Let x_1, x_2, y_1, and y_2 be 16-bit numbers s.t.
- *
- * x = x_1*2^16 + x_2
- * y = y_1*2^16 + y_2
- *
- * x*y = (x_2*y_2*2^32) + (x_1*y_2*2^16) + (x_2*y_1*2^16) + (x_1*y_1)
- *
- * Letting p_0 = x_1*y_1, p_1 = x_2*y_1, p_2 = x_1*y_2, and p_3 = x_2*y_2, we can
- * rewrite the above equation:
- *
- * x*y = (p_3*2^32) + (p_2*2^16) + (p_1*2^16) + p_0
- *
- * The p_3 and p_0 terms have no overlapping terms so we can concatenate them to
- * add them. The p_2 and p_1 terms have the same offset so we add them together
- * first to prevent excess bit growth.
+ *  F4PGA & Yosys do not infer 32x32 signed multiplication correctly to Xilinx DSP48
+ *  blocks unless given the correct incantation. It may be possible to further simplify
+ *  the pipeline, but any changes should be tested extensively to verify that they do
+ *  not exhibit any unintended behavior. Specifically, be sure that Yosys/ABC does not
+ *  limit the multiplication to 25x18. This happened without warning during testing.
  */
+
+ `define MULT32_V
 
  module mult32 (
 	input clk, 
@@ -32,30 +20,24 @@
 	input [32-1:0] multiplicand,
 	input [32-1:0] multiplier,
 
-	output reg signed [64-1:0] product
+	output [64-1:0] product
 );
-    reg [32-1:0] p0;
-    reg [32-1:0] p1;
-    reg [32-1:0] p2;
-    reg [32-1:0] p3;
-    reg [33-1:0] sump1p2;
+    reg [33-1:0] multiplicand_q;
+    reg [33-1:0] multiplier_q;
+	reg [64-1:0] product_buffer;
+
+	// Stage 0
+	always @(posedge clk) begin
+		/* verilator lint_off WIDTH */
+		multiplicand_q <= $signed(multiplicand);
+		multiplier_q <= $signed(multiplier);
+		/* verilator lint_on WIDTH */
+	end
 
 	// Stage 1
 	always @(posedge clk) begin
-		p0 <= multiplicand[15:0]*multiplier[15:0];
-        p1 <= multiplicand[15:0]*multiplier[31:16];
-        p2 <= multiplicand[31:16]*multiplier[15:0];
-        p3 <= multiplicand[31:16]*multiplier[31:16];
+		product_buffer <= $signed(multiplicand_q)*$signed(multiplier_q);
 	end
 
-	// Stage 2
-	always @(posedge clk) begin
-        sump1p2 <= p1+p2;
-    end
-
-    // Stage 3
-	always @(posedge clk) begin
-        product <= {p3, p0} + {{15{1'b0}},sump1p2,{16{1'b0}}};
-    end
-
+	assign product = product_buffer[63:0];
 endmodule
