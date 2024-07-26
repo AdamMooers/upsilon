@@ -35,18 +35,11 @@ module pi_pipeline #(
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] pi_result_unclamped;
 	/* verilator lint_on UNUSEDSIGNAL */
 
-	reg pi_result_unclamped_upper_word_has_ones; // Is the upper word, excluding the sign, all zeros?
-	reg pi_result_unclamped_upper_word_all_ones; // Is the upper word, excluding the sign, all ones?
-	reg pi_result_unclamped_lower_word_lt_lb;  // Less than lower bound
-	reg pi_result_unclamped_lower_word_gt_ub;  // greater than upper bound
-
 	wire [OUTPUT_WIDTH-1:0] actual_sign_extended;
 	wire [OUTPUT_WIDTH-1:0] setpoint_sign_extended;
-	wire pi_result_unclamped_sign;
 
 	assign actual_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{actual[INPUT_WIDTH-1]}},actual};
 	assign setpoint_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
-	assign pi_result_unclamped_sign = pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-1];
 
 	// Stage 1
 	always @(posedge clk) begin
@@ -64,27 +57,21 @@ module pi_pipeline #(
 		weighted_proportional <= $signed(error) * $signed(kp);
 	end
 
-/*
-	// Stages 3,4
-	mult32 mul_updated_integral_by_ki (
-		.clk(clk),
-		.multiplier(updated_integral),
-		.multiplicand(ki),
-		.product(weighted_integral)
-	);
-
-	mult32 mul_error_by_kp (
-		.clk(clk),
-		.multiplier($signed(error)),
-		.multiplicand($signed(kp)),
-		.product(weighted_proportional)
-	);
-*/
-
 	// Stage 4
 	always @(posedge clk) begin
 		pi_result_unclamped <= $signed(weighted_integral) + $signed(weighted_proportional);
 	end
+
+	// Stage 5
+	always @(posedge clk) begin
+		pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
+	end
+
+	/*
+	reg pi_result_unclamped_upper_word_has_ones; // Is the upper word, excluding the sign, all zeros?
+	reg pi_result_unclamped_upper_word_all_ones; // Is the upper word, excluding the sign, all ones?
+	reg pi_result_unclamped_lower_word_lt_lb;  // Less than lower bound
+	reg pi_result_unclamped_lower_word_gt_ub;  // greater than upper bound
 
 	//Stage 5
 	always @(posedge clk) begin
@@ -106,6 +93,7 @@ module pi_pipeline #(
 			pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
 		end
 	end
+	*/
 
 	assign integral_result = updated_integral;
 
