@@ -8,7 +8,7 @@
 .PHONY: test clean codegen all
 
 CPP_FILE=pi_pipeline.cpp
-VERILOG=pi_pipeline.v ../mult32/mult32.v
+VERILOG=pi_pipeline.v
 
 test: obj_dir/Vpi_pipeline
 	obj_dir/Vpi_pipeline

@@ -40,8 +40,8 @@ void PIPipelineTestbench::run_test(
 	mod.actual = actual;
 	mod.integral_input = integral_input;
 
-	// Let the pipeline run through all 5 stages
-	for (int j = 0; j<6; j++) {
+	// Let the pipeline run through all stages
+	for (int j = 0; j<7; j++) {
 		this->run_clock();
 	}
 
