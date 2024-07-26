@@ -393,7 +393,6 @@ class UpsilonSoC(SoCCore):
             pi_pipeline.registers.public_registers, 
             "byte")
 
-        # Need to figure out register region
         def f(csrs):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
             return f'{name} = PIPipeline(master_selector.{name}_PI_master_selector,'+ \
@@ -402,6 +401,28 @@ class UpsilonSoC(SoCCore):
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi_pipeline.pre_finalize())
         return pi_pipeline, pi
+        
+    def add_mult32(self, name, **kwargs):
+        """
+        :param name: Name of new mult32 module.
+        """
+        mult32 = Mult32(**kwargs)
+        self.add_module(name, mult32)
+
+        pi = self.add_preemptive_interface_for_slave(
+            name + "_PI",
+            mult32.registers.bus,
+            mult32.registers.width,
+            mult32.registers.public_registers, 
+            "byte")
+
+        def f(csrs):
+            param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
+            return f'{name} = RegisterRegion({param_origin}, {mult32.registers.mmio(param_origin)})'
+
+        self.mmio_closures.append(f)
+        self.pre_finalize.append(lambda : mult32.pre_finalize())
+        return mult32, pi
 
     def __init__(
             self,
@@ -448,6 +469,7 @@ class UpsilonSoC(SoCCore):
         platform.add_source("rtl/spi/spi_master_ss.v")
         platform.add_source("rtl/waveform/waveform.v")
         platform.add_source("rtl/pi/pi_pipeline.v")
+        platform.add_source("rtl/mult32/mult32.v")
 
         # Initialize SoC Core
 
@@ -527,7 +549,7 @@ class UpsilonSoC(SoCCore):
         #########################
 
         # Add control loop DACs and ADCs.
-        for i in range(0,8):
+        for i in range(0,1):
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
@@ -553,6 +575,9 @@ class UpsilonSoC(SoCCore):
         # Add pi pipeline
         pi_pipeline0, pi_pipeline0_pi = self.add_pi_pipeline("pi_pipeline0", input_width=18, output_width=32)
 
+        # Add mult32
+        #mult32_0, mult32_0_pi = self.add_mult32("mult32_0")
+
         # Add swic for handling control loop
         self.add_picorv32("swic0")
         self.picorv32_add_cl("swic0")
@@ -570,13 +595,13 @@ class UpsilonSoC(SoCCore):
             0x300000, 
             self.adc0.registers.width,
             self.adc0.registers.public_registers)
-        self.picorv32_add_pi(
-            "swic0", 
-            "pi_pipeline0", 
-            "pi_pipeline0_PI", 
-            0x400000, 
-            pi_pipeline0.registers.width, 
-            pi_pipeline0.registers.public_registers)
+        #self.picorv32_add_pi(
+        #    "swic0", 
+        #    "pi_pipeline0", 
+        #    "pi_pipeline0_PI", 
+        #    0x400000, 
+        #    pi_pipeline0.registers.width, 
+        #    pi_pipeline0.registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 
