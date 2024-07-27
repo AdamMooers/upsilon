@@ -9,7 +9,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <string>
-#include <algorithm>
+//#include <algorithm>
 #include "Vpi_pipeline.h"
 #include "../testbench.hpp"
 
@@ -41,7 +41,7 @@ void PIPipelineTestbench::run_test(
 	mod.integral_input = integral_input;
 
 	// Let the pipeline run through all stages
-	for (int j = 0; j<7; j++) {
+	for (int j = 0; j<6; j++) {
 		this->run_clock();
 	}
 
@@ -50,13 +50,7 @@ void PIPipelineTestbench::run_test(
 	int64_t expected_unsaturated_pi_result = 
 		kp*static_cast<int64_t>(expected_error) + 
 		ki*static_cast<int64_t>(expected_integral_result);
-	
-	//TODO: Remove the magic numbers
-	int32_t expected_pi_result = static_cast<int32_t>(std::clamp(
-		expected_unsaturated_pi_result,
-		static_cast<int64_t>(-(1 << 19)),
-		static_cast<int64_t>((1 << 19)-1)
-	));
+	int32_t expected_pi_result = static_cast<int32_t>(expected_unsaturated_pi_result);
 
 	if (static_cast<int32_t>(mod.integral_result) != expected_integral_result) {
 		this->dump_inputs();
@@ -66,7 +60,22 @@ void PIPipelineTestbench::run_test(
 			std::to_string(expected_integral_result)+")");
 	}
 
-	if (static_cast<int32_t>(mod.pi_result) != expected_pi_result) {
+	if (expected_unsaturated_pi_result < -(static_cast<int64_t>(1) << 19)) {
+		if (mod.pi_result_underflow_detected != 1) {
+			this->dump_inputs();
+			this->dump_outputs();
+			std::cout << "expected_unsaturated_pi_result = " << expected_unsaturated_pi_result << std::endl;
+			throw std::logic_error("Result underflowed but underflow flag was not set.");
+
+		}
+	} else if (expected_unsaturated_pi_result > (static_cast<int64_t>(1) << 19)-1) {
+		if (mod.pi_result_overflow_detected != 1) {
+			this->dump_inputs();
+			this->dump_outputs();
+			std::cout << "expected_unsaturated_pi_result = " << expected_unsaturated_pi_result << std::endl;
+			throw std::logic_error("Result overflowed but overflow flag was not set.");
+		}
+	} else if (static_cast<int32_t>(mod.pi_result) != expected_pi_result) {
 		this->dump_inputs();
 		this->dump_outputs();
 		throw std::logic_error(
@@ -78,7 +87,9 @@ void PIPipelineTestbench::run_test(
 void PIPipelineTestbench::dump_outputs() {
 	std::cout 
 	<< "integral_result: " << static_cast<int32_t>(mod.integral_result) << std::endl
-	<< "pi_result: " << static_cast<int32_t>(mod.pi_result) << std::endl;
+	<< "pi_result: " << static_cast<int32_t>(mod.pi_result) << std::endl
+	<< "pi_result_overflow_detected: " << static_cast<uint32_t>(mod.pi_result_overflow_detected) << std::endl
+	<< "pi_result_underflow_detected: " << static_cast<uint32_t>(mod.pi_result_underflow_detected) << std::endl;
 }
 
 void PIPipelineTestbench::dump_inputs() {

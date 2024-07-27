@@ -9,8 +9,7 @@
 module pi_pipeline #(
 	parameter INPUT_WIDTH = 18,
 	parameter OUTPUT_WIDTH = 32,
-	parameter signed PI_SATURATION_LOWER_BOUND /*verilator public*/ = -32'sh80000,
-	parameter signed PI_SATURATION_UPPER_BOUND /*verilator public*/ = 32'sh7FFFF
+	parameter OUTPUT_RANGE_BITS /*verilator public*/ = 20
 ) (
 	input clk, 
 
@@ -21,7 +20,9 @@ module pi_pipeline #(
 	input [OUTPUT_WIDTH-1:0] integral_input,
 
 	output [OUTPUT_WIDTH-1:0] integral_result,
-	output reg [OUTPUT_WIDTH-1:0] pi_result
+	output reg [OUTPUT_WIDTH-1:0] pi_result,
+	output pi_result_overflow_detected,
+	output pi_result_underflow_detected
 );
 	localparam integer UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
 
@@ -65,35 +66,13 @@ module pi_pipeline #(
 	// Stage 5
 	always @(posedge clk) begin
 		pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
+		pi_result_overflow_detected <= 
+			~pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-1] & 
+			(|pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-2:OUTPUT_RANGE_BITS-1]);
+		pi_result_underflow_detected <= 
+			pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-1] & 
+			(~&pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-2:OUTPUT_RANGE_BITS-1]);
 	end
-
-	/*
-	reg pi_result_unclamped_upper_word_has_ones; // Is the upper word, excluding the sign, all zeros?
-	reg pi_result_unclamped_upper_word_all_ones; // Is the upper word, excluding the sign, all ones?
-	reg pi_result_unclamped_lower_word_lt_lb;  // Less than lower bound
-	reg pi_result_unclamped_lower_word_gt_ub;  // greater than upper bound
-
-	//Stage 5
-	always @(posedge clk) begin
-		pi_result_unclamped_upper_word_has_ones <= |pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-2:OUTPUT_WIDTH-1];
-		pi_result_unclamped_upper_word_all_ones <= &pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-2:OUTPUT_WIDTH-1];
-		pi_result_unclamped_lower_word_gt_ub <= $signed(pi_result_unclamped[OUTPUT_WIDTH-1:0]) > PI_SATURATION_UPPER_BOUND;
-		pi_result_unclamped_lower_word_lt_lb <= $signed(pi_result_unclamped[OUTPUT_WIDTH-1:0]) < PI_SATURATION_LOWER_BOUND;
-	end
-
-	// Stage 6
-	always @(posedge clk) begin
-		if (~pi_result_unclamped_sign && (pi_result_unclamped_upper_word_has_ones || pi_result_unclamped_lower_word_gt_ub)) begin
-			pi_result <= PI_SATURATION_UPPER_BOUND;
-		end
-		else if (pi_result_unclamped_sign && (~pi_result_unclamped_upper_word_all_ones || pi_result_unclamped_lower_word_lt_lb)) begin
-			pi_result <= PI_SATURATION_LOWER_BOUND;
-		end
-		else begin
-			pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
-		end
-	end
-	*/
 
 	assign integral_result = updated_integral;
 

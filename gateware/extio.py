@@ -303,13 +303,46 @@ class PIPipeline(Module):
         # integral_result: the integral + error output from the PI pipeline
         # pi_result: The updated PI output from the PI pipeline
         self.registers.add_registers([
-            {'name':'kp', 'read_only':False, 'bitwidth_or_sig':output_width},
-            {'name':'ki', 'read_only':False, 'bitwidth_or_sig':output_width},
-            {'name':'setpoint', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'actual', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'integral_input', 'read_only':False, 'bitwidth_or_sig':output_width},
-            {'name':'integral_result', 'read_only':True, 'bitwidth_or_sig':output_width},
-            {'name':'pi_result', 'read_only':True, 'bitwidth_or_sig':output_width}
+            {
+                'name':'kp',
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'ki', 
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'setpoint', 
+                'read_only':False, 
+                'bitwidth_or_sig':input_width
+            },
+            {
+                'name':'actual', 
+                'read_only':False, 
+                'bitwidth_or_sig':input_width
+            },
+            {
+                'name':'integral_input', 
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'integral_result', 
+                'read_only':True, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'pi_result', 
+                'read_only':True, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'pi_result_flags', 
+                'read_only':True, 
+                'bitwidth_or_sig':2
+            },
         ])
 
         self.specials += Instance("pi_pipeline",
@@ -325,35 +358,9 @@ class PIPipeline(Module):
 
             o_integral_result = self.registers.signals["integral_result"],
             o_pi_result = self.registers.signals["pi_result"],
+            o_pi_result_overflow_detected = self.registers.signals["pi_result_flags"][0],
+            o_pi_result_underflow_detected = self.registers.signals["pi_result_flags"][1],
         )
-
-    def pre_finalize(self):
-        self.registers.pre_finalize()
-
-class Mult32(Module):
-    def __init__(self):
-        self.submodules.registers = RegisterInterface()
-        self.registers.add_registers([
-            {'name':'multiplicand', 'read_only':False, 'bitwidth_or_sig':32},
-            {'name':'multiplier', 'read_only':False, 'bitwidth_or_sig':32},
-            {'name':'product_l', 'read_only':True, 'bitwidth_or_sig':32},
-            {'name':'product_h', 'read_only':True, 'bitwidth_or_sig':32},
-        ])
-
-        product = Signal(64)
-
-        self.specials += Instance("mult32",
-            i_clk = ClockSignal(),
-            i_multiplicand = self.registers.signals["multiplicand"],
-            i_multiplier = self.registers.signals["multiplier"],
-            o_product = product
-        )
-
-        # TODO: Verify that these indices are correct
-        self.comb += [
-            self.registers.signals["product_l"].eq(product[0:32]),
-            self.registers.signals["product_h"].eq(product[32:64])
-        ]
 
     def pre_finalize(self):
         self.registers.pre_finalize()
