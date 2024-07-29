@@ -9,8 +9,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <string>
-//#include <algorithm>
 #include "Vpi_pipeline.h"
+#include "Vpi_pipeline_pi_pipeline.h"
 #include "../testbench.hpp"
 
 
@@ -40,6 +40,8 @@ void PIPipelineTestbench::run_test(
 	mod.actual = actual;
 	mod.integral_input = integral_input;
 
+	uint32_t OUTPUT_RANGE_BITS = mod.pi_pipeline->OUTPUT_RANGE_BITS;
+
 	// Let the pipeline run through all stages
 	for (int j = 0; j<6; j++) {
 		this->run_clock();
@@ -60,7 +62,7 @@ void PIPipelineTestbench::run_test(
 			std::to_string(expected_integral_result)+")");
 	}
 
-	if (expected_unsaturated_pi_result < -(static_cast<int64_t>(1) << 19)) {
+	if (expected_unsaturated_pi_result < -(static_cast<int64_t>(1) << (OUTPUT_RANGE_BITS-1))) {
 		if (mod.pi_result_underflow_detected != 1) {
 			this->dump_inputs();
 			this->dump_outputs();
@@ -68,7 +70,7 @@ void PIPipelineTestbench::run_test(
 			throw std::logic_error("Result underflowed but underflow flag was not set.");
 
 		}
-	} else if (expected_unsaturated_pi_result > (static_cast<int64_t>(1) << 19)-1) {
+	} else if (expected_unsaturated_pi_result > (static_cast<int64_t>(1) << (OUTPUT_RANGE_BITS-1))-1) {
 		if (mod.pi_result_overflow_detected != 1) {
 			this->dump_inputs();
 			this->dump_outputs();
