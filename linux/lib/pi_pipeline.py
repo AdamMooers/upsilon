@@ -51,7 +51,8 @@ class PIPipeline(Immutable):
 
         return {
             'integral_result':self.regs.integral_result.v,
-            'pi_result':self.regs.pi_result.v}
+            'pi_result':self.regs.pi_result.v,
+            'pi_result_flags':self.regs.pi_result_flags.v}
 
     def dump(self):
         """ Dump contents of control registers. """
