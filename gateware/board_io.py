@@ -21,7 +21,7 @@ the pin numbering scheme for these headers as viewed from the front:
     6   5   4   3   2   1
     12  11  10  9   8   7
 
-TODO: generate declaratively from constraints file.
+TODO: generate from Litex Upsilon Board files
 """
 
 io = [

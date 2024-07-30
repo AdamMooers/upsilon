@@ -393,7 +393,6 @@ class UpsilonSoC(SoCCore):
             pi_pipeline.registers.public_registers, 
             "byte")
 
-        # Need to figure out register region
         def f(csrs):
             param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
             return f'{name} = PIPipeline(master_selector.{name}_PI_master_selector,'+ \

@@ -303,13 +303,46 @@ class PIPipeline(Module):
         # integral_result: the integral + error output from the PI pipeline
         # pi_result: The updated PI output from the PI pipeline
         self.registers.add_registers([
-            {'name':'kp', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'ki', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'setpoint', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'actual', 'read_only':False, 'bitwidth_or_sig':input_width},
-            {'name':'integral_input', 'read_only':False, 'bitwidth_or_sig':output_width},
-            {'name':'integral_result', 'read_only':True, 'bitwidth_or_sig':output_width},
-            {'name':'pi_result', 'read_only':True, 'bitwidth_or_sig':output_width}
+            {
+                'name':'kp',
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'ki', 
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'setpoint', 
+                'read_only':False, 
+                'bitwidth_or_sig':input_width
+            },
+            {
+                'name':'actual', 
+                'read_only':False, 
+                'bitwidth_or_sig':input_width
+            },
+            {
+                'name':'integral_input', 
+                'read_only':False, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'integral_result', 
+                'read_only':True, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'pi_result', 
+                'read_only':True, 
+                'bitwidth_or_sig':output_width
+            },
+            {
+                'name':'pi_result_flags', 
+                'read_only':True, 
+                'bitwidth_or_sig':2
+            },
         ])
 
         self.specials += Instance("pi_pipeline",
@@ -325,6 +358,8 @@ class PIPipeline(Module):
 
             o_integral_result = self.registers.signals["integral_result"],
             o_pi_result = self.registers.signals["pi_result"],
+            o_pi_result_overflow_detected = self.registers.signals["pi_result_flags"][0],
+            o_pi_result_underflow_detected = self.registers.signals["pi_result_flags"][1],
         )
 
     def pre_finalize(self):

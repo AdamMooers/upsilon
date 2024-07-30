@@ -1,15 +1,22 @@
+/* Copyright 2024 (C) Adam Mooers
+ *
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
 #include <random>
 #include <stdexcept>
 #include <iostream>
 #include <cstdlib>
 #include <string>
 #include "Vpi_pipeline.h"
+#include "Vpi_pipeline_pi_pipeline.h"
 #include "../testbench.hpp"
 
 
 class PIPipelineTestbench : public TB<Vpi_pipeline> {
 	public:
-		void start_test(int32_t, int32_t, int32_t, int32_t, int32_t);
+		void run_test(int32_t, int32_t, int32_t, int32_t, int32_t);
 		void dump_inputs();
 		void dump_outputs();
 		PIPipelineTestbench(int _bailout = 0) : TB<Vpi_pipeline>(_bailout) {}
@@ -20,24 +27,71 @@ class PIPipelineTestbench : public TB<Vpi_pipeline> {
 void PIPipelineTestbench::posedge() {
 }
 
-void PIPipelineTestbench::start_test(
+void PIPipelineTestbench::run_test(
 	int32_t kp, 
 	int32_t ki, 
 	int32_t setpoint, 
 	int32_t actual, 
 	int32_t integral_input) {
+
 	mod.kp = kp;
 	mod.ki = ki;
 	mod.setpoint = setpoint;
 	mod.actual = actual;
 	mod.integral_input = integral_input;
-	run_clock();
+
+	uint32_t OUTPUT_RANGE_BITS = mod.pi_pipeline->OUTPUT_RANGE_BITS;
+
+	// Let the pipeline run through all stages
+	for (int j = 0; j<6; j++) {
+		this->run_clock();
+	}
+
+	int32_t expected_error = actual - setpoint;
+	int32_t expected_integral_result = integral_input + expected_error;
+	int64_t expected_unsaturated_pi_result = 
+		kp*static_cast<int64_t>(expected_error) + 
+		ki*static_cast<int64_t>(expected_integral_result);
+	int32_t expected_pi_result = static_cast<int32_t>(expected_unsaturated_pi_result);
+
+	if (static_cast<int32_t>(mod.integral_result) != expected_integral_result) {
+		this->dump_inputs();
+		this->dump_outputs();
+		throw std::logic_error(
+			"Output integral calculation did yield the expected value. (expected mod.integral_result = "+
+			std::to_string(expected_integral_result)+")");
+	}
+
+	if (expected_unsaturated_pi_result < -(static_cast<int64_t>(1) << (OUTPUT_RANGE_BITS-1))) {
+		if (mod.pi_result_underflow_detected != 1) {
+			this->dump_inputs();
+			this->dump_outputs();
+			std::cout << "expected_unsaturated_pi_result = " << expected_unsaturated_pi_result << std::endl;
+			throw std::logic_error("Result underflowed but underflow flag was not set.");
+
+		}
+	} else if (expected_unsaturated_pi_result > (static_cast<int64_t>(1) << (OUTPUT_RANGE_BITS-1))-1) {
+		if (mod.pi_result_overflow_detected != 1) {
+			this->dump_inputs();
+			this->dump_outputs();
+			std::cout << "expected_unsaturated_pi_result = " << expected_unsaturated_pi_result << std::endl;
+			throw std::logic_error("Result overflowed but overflow flag was not set.");
+		}
+	} else if (static_cast<int32_t>(mod.pi_result) != expected_pi_result) {
+		this->dump_inputs();
+		this->dump_outputs();
+		throw std::logic_error(
+			"PI calculation did not yield the expected value. (expected mod.pi_result = "+
+			std::to_string(expected_pi_result)+")");
+	}
 }
 
 void PIPipelineTestbench::dump_outputs() {
 	std::cout 
 	<< "integral_result: " << static_cast<int32_t>(mod.integral_result) << std::endl
-	<< "pi_result: " << static_cast<int32_t>(mod.pi_result) << std::endl;
+	<< "pi_result: " << static_cast<int32_t>(mod.pi_result) << std::endl
+	<< "pi_result_overflow_detected: " << static_cast<uint32_t>(mod.pi_result_overflow_detected) << std::endl
+	<< "pi_result_underflow_detected: " << static_cast<uint32_t>(mod.pi_result_underflow_detected) << std::endl;
 }
 
 void PIPipelineTestbench::dump_inputs() {
@@ -55,7 +109,7 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 100000
+#define NUM_INCRS 100000000
 int main(int argc, char *argv[]) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -68,8 +122,11 @@ int main(int argc, char *argv[]) {
 
 	auto adc_dist = std::uniform_int_distribution<int32_t>(-(1 << 17),(1 << 17) - 1);
 
-	// We limit these to 14 bits to ensure we don't overflow pi_result
-	auto pi_dist = std::uniform_int_distribution<int32_t>(-(1 << 14),(1 << 14) - 1);
+	// This value will be clamped by the SWIC to the provided range
+	auto int_dist = std::uniform_int_distribution<int32_t>(-(1 << 19),(1 << 19) - 1);
+
+	// These are set to scale across the entire range of the DAC output
+	auto pi_dist = std::uniform_int_distribution<int32_t>(-(1 << 19),(1 << 19) - 1);
 
 	for (int i = 1; i < NUM_INCRS; i++) {
 		uint32_t kp = pi_dist(engine);
@@ -78,32 +135,7 @@ int main(int argc, char *argv[]) {
 		int32_t actual = adc_dist(engine);
 		int32_t integral_input = adc_dist(engine);
 
-		tb->start_test(kp, ki, setpoint, actual, integral_input);
-
-		// Let the pipeline run through all 4 stages
-		for (int j = 0; j<4; j++) {
-			tb->run_clock();
-		}
-
-		int32_t expected_error = actual - setpoint;
-		int32_t expected_integral_result = integral_input + expected_error;
-		int32_t expected_pi_result =  kp*expected_error + ki*expected_integral_result;
-
-		if (static_cast<int32_t>(tb->mod.integral_result) != expected_integral_result) {
-			tb->dump_inputs();
-			tb->dump_outputs();
-			throw std::logic_error(
-				"Output integral calculation did yield the expected value. (expected mod.integral_result = "+
-				std::to_string(expected_integral_result)+")");
-		}
-
-		if (static_cast<int32_t>(tb->mod.pi_result) != expected_pi_result) {
-			tb->dump_inputs();
-			tb->dump_outputs();
-			throw std::logic_error(
-				"PI calculation did not yield the expected value. (expected mod.pi_result = "+
-				std::to_string(expected_pi_result)+")");
-		}
+		tb->run_test(kp, ki, setpoint, actual, integral_input);
 	}
 
 	return 0;
