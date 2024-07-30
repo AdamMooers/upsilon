@@ -526,7 +526,7 @@ class UpsilonSoC(SoCCore):
         #########################
 
         # Add control loop DACs and ADCs.
-        for i in range(0,1):
+        for i in range(0,8):
             dac_name = f"dac{i}"
             adc_name = f"adc{i}"
 
@@ -569,13 +569,13 @@ class UpsilonSoC(SoCCore):
             0x300000, 
             self.adc0.registers.width,
             self.adc0.registers.public_registers)
-        #self.picorv32_add_pi(
-        #    "swic0", 
-        #    "pi_pipeline0", 
-        #    "pi_pipeline0_PI", 
-        #    0x400000, 
-        #    pi_pipeline0.registers.width, 
-        #    pi_pipeline0.registers.public_registers)
+        self.picorv32_add_pi(
+            "swic0", 
+            "pi_pipeline0", 
+            "pi_pipeline0_PI", 
+            0x400000, 
+            pi_pipeline0.registers.width, 
+            pi_pipeline0.registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 
