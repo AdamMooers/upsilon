@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include "pico0_mmio.h"
+#include "swic0_mmio.h"
 
 #define DELAY (uint32_t)(10000)
 #define DAC_WRITE_MASK (uint32_t)(0x100000)
