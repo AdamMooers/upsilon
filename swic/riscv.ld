@@ -1,14 +1,27 @@
-#ifndef RAM_SIZE
-#  error "Set the -DRAM_SIZE flag to the SWIC RAM size in bytes."
-#endif
+OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv",
+	      "elf32-littleriscv")
+OUTPUT_ARCH(riscv)
 
 MEMORY
 {
-    RAM (xrw)       : ORIGIN = 0x10000, LENGTH = RAM_SIZE /* Update RAM size here if changed in soc.py */
+    RAM (xrw)       : ORIGIN = RAM_ORIGIN, LENGTH = RAM_SIZE /* Use the Makefile to adjust RAM size*/
 }
 
+ENTRY(start)
 SECTIONS {
-    /* The program code and other data goes into RAM. */
+    /* The IRQ handler is located close to the beginning, so we use a start function to jump to main. */
+    .start :
+    {
+        KEEP(*(.start))
+    } >RAM
+
+    .IRQ_handler :
+    {
+        . = IRQ_REL_ORIGIN;
+        KEEP(*(.IRQ_handler))
+    } >RAM
+
+    /* main and any other functions are placed after the IRQ handler. */
     .text :
     {
         . = ALIGN(4);
@@ -22,7 +35,6 @@ SECTIONS {
         _etext = .;        /* define a global symbol at end of code */
         _sidata = _etext;  /* This is used by the startup in order to initialize the .data section */
     } >RAM
-
 
     /* This is the initialized data section */
     .data : AT ( _sidata )
