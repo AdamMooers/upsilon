@@ -218,7 +218,13 @@ class UpsilonSoC(SoCCore):
            memory.
         """
         # Add PicoRV32 core
-        pico = PicoRV32(name, origin, origin+0x10, param_origin)
+        pico = PicoRV32(
+            name, 
+            start_addr=origin, 
+            irq_addr=origin+0x10, 
+            stackaddr=origin+size, 
+            param_origin=param_origin)
+
         self.add_module(name, pico)
 
         # Attach registers to main CPU at pre-finalize time.
