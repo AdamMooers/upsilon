@@ -1,5 +1,5 @@
 .globl start
-.section .start
+.section .start,"a"
 
 # The ISR starts at 0x10010 so we need to keep the
 # start routine limited to 4 instructions or less.
