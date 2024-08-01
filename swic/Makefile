@@ -8,11 +8,13 @@ COMPILE_FLAGS = -march=rv32im -mabi=ilp32 -ffreestanding -nostdlib -Os \
 SOURCE_FILES = start.s main.c
 
 test.bin: test.elf
-	#$(CROSS)objcopy -O binary -j .text test.elf test.bin
+	#$(CROSS)objcopy -O binary -j .start -j .IRQ_handler -j .text test.elf test.bin
 
 test.elf: $(SOURCE_FILES)
 	$(CROSS)gcc $(COMPILE_FLAGS) $(SOURCE_FILES) -o test.elf
 decompile: test.elf
 	$(CROSS)objdump -D test.elf
+section-stats: test.elf
+	$(CROSS)objdump -h test.elf
 clean:
 	rm -rf *.elf *.bin
