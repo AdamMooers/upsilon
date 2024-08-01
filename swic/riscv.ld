@@ -2,9 +2,12 @@ OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv",
 	      "elf32-littleriscv")
 OUTPUT_ARCH(riscv)
 
+RAM_BOOT_REGION_LEN = IRQ_ORIGIN - RAM_ORIGIN;
+
 MEMORY
 {
-    RAM (xrw)       : ORIGIN = RAM_ORIGIN, LENGTH = RAM_SIZE /* Use the Makefile to adjust RAM size*/
+    RAM_BOOT_REGION (xrw)       : ORIGIN = RAM_ORIGIN, LENGTH = RAM_BOOT_REGION_LEN
+    RAM_USER_CODE_REGION (xrw)  : ORIGIN = IRQ_ORIGIN, LENGTH = RAM_SIZE - RAM_BOOT_REGION_LEN
 }
 
 ENTRY(start)
@@ -13,13 +16,12 @@ SECTIONS {
     .start :
     {
         KEEP(*(.start))
-    } >RAM
+    } >RAM_BOOT_REGION
 
     .IRQ_handler :
     {
-        . = IRQ_REL_ORIGIN;
         KEEP(*(.IRQ_handler))
-    } >RAM
+    } >RAM_USER_CODE_REGION
 
     /* main and any other functions are placed after the IRQ handler. */
     .text :
@@ -34,7 +36,7 @@ SECTIONS {
         . = ALIGN(4);
         _etext = .;        /* define a global symbol at end of code */
         _sidata = _etext;  /* This is used by the startup in order to initialize the .data section */
-    } >RAM
+    } >RAM_USER_CODE_REGION
 
     /* This is the initialized data section */
     .data : AT ( _sidata )
@@ -49,7 +51,7 @@ SECTIONS {
         *(.sdata*)          /* .sdata* sections */
         . = ALIGN(4);
         _edata = .;        /* define a global symbol at data end; used by startup code in order to initialise the .data section in RAM */
-    } >RAM
+    } >RAM_USER_CODE_REGION
 
     /* Uninitialized data section */
     .bss :
@@ -64,12 +66,12 @@ SECTIONS {
 
         . = ALIGN(4);
         _ebss = .;         /* define a global symbol at bss end; used by startup code */
-    } >RAM
+    } >RAM_USER_CODE_REGION
 
     /* this is to define the start of the heap, and make sure we have a minimum size */
     .heap :
     {
         . = ALIGN(4);
         _heap_start = .;    /* define a global symbol at heap start */
-    } >RAM
+    } >RAM_USER_CODE_REGION
 }
