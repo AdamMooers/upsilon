@@ -39,6 +39,9 @@ void main(void)
 	}
 }
 
+/*
+The IRQ Handler is not yet functional because the registers are not preserved during
+interrupt calls and will likely be clobbered if used.*/
 void IRQ_handler(uint32_t irq_mask)
 {
 	//*DAC0_ARM = 1;
