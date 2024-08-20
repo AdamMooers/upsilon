@@ -214,11 +214,18 @@ class UpsilonSoC(SoCCore):
         :param name: Name of the PicoRV32 module in the Main CPU.
         :param size: Size of the PicoRV32 RAM region.
         :param origin: Start position of the PicoRV32.
-        :param param_origin: Origin of the PicoRV32 param region in the PicoRV32
-           memory.
+        :param param_origin: Origin of the PicoRV32 param region in the PicoRV32 memory.
+
+        Note: Be sure to update the RAM size/origin in the SWIC Makefile if you change it here.
         """
         # Add PicoRV32 core
-        pico = PicoRV32(name, origin, origin+0x10, param_origin)
+        pico = PicoRV32(
+            name, 
+            start_addr=origin, 
+            irq_addr=origin+0x10, 
+            stackaddr=origin+size, 
+            param_origin=param_origin)
+
         self.add_module(name, pico)
 
         # Attach registers to main CPU at pre-finalize time.
