@@ -19,12 +19,39 @@ class PIPipelineTestbench : public TB<Vpi_pipeline> {
 		void run_test(int32_t, int32_t, int32_t, int32_t, int32_t);
 		void dump_inputs();
 		void dump_outputs();
+		void flush_pipeline_and_test_result_valid();
 		PIPipelineTestbench(int _bailout = 0) : TB<Vpi_pipeline>(_bailout) {}
 	private:
 		void posedge() override;
 };
 
 void PIPipelineTestbench::posedge() {
+}
+
+void PIPipelineTestbench::flush_pipeline_and_test_result_valid() {
+	mod.cyc = 0;
+	this->run_clock();
+	if (static_cast<int32_t>(mod.result_valid) != 0) {
+		throw std::logic_error("Expected result_valid to be 0 since cyc was set to 0.");
+	}
+
+	// Let the pipeline run through all stages
+	mod.cyc = 1;
+	int pipeline_cycle_count;
+
+	for (pipeline_cycle_count = 1; pipeline_cycle_count<=5-1; pipeline_cycle_count++) {
+		this->run_clock();
+		if (static_cast<int32_t>(mod.result_valid) != 0) {
+			throw std::logic_error("Expected result_valid to be 0 in the "
+			+std::to_string(pipeline_cycle_count)+"th clock cycle.");
+		}
+	}
+
+	this->run_clock();
+	if (static_cast<int32_t>(mod.result_valid) == 0) {
+		throw std::logic_error("Expected result_valid to be 1 in the "
+		+std::to_string(pipeline_cycle_count)+"th clock cycle.");
+	}
 }
 
 void PIPipelineTestbench::run_test(
@@ -34,6 +61,7 @@ void PIPipelineTestbench::run_test(
 	int32_t actual, 
 	int32_t integral_input) {
 
+	mod.cyc = 1;
 	mod.kp = kp;
 	mod.ki = ki;
 	mod.setpoint = setpoint;
@@ -42,10 +70,7 @@ void PIPipelineTestbench::run_test(
 
 	uint32_t OUTPUT_RANGE_BITS = mod.pi_pipeline->OUTPUT_RANGE_BITS;
 
-	// Let the pipeline run through all stages
-	for (int j = 0; j<6; j++) {
-		this->run_clock();
-	}
+	flush_pipeline_and_test_result_valid();
 
 	int32_t expected_error = actual - setpoint;
 	int32_t expected_integral_result = integral_input + expected_error;
