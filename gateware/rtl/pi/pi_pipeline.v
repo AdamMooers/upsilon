@@ -11,7 +11,8 @@ module pi_pipeline #(
 	parameter OUTPUT_WIDTH = 32,
 	parameter OUTPUT_RANGE_BITS /*verilator public*/ = 20
 ) (
-	input clk, 
+	input clk,
+	input cyc,
 
 	input [OUTPUT_WIDTH-1:0] kp,
 	input [OUTPUT_WIDTH-1:0] ki,
@@ -19,15 +20,29 @@ module pi_pipeline #(
 	input [INPUT_WIDTH-1:0] actual,
 	input [OUTPUT_WIDTH-1:0] integral_input,
 
-	output [OUTPUT_WIDTH-1:0] integral_result,
+	output result_valid,
+	output reg [OUTPUT_WIDTH-1:0] integral_result,
 	output reg [OUTPUT_WIDTH-1:0] pi_result,
 	output pi_result_overflow_detected,
 	output pi_result_underflow_detected
 );
+	localparam integer NUM_STAGES = 5;
+	reg [NUM_STAGES-1:0] pipeline_tracker;
+
+	// Pipeline stage stacking
+	always @(posedge clk) begin
+		pipeline_tracker <= 0;
+
+		if (cyc) begin
+			pipeline_tracker <= {pipeline_tracker[NUM_STAGES-2:0], cyc};
+		end
+	end
+
+	assign result_valid = pipeline_tracker[NUM_STAGES-1];
+
 	localparam integer UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
 
 	reg [OUTPUT_WIDTH-1:0] error;
-	reg [OUTPUT_WIDTH-1:0] updated_integral;
 
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_integral;
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_proportional;
@@ -49,12 +64,12 @@ module pi_pipeline #(
 
 	// Stage 2
 	always @(posedge clk) begin
-		updated_integral <= $signed(integral_input) + $signed(error);
+		integral_result <= $signed(integral_input) + $signed(error);
 	end
 
 	// Stage 3
 	always @(posedge clk) begin
-		weighted_integral <= $signed(updated_integral) * $signed(ki);
+		weighted_integral <= $signed(integral_result) * $signed(ki);
 		weighted_proportional <= $signed(error) * $signed(kp);
 	end
 
@@ -73,7 +88,5 @@ module pi_pipeline #(
 			pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-1] & 
 			(~&pi_result_unclamped[UNCLAMPED_PI_RESULT_WIDTH-2:OUTPUT_RANGE_BITS-1]);
 	end
-
-	assign integral_result = updated_integral;
 
 endmodule
