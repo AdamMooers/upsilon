@@ -292,6 +292,8 @@ class PIPipeline(Module):
         :param output_width: Width of output signals
         """
 
+        result_valid_flag = Signal()
+
         self.submodules.registers = RegisterInterface()
 
         # Add the following registers:
@@ -331,17 +333,20 @@ class PIPipeline(Module):
             {
                 'name':'integral_result', 
                 'read_only':True, 
-                'bitwidth_or_sig':output_width
+                'bitwidth_or_sig':output_width,
+                'ack_signal':result_valid_flag
             },
             {
                 'name':'pi_result', 
                 'read_only':True, 
-                'bitwidth_or_sig':output_width
+                'bitwidth_or_sig':output_width,
+                'ack_signal':result_valid_flag
             },
             {
                 'name':'pi_result_flags', 
                 'read_only':True, 
-                'bitwidth_or_sig':2
+                'bitwidth_or_sig':2,
+                'ack_signal':result_valid_flag
             },
         ])
 
@@ -350,12 +355,14 @@ class PIPipeline(Module):
             p_OUTPUT_WIDTH = output_width,
 
             i_clk = ClockSignal(),
+            i_cyc = self.registers.bus.cyc,
             i_kp = self.registers.signals["kp"],
             i_ki = self.registers.signals["ki"],
             i_setpoint = self.registers.signals["setpoint"],
             i_actual = self.registers.signals["actual"],
             i_integral_input = self.registers.signals["integral_input"],
 
+            o_result_valid = result_valid_flag,
             o_integral_result = self.registers.signals["integral_result"],
             o_pi_result = self.registers.signals["pi_result"],
             o_pi_result_overflow_detected = self.registers.signals["pi_result_flags"][0],
