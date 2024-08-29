@@ -178,7 +178,7 @@ class RegisterInterface(LiteXModule):
         :param bitwidth_or_sig: Creates a new signal for the register if a width is given
             or uses the provided signal as the register
         :param ack_signal: optional ack signal to use when the register is selected. The
-            bus will wait until the provided signal goes high befire the data is considered
+            bus will wait until the provided signal goes high before the data is considered
             valid. If no signal is provided, then by default ack will go high immediately
             (the most common option).
         """

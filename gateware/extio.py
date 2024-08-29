@@ -24,10 +24,8 @@ class Waveform(LiteXModule):
         # This is Waveform's bus to control SPI and RAM devices it owns.
         self.masterbus = Interface(address_width=32, data_width=32, addressing="byte")
         self.mmap = MemoryMap(self.masterbus)
-        self.mmap.add_region("ram",
-                BasicRegion(ram_start_addr, None))
-        self.mmap.add_region("spi",
-                BasicRegion(spi_start_addr, None))
+        self.mmap.add_region("ram", BasicRegion(ram_start_addr, None))
+        self.mmap.add_region("spi", BasicRegion(spi_start_addr, None))
 
         self.submodules.registers = RegisterInterface()
 
@@ -293,10 +291,25 @@ class PIPipeline(Module):
         """
 
         result_valid_flag = Signal()
+        pi_pipeline_actual = Signal(input_width)
+        pi_pipeline_integral_result = Signal(output_width)
+        pi_pipeline_pi_result = Signal(output_width)
 
         self.submodules.registers = RegisterInterface()
 
-        # Add the following registers:
+        # Registers available to the main CPU
+        self.submodules.controller_registers = RegisterInterface()
+
+        # Registers available to the feedback loop
+        self.submodules.feedback_registers = RegisterInterface()
+
+        # Note that for the controller registers, we do not specify the ack flag so reads may
+        # occur even while a result is being processed. We do this to ensure that 1) the main
+        # CPU never hangs and 2) that the Wishbone specification is being followed since the
+        # cycle line is driven by the feedback register bus (ack only responds to the cyc signal
+        # of one bus)
+
+        # Add the following registers to the controller registers and feedback registers.
         # kp: the kp input term for the PI calculation
         # ki: the ki term input for the PI calculation
         # setpoint: the setpoint input for the PI calculation
@@ -304,7 +317,9 @@ class PIPipeline(Module):
         # integral_input: the current integral input for the PI calculation
         # integral_result: the integral + error output from the PI pipeline
         # pi_result: The updated PI output from the PI pipeline
-        self.registers.add_registers([
+        # pi_result_wait_finished: The updated PI output from the PI pipeline
+
+        self.controller_registers.add_registers([
             {
                 'name':'kp',
                 'read_only':False, 
@@ -322,8 +337,26 @@ class PIPipeline(Module):
             },
             {
                 'name':'actual', 
+                'read_only':True,
+                'bitwidth_or_sig':pi_pipeline_actual
+            },
+            {
+                'name':'integral_result', 
+                'read_only':True, 
+                'bitwidth_or_sig':pi_pipeline_integral_result
+            },
+            {
+                'name':'pi_result', 
+                'read_only':True,
+                'bitwidth_or_sig':pi_pipeline_pi_result
+            }
+        ])
+
+        self.feedback_registers.add_registers([
+            {
+                'name':'actual', 
                 'read_only':False, 
-                'bitwidth_or_sig':input_width
+                'bitwidth_or_sig':pi_pipeline_actual
             },
             {
                 'name':'integral_input', 
@@ -333,20 +366,18 @@ class PIPipeline(Module):
             {
                 'name':'integral_result', 
                 'read_only':True, 
-                'bitwidth_or_sig':output_width,
-                'ack_signal':result_valid_flag
+                'bitwidth_or_sig':pi_pipeline_integral_result
             },
             {
-                'name':'pi_result', 
+                'name':'pi_result_wait_finished', 
                 'read_only':True, 
-                'bitwidth_or_sig':output_width,
+                'bitwidth_or_sig':pi_pipeline_pi_result,
                 'ack_signal':result_valid_flag
             },
             {
                 'name':'pi_result_flags', 
                 'read_only':True, 
-                'bitwidth_or_sig':2,
-                'ack_signal':result_valid_flag
+                'bitwidth_or_sig':2
             },
         ])
 
@@ -355,19 +386,20 @@ class PIPipeline(Module):
             p_OUTPUT_WIDTH = output_width,
 
             i_clk = ClockSignal(),
-            i_cyc = self.registers.bus.cyc,
-            i_kp = self.registers.signals["kp"],
-            i_ki = self.registers.signals["ki"],
-            i_setpoint = self.registers.signals["setpoint"],
-            i_actual = self.registers.signals["actual"],
-            i_integral_input = self.registers.signals["integral_input"],
+            i_cyc = self.feedback_registers.bus.cyc,
+            i_kp = self.controller_registers.signals["kp"],
+            i_ki = self.controller_registers.signals["ki"],
+            i_setpoint = self.controller_registers.signals["setpoint"],
+            i_actual = pi_pipeline_actual,
+            i_integral_input = self.feedback_registers.signals["integral_input"],
 
             o_result_valid = result_valid_flag,
-            o_integral_result = self.registers.signals["integral_result"],
-            o_pi_result = self.registers.signals["pi_result"],
-            o_pi_result_overflow_detected = self.registers.signals["pi_result_flags"][0],
-            o_pi_result_underflow_detected = self.registers.signals["pi_result_flags"][1],
+            o_integral_result = pi_pipeline_integral_result,
+            o_pi_result = pi_pipeline_pi_result,
+            o_pi_result_overflow_detected = self.feedback_registers.signals["pi_result_flags"][0],
+            o_pi_result_underflow_detected = self.feedback_registers.signals["pi_result_flags"][1],
         )
 
     def pre_finalize(self):
-        self.registers.pre_finalize()
+        self.controller_registers.pre_finalize()
+        self.feedback_registers.pre_finalize()

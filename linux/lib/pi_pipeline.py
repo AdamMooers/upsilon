@@ -6,24 +6,32 @@
 from registers import *
 
 class PIPipeline(Immutable):
-    def __init__(self, pi_pipeline_pi, regs):
+    def __init__(
+        self,
+        pi_pipeline_controller_pi,
+        pi_pipeline_feedback_pi,
+        controller_regs,
+        feedback_regs):
         super().__init__()
 
-        self.pi_pipeline_pi = pi_pipeline_pi
-        self.regs = regs
+        self.pi_pipeline_controller_pi = pi_pipeline_controller_pi
+        self.pi_pipeline_feedback_pi = pi_pipeline_feedback_pi
+        self.controller_regs = controller_regs
+        self.feedback_regs = feedback_regs
 
         self.make_immutable()
 
-    def run_pi_pipeline(self, kp, ki, setpoint, actual, integral_input):
+    def evaluate_pi_pipeline(self, kp, ki, setpoint, actual, integral_input, force=False):
         """
-        A simple helper function which loads the inputs and returns the outputs
-        to document how the pipeline is used. All values are signed (refer to the
-        individual register size for 2's complement conversion if necessary)
+        A simple helper method which loads the inputs and returns the outputs
+        to document how the pipeline is used as a whole. This means this method
+        plays the parameter config and feedback roles. All values are signed 
+        (refer to the individual register size for 2's complement conversion if necessary)
 
         Note that the pipeline has an integral input and output. This allows
-        the pipeline to be entirely stateless, simplifying the hardware design.
-        Whenever a new iteration of the loop is to be run, the output must be
-        copied back to the input.
+        the pipeline to be stateless (with the exception of a result_valid flag), 
+        simplifying the hardware design. Whenever a new iteration of the loop is to 
+        be run, the output must be copied back to the input.
 
         :param kp: kp parameter of the pi control loop
         :param ki: ki parameter of the pi control loop
@@ -32,28 +40,28 @@ class PIPipeline(Immutable):
         :param integral_input: the current integral value
         :return: the output variables of the pipeline
         """
-        if self.pi_pipeline_pi.v != 0:
-            if not force_control:
-                raise Exception("PI Pipeline is not controlled by master")
-            self.pi_pipeline_pi.v = 0
+        if self.pi_pipeline_controller_pi.v != 0:
+            if not force:
+                raise Exception("PI Pipeline controller is not controlled by master")
+            self.pi_pipeline_controller_pi.v = 0
 
-        self.regs.kp.v = kp
-        self.regs.ki.v = ki
-        self.regs.setpoint.v = setpoint
-        self.regs.actual.v = actual
-        self.regs.integral_input.v = integral_input
+        if self.pi_pipeline_feedback_pi.v != 0:
+            if not force:
+                raise Exception("PI Pipeline feedback is not controlled by master")
+            self.pi_pipeline_feedback_pi.v = 0
 
-        # Now we need to wait 5 clock cycles for the registers to propagate
-        # The below loop is not necessary since micropython is slow but helps
-        # document the quirk
-        for i in range(0,5):
-            pass
+        self.controller_regs.kp.v = kp
+        self.controller_regs.ki.v = ki
+        self.controller_regs.setpoint.v = setpoint
+        self.feedback_regs.actual.v = actual
+        self.feedback_regs.integral_input.v = integral_input
 
         return {
-            'integral_result':self.regs.integral_result.v,
-            'pi_result':self.regs.pi_result.v,
-            'pi_result_flags':self.regs.pi_result_flags.v}
+            'integral_result':self.feedback_regs.integral_result.v,
+            'pi_result':self.controller_regs.pi_result.v,
+            'pi_result_flags':self.feedback_regs.pi_result_flags.v
+            }
 
     def dump(self):
         """ Dump contents of control registers. """
-        return self.regs.dump()
+        return self.controller_regs.dump()

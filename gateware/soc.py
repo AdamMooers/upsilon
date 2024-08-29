@@ -281,9 +281,15 @@ class UpsilonSoC(SoCCore):
         pico = self.get_module(name)
         pi = self.get_module(pi_name)
 
-        pico.mmap.add_region(region_name,
-                BasicRegion(origin=origin, size=width,
-                    bus=pi.add_master(name), registers=registers))
+        pico.mmap.add_region(
+            region_name,
+            BasicRegion(
+                origin=origin, 
+                size=width,
+                bus=pi.add_master(name), 
+                registers=registers
+            )
+        )
 
     def add_spi_master(self, name, **kwargs):
         """ Add a SPI master to the SoC. Unrecognized keyword arguments
@@ -393,21 +399,31 @@ class UpsilonSoC(SoCCore):
         pi_pipeline = PIPipeline(**kwargs)
         self.add_module(name, pi_pipeline)
 
-        pi = self.add_preemptive_interface_for_slave(
-            name + "_PI",
-            pi_pipeline.registers.bus,
-            pi_pipeline.registers.width,
-            pi_pipeline.registers.public_registers, 
+        controller_pi = self.add_preemptive_interface_for_slave(
+            name + "_controller_PI",
+            pi_pipeline.controller_registers.bus,
+            pi_pipeline.controller_registers.width,
+            pi_pipeline.controller_registers.public_registers, 
+            "byte")
+        
+        feedback_pi = self.add_preemptive_interface_for_slave(
+            name + "_feedback_PI",
+            pi_pipeline.feedback_registers.bus,
+            pi_pipeline.feedback_registers.width,
+            pi_pipeline.feedback_registers.public_registers, 
             "byte")
 
         def f(csrs):
-            param_origin = csrs["memories"][name.lower() + "_pi"]["base"]
-            return f'{name} = PIPipeline(master_selector.{name}_PI_master_selector,'+ \
-            f' RegisterRegion({param_origin}, {pi_pipeline.registers.mmio(param_origin)}))'
+            controller_param_origin = csrs["memories"][name.lower() + "_controller_pi"]["base"]
+            feedback_param_origin = csrs["memories"][name.lower() + "_feedback_pi"]["base"]
+            return f'{name} = PIPipeline(master_selector.{name}_controller_PI_master_selector,'
+            f' master_selector.{name}_feedback_PI_master_selector,'+ \
+            f' RegisterRegion({param_origin}, {pi_pipeline.controller_registers.mmio(controller_param_origin)})'+ \
+            f' RegisterRegion({param_origin}, {pi_pipeline.feedback_registers.mmio(feedback_param_origin)}))'
         
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi_pipeline.pre_finalize())
-        return pi_pipeline, pi
+        return pi_pipeline, controller_pi
 
     def __init__(
             self,
@@ -557,7 +573,11 @@ class UpsilonSoC(SoCCore):
         wf0, wf0_pi = self.add_waveform("wf0", 4096)
 
         # Add pi pipeline
-        pi_pipeline0, pi_pipeline0_pi = self.add_pi_pipeline("pi_pipeline0", input_width=18, output_width=32)
+        pi_pipeline0, pi_pipeline0_pi = self.add_pi_pipeline(
+            "pi_pipeline0",
+            input_width=18,
+            output_width=32
+        )
 
         # Add swic for handling control loop
         self.add_picorv32("swic0")
@@ -579,10 +599,10 @@ class UpsilonSoC(SoCCore):
         self.picorv32_add_pi(
             "swic0", 
             "pi_pipeline0", 
-            "pi_pipeline0_PI", 
+            "pi_pipeline0_feedback_PI", 
             0x400000, 
-            pi_pipeline0.registers.width, 
-            pi_pipeline0.registers.public_registers)
+            pi_pipeline0.feedback_registers.width, 
+            pi_pipeline0.feedback_registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 
