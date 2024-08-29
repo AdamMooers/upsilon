@@ -416,10 +416,10 @@ class UpsilonSoC(SoCCore):
         def f(csrs):
             controller_param_origin = csrs["memories"][name.lower() + "_controller_pi"]["base"]
             feedback_param_origin = csrs["memories"][name.lower() + "_feedback_pi"]["base"]
-            return f'{name} = PIPipeline(master_selector.{name}_controller_PI_master_selector,'
-            f' master_selector.{name}_feedback_PI_master_selector,'+ \
-            f' RegisterRegion({param_origin}, {pi_pipeline.controller_registers.mmio(controller_param_origin)})'+ \
-            f' RegisterRegion({param_origin}, {pi_pipeline.feedback_registers.mmio(feedback_param_origin)}))'
+            return f'{name} = PIPipeline(master_selector.{name}_controller_PI_master_selector,' + \
+                f' master_selector.{name}_feedback_PI_master_selector,'+ \
+                f' RegisterRegion({controller_param_origin}, {pi_pipeline.controller_registers.mmio(controller_param_origin)}),'+ \
+                f' RegisterRegion({feedback_param_origin}, {pi_pipeline.feedback_registers.mmio(feedback_param_origin)}))'
         
         self.mmio_closures.append(f)
         self.pre_finalize.append(lambda : pi_pipeline.pre_finalize())
@@ -596,13 +596,13 @@ class UpsilonSoC(SoCCore):
             0x300000, 
             self.adc0.registers.width,
             self.adc0.registers.public_registers)
-        self.picorv32_add_pi(
-            "swic0", 
-            "pi_pipeline0", 
-            "pi_pipeline0_feedback_PI", 
-            0x400000, 
-            pi_pipeline0.feedback_registers.width, 
-            pi_pipeline0.feedback_registers.public_registers)
+        #self.picorv32_add_pi(
+        #    "swic0", 
+        #    "pi_pipeline0", 
+        #    "pi_pipeline0_feedback_PI", 
+        #    0x400000, 
+        #    pi_pipeline0.feedback_registers.width, 
+        #    pi_pipeline0.feedback_registers.public_registers)
         self.picorv32_add_pi(
             "swic0", 
             "wf0", 

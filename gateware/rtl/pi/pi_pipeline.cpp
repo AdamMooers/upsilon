@@ -29,14 +29,11 @@ void PIPipelineTestbench::posedge() {
 }
 
 void PIPipelineTestbench::flush_pipeline_and_test_result_valid() {
-	mod.cyc = 0;
+	// Generate a positive edge
+	mod.start = 0;
 	this->run_clock();
-	if (static_cast<int32_t>(mod.result_valid) != 0) {
-		throw std::logic_error("Expected result_valid to be 0 since cyc was set to 0.");
-	}
+	mod.start = 1;
 
-	// Let the pipeline run through all stages
-	mod.cyc = 1;
 	int pipeline_cycle_count;
 
 	for (pipeline_cycle_count = 1; pipeline_cycle_count<=5-1; pipeline_cycle_count++) {
@@ -61,7 +58,6 @@ void PIPipelineTestbench::run_test(
 	int32_t actual, 
 	int32_t integral_input) {
 
-	mod.cyc = 1;
 	mod.kp = kp;
 	mod.ki = ki;
 	mod.setpoint = setpoint;

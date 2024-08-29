@@ -12,7 +12,7 @@ module pi_pipeline #(
 	parameter OUTPUT_RANGE_BITS /*verilator public*/ = 20
 ) (
 	input clk,
-	input cyc,
+	input start,
 
 	input [OUTPUT_WIDTH-1:0] kp,
 	input [OUTPUT_WIDTH-1:0] ki,
@@ -27,18 +27,22 @@ module pi_pipeline #(
 	output pi_result_underflow_detected
 );
 	localparam integer NUM_STAGES = 5;
-	reg [NUM_STAGES-1:0] pipeline_tracker;
+
+	reg start_delayed_1clk;
+	reg [NUM_STAGES-2:0] pipeline_tracker;
 
 	// Pipeline stage stacking
 	always @(posedge clk) begin
-		pipeline_tracker <= 0;
+		start_delayed_1clk <= start;
 
-		if (cyc) begin
-			pipeline_tracker <= {pipeline_tracker[NUM_STAGES-2:0], cyc};
+		pipeline_tracker <= {pipeline_tracker[NUM_STAGES-3:0], 1'b1};
+
+		if (start && !start_delayed_1clk) begin
+			pipeline_tracker <= 0;
 		end
 	end
 
-	assign result_valid = pipeline_tracker[NUM_STAGES-1];
+	assign result_valid = pipeline_tracker[NUM_STAGES-2];
 
 	localparam integer UNCLAMPED_PI_RESULT_WIDTH = OUTPUT_WIDTH*2;
 
