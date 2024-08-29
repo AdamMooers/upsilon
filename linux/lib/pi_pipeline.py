@@ -57,9 +57,8 @@ class PIPipeline(Immutable):
         self.feedback_regs.integral_input.v = integral_input
 
         return {
-            'integral_result':self.feedback_regs.integral_result.v,
-            'pi_result':self.controller_regs.pi_result.v,
-            'pi_result_flags':self.feedback_regs.pi_result_flags.v
+            'controller_registers':self.controller_regs.dump(),
+            'feedback_registers':self.feedback_regs.dump()
         }
 
     def dump(self):
