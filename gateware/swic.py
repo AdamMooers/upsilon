@@ -45,11 +45,7 @@ class PicoRV32(LiteXModule):
         region information to a JSON file `dumpname`.
         """
 
-        self.params.add_register("cl_I", "1", 32)
-        self.params.add_register("cl_P", "1", 32)
         self.params.add_register("deltaT", "1", 32)
-        self.params.add_register("setpt", "1", 32)
-        self.params.add_register("zset", "2", 32)
         self.params.add_register("zpos", "2", 32)
 
     def __init__(self, name, start_addr=0x10000, irq_addr=0x10010, stackaddr=0x100FF, param_origin=0x100000):
