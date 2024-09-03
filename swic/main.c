@@ -8,10 +8,9 @@
 #define DAC_SET_MAX (uint32_t)(0x100000)
 #define DAC_SET_MIN (uint32_t)(0x100000)
 
-void IRQ_handler(uint32_t irq_mask) __attribute__((section(".IRQ_handler")));
-
 void main(void)
 {
+/*
 	int finished_or_ready_holder;
 	int32_t pi_result_flags;
 
@@ -71,7 +70,8 @@ void main(void)
 
 		// TODO: sleep until it is time to start next iteration
 	}
-/*
+*/
+
 	*PARAMS_ZPOS = 0;
 	int32_t output = 0;
 	for (;;)
@@ -99,16 +99,5 @@ void main(void)
 
 		*PARAMS_ZPOS = *ADC0_FROM_SLAVE;
 	}
-*/
-}
 
-/*
-Warning: Registers are not preserved before entering the interrupt handler at
-present. Be careful to avoid overwriting registers (i.e. use volatile global variables)
-until this feature is implemented.
-*/
-void IRQ_handler(uint32_t irq_mask)
-{
-	//*DAC0_ARM = 1;
-	//*DAC0_ARM = 0;
 }

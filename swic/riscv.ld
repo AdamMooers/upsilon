@@ -8,12 +8,12 @@ MEMORY
     RAM_USER_CODE_REGION (xrw)  : ORIGIN = IRQ_ORIGIN, LENGTH = RAM_SIZE - IRQ_ORIGIN
 }
 
-ENTRY(start)
+ENTRY(reset_vec)
 SECTIONS {
-    /* The IRQ handler is located close to the beginning, so we use a start function to jump to main. */
-    .start :
+    /* The IRQ handler is located close to the beginning, so we use a reset_vec function to jump to main. */
+    .reset_vec :
     {
-        KEEP(*(.start))
+        KEEP(*(.reset_vec))
     } >RAM_BOOT_REGION
 
     .IRQ_handler :
