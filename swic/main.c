@@ -1,12 +1,44 @@
+/*
+ * Copyright 2024 (C) Adam Mooers
+ *
+ * This file is a part of Upsilon, a free and open source software project.
+ * For license terms, refer to the files in `doc/copying` in the Upsilon
+ * source distribution.
+ */
+
 #include <stdint.h>
 #include "swic0_mmio.h"
 
-#define DELAY (uint32_t)(100)
+#define DELAY (uint32_t)(1000)
 #define DAC_WRITE_MASK (uint32_t)(0x100000)
+
+#define TIMER_IRQ_MASK (uint32_t)(0xFFFFFFFE)
 
 // TODO: DEFINE THESE
 #define DAC_SET_MAX (uint32_t)(0x100000)
 #define DAC_SET_MIN (uint32_t)(0x100000)
+
+/**
+ * Sets the IRQ mask
+ *
+ * @return The previous IRQ mask
+ */
+extern uint32_t picorv32_set_irq_mask(uint32_t mask);
+
+/**
+ * Pauses the execution of the program until the next interrupt 
+ * request (IRQ) occurs. It returns a bit vector containing
+ * the pending IRQs.
+ *
+ * @return A bit vector containing pending IRQs.
+ */
+extern uint32_t picorv32_waitirq();
+
+/**
+ * Sets the hardware timer to the indicated number of clock cycles.
+ * The clock counts down and triggers an interrupt if IRQ0 is enabled. 
+ */
+extern void picorv32_set_timer(uint32_t delay_clock_cycles);
 
 void main(void)
 {
@@ -72,8 +104,13 @@ void main(void)
 	}
 */
 
+	picorv32_set_irq_mask(TIMER_IRQ_MASK);
+
 	*PARAMS_ZPOS = 0;
 	int32_t output = 0;
+
+	picorv32_set_timer(DELAY);
+
 	for (;;)
 	{
 		output = (output + 128)%(1 << 16);
@@ -98,6 +135,7 @@ void main(void)
 		for (uint32_t i=0;i<DELAY;i++);
 
 		*PARAMS_ZPOS = *ADC0_FROM_SLAVE;
+		picorv32_waitirq();
+		picorv32_set_timer(DELAY);
 	}
-
 }
