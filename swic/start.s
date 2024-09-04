@@ -9,7 +9,7 @@
 .globl reset_vec
 .globl IRQ_handler
 .globl picorv32_set_irq_mask
-.globl picorv32_waitirq_insn
+.globl picorv32_waitirq
 .globl picorv32_set_timer
 
 # The ISR starts at 0x10010 so we need to keep the
