@@ -37,9 +37,6 @@ mmio.dac0.PI.v = 1
 # Transfer control of ADC0 to the swic
 mmio.adc0.PI.v = 1
 
-mmio.swic0.params.cl_I.v = 0xaa
-mmio.swic0.params.cl_P.v = 0xbb
-
 # Need to fill variables and transfer output
 mmio.swic0.load('../test.bin')
 mmio.swic0.enable()
