@@ -10,15 +10,20 @@ MEMORY
 
 ENTRY(reset_vec)
 SECTIONS {
-    /* The IRQ handler is located close to the beginning, so we use a reset_vec function to jump to main. */
+    /* The IRQ vector is located close to the beginning, so we use a reset_vec function to jump to main. */
     .reset_vec :
     {
         KEEP(*(.reset_vec))
     } >RAM_BOOT_REGION
 
-    .IRQ_handler :
+    .irq_vec :
     {
-        KEEP(*(.IRQ_handler))
+        KEEP(*(.irq_vec))
+    } >RAM_USER_CODE_REGION
+
+    .helper_routines :
+    {
+        KEEP(*(.helper_routines))
     } >RAM_USER_CODE_REGION
 
     /* main and any other functions are placed after the IRQ handler. */

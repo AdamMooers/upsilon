@@ -7,7 +7,8 @@
 .include "custom_ops.s"
 
 .globl reset_vec
-.globl IRQ_handler
+.globl irq_vec
+.globl helper_routines
 .globl picorv32_set_irq_mask
 .globl picorv32_waitirq
 .globl picorv32_set_timer
@@ -25,19 +26,12 @@ reset_vec:
 loop:
     j loop
 
-.section .IRQ_handler,"a"
-
-IRQ_handler:
-    # Save a0 -> q
-    # ld delay into a0
-    picorv32_timer_insn a0, a0
-
-    # Restore q-> a0
-
+.section .irq_vec,"a"
+irq_vec:
+    #call IRQ_handler
     picorv32_retirq_insn
 
-# These helper methods aren't part of the IRQ handler but
-# this is a convenient place to put helper commands
+.section .helper_routines,"a"
 
 picorv32_set_irq_mask:
     picorv32_maskirq_insn a0, a0
