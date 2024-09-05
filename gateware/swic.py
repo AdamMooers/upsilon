@@ -97,11 +97,14 @@ class PicoRV32(LiteXModule):
 
         self.specials += Instance("picorv32",
             p_COMPRESSED_ISA = 1,
+            p_ENABLE_IRQ = 1,
+            p_ENABLE_IRQ_TIMER = 1,
             p_ENABLE_FAST_MUL = 1,
             p_REGS_INIT_ZERO = 1,
             p_PROGADDR_RESET=start_addr,
             p_PROGADDR_IRQ  =irq_addr,
             p_STACKADDR = stackaddr,
+
             o_trap = self.params.signals["trap"],
 
             o_mem_valid = mem_valid,
