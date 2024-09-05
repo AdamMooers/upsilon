@@ -31,9 +31,13 @@ loop:
 
 .section .irq_vec,"a"
 irq_vec:
-    #picorv32_setq_insn q2, ra
-    #jal IRQ_handler
-    #picorv32_getq_insn ra, q2
+    picorv32_setq_insn q2, a0
+    picorv32_setq_insn q3, t0
+    li t0, PARAMS_DELTAT
+    lw a0, 0(t0)
+    picorv32_timer_insn a0, a0
+    picorv32_getq_insn a0, q2
+    picorv32_getq_insn t0, q3
     picorv32_retirq_insn
 
 .section .helper_routines,"a"

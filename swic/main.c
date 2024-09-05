@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include "swic0_mmio.h"
 
-#define DELAY (uint32_t)(500)
 #define DAC_WRITE_MASK (uint32_t)(0x100000)
 
 #define TIMER_IRQ_MASK (uint32_t)(0xFFFFFFFE)
@@ -127,7 +126,7 @@ void main(void)
 	*PARAMS_ZPOS = 0;
 	int32_t output = 0;
 
-	picorv32_set_timer(DELAY);
+	picorv32_set_timer(*PARAMS_DELTAT);
 
 	for (;;)
 	{
@@ -150,8 +149,6 @@ void main(void)
 
 		*PARAMS_ZPOS = output;
 
-		// TODO: this could hang if the above code takes too long
 		picorv32_waitirq();
-		picorv32_set_timer(DELAY);
 	}
 }

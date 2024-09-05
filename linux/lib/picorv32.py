@@ -44,9 +44,7 @@ class PicoRV32(Immutable):
         """
         return self.params.dump()
 
-def test_pico(pico, filename, cl_I):
-    pico.params.cl_I.v = cl_I
-
+def test_pico(pico, filename):
     pico.load(filename, force=True)
     pico.enable()
 

@@ -38,5 +38,6 @@ mmio.dac0.PI.v = 1
 mmio.adc0.PI.v = 1
 
 # Need to fill variables and transfer output
+mmio.swic0.params.deltaT.v = 600
 mmio.swic0.load('../test.bin')
 mmio.swic0.enable()
