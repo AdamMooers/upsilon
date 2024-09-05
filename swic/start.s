@@ -5,6 +5,9 @@
 # source distribution.
 
 .include "custom_ops.s"
+.include "swic0_mmio.s"
+
+.extern main
 
 .globl reset_vec
 .globl irq_vec
@@ -21,14 +24,16 @@
 .section .reset_vec,"a"
 
 reset_vec:
-    call main
+    jal main
 
 loop:
     j loop
 
 .section .irq_vec,"a"
 irq_vec:
-    #call IRQ_handler
+    #picorv32_setq_insn q2, ra
+    #jal IRQ_handler
+    #picorv32_getq_insn ra, q2
     picorv32_retirq_insn
 
 .section .helper_routines,"a"

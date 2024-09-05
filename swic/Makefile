@@ -7,13 +7,15 @@ COMPILE_FLAGS = -march=rv32im -mabi=ilp32 -ffreestanding -nostdlib -Os \
 	-nostartfiles -lgcc
 SOURCE_FILES = start.s main.c
 
+swic0_mmio.s:
+	sed -E 's/#define ([A-Za-z0-9_]+) \(.*\)\((.*)\)/.equ \1, \2/' *.h > swic0_mmio.s
 test.bin: test.elf
 	$(CROSS)objcopy -O binary -j .reset_vec -j .irq_vec -j .helper_routines -j .text test.elf test.bin
-test.elf: $(SOURCE_FILES)
+test.elf: $(SOURCE_FILES) swic0_mmio.s
 	$(CROSS)gcc $(COMPILE_FLAGS) $(SOURCE_FILES) -o test.elf
 decompile: test.elf
 	$(CROSS)objdump -D test.elf
 section-stats: test.elf
 	$(CROSS)objdump -h test.elf
 clean:
-	rm -rf *.elf *.bin
+	rm -rf *.elf *.bin swic0_mmio.s
