@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include "swic0_mmio.h"
 
-#define DELAY (uint32_t)(1000)
+#define DELAY (uint32_t)(500)
 #define DAC_WRITE_MASK (uint32_t)(0x100000)
 
 #define TIMER_IRQ_MASK (uint32_t)(0xFFFFFFFE)
@@ -36,14 +36,32 @@ extern uint32_t picorv32_waitirq();
 
 /**
  * Sets the hardware timer to the indicated number of clock cycles.
- * The clock counts down and triggers an interrupt if IRQ0 is enabled. 
+ * The clock counts down and triggers an interrupt on the transition
+ * from 1->0 if IRQ0 is unmasked. 
  */
 extern void picorv32_set_timer(uint32_t delay_clock_cycles);
+
+/**
+ * The SPI peripherals have a special register which freezes the main
+ * CPU until the SPI write is complete. GCC will optimize out calls to
+ * these registers since we read without writing. This method provides
+ * a fast and reliable way to ensure that these reads are not optimized out.
+ * 
+ * @param reg The register to read
+ */
+inline void wait_for_register(volatile uint32_t* reg)
+{
+	asm volatile (
+		"lw x0, 0(%0)"
+		:
+		: "r" (reg)
+	);
+}
 
 void main(void)
 {
 /*
-	int finished_or_ready_holder;
+	picorv32_set_irq_mask(TIMER_IRQ_MASK);
 	int32_t pi_result_flags;
 
 	*PI_PIPELINE0_INTEGRAL_INPUT = 0;
@@ -58,7 +76,7 @@ void main(void)
 		// the ADC has a result ready.
 		*ADC0_ARM = 1;
 		*ADC0_ARM = 0;
-		finished_or_ready_holder = *ADC0_WAIT_FINISHED_OR_READY;
+		wait_for_register(ADC0_WAIT_FINISHED_OR_READY);
 
 		// Update the PI pipeline actual input with the raw ADC value
 		*PI_PIPELINE0_ACTUAL = *ADC0_FROM_SLAVE;
@@ -98,9 +116,9 @@ void main(void)
 		// DAC and reading the ADC.
 		*DAC0_ARM = 1;
 		*DAC0_ARM = 0;
-		finished_or_ready_holder = *DAC0_WAIT_FINISHED_OR_READY;
+		wait_for_register(DAC0_WAIT_FINISHED_OR_READY);
 
-		// TODO: sleep until it is time to start next iteration
+		picorv32_waitirq();
 	}
 */
 
@@ -113,28 +131,26 @@ void main(void)
 
 	for (;;)
 	{
-		output = (output + 128)%(1 << 16);
+		output = (output + 1024)%(1 << 14);
 
 		// Wait for the DAC to become available
-		//while (*DAC0_WAIT_FINISHED_OR_READY == 0);
+		while (*DAC0_WAIT_FINISHED_OR_READY == 0);
 
 		// Write voltage to the DAC
 		*DAC0_TO_SLAVE = DAC_WRITE_MASK | output;
 		*DAC0_ARM = 1;
 		*DAC0_ARM = 0;
+		wait_for_register(DAC0_WAIT_FINISHED_OR_READY);
 
 		// Request voltage from the ADC
 		*ADC0_TO_SLAVE = 0;
 		*ADC0_ARM = 1;
 		*ADC0_ARM = 0;
+		wait_for_register(ADC0_WAIT_FINISHED_OR_READY);
 
-		//while (*ADC0_WAIT_FINISHED_OR_READY == 0) {
-		//	*PARAMS_ZPOS += 1;
-		//}
+		*PARAMS_ZPOS = output;
 
-		for (uint32_t i=0;i<DELAY;i++);
-
-		*PARAMS_ZPOS = *ADC0_FROM_SLAVE;
+		// TODO: this could hang if the above code takes too long
 		picorv32_waitirq();
 		picorv32_set_timer(DELAY);
 	}

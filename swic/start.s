@@ -28,6 +28,12 @@ loop:
 .section .IRQ_handler,"a"
 
 IRQ_handler:
+    # Save a0 -> q
+    # ld delay into a0
+    picorv32_timer_insn a0, a0
+
+    # Restore q-> a0
+
     picorv32_retirq_insn
 
 # These helper methods aren't part of the IRQ handler but
