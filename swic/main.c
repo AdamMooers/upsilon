@@ -13,9 +13,10 @@
 
 #define TIMER_IRQ_MASK (uint32_t)(0xFFFFFFFE)
 
-// TODO: DEFINE THESE
-#define DAC_SET_MAX (uint32_t)(0x100000)
-#define DAC_SET_MIN (uint32_t)(0x100000)
+#define DAC_BITS 20
+#define DAC_SIGN_BIT_MASK (int32_t)(1 << (_DAC_BITS - 1))
+#define DAC_SET_MAX (uint32_t)(DAC_SIGN_BIT_MASK - 1)
+#define DAC_SET_MIN (int32_t)(-DAC_SIGN_BIT_MASK)
 
 /**
  * Sets the IRQ mask
@@ -59,12 +60,12 @@ inline void wait_for_register(volatile uint32_t* reg)
 
 void main(void)
 {
-/*
 	picorv32_set_irq_mask(TIMER_IRQ_MASK);
 	int32_t pi_result_flags;
 
 	*PI_PIPELINE0_INTEGRAL_INPUT = 0;
 
+	picorv32_set_timer(*PARAMS_DELTAT);
 	for (;;)
 	{
 		// Request voltage from the ADC
@@ -119,8 +120,8 @@ void main(void)
 
 		picorv32_waitirq();
 	}
-*/
 
+	/*
 	picorv32_set_irq_mask(TIMER_IRQ_MASK);
 
 	*PARAMS_ZPOS = 0;
@@ -151,4 +152,5 @@ void main(void)
 
 		picorv32_waitirq();
 	}
+	*/
 }
