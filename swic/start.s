@@ -31,11 +31,16 @@ loop:
 
 .section .irq_vec,"a"
 irq_vec:
+    # Save registers to avoid clobbering them
     picorv32_setq_insn q2, a0
     picorv32_setq_insn q3, t0
+
+    # Reset the timer
     li t0, PARAMS_DELTAT
     lw a0, 0(t0)
     picorv32_timer_insn a0, a0
+
+    # Restore registers and return from the IRQ handler
     picorv32_getq_insn a0, q2
     picorv32_getq_insn t0, q3
     picorv32_retirq_insn
