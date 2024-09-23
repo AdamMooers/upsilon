@@ -37,6 +37,14 @@ mmio.dac0.PI.v = 1
 # Transfer control of ADC0 to the swic
 mmio.adc0.PI.v = 1
 
+# Transfer control of the feedback side of the PI to the swic
+mmio.pi_pipeline0.pi_pipeline_feedback_pi.v = 1
+
+# Configure default settings for the PI loop
+mmio.pi_pipeline0.controller_regs.kp.v = 1
+mmio.pi_pipeline0.controller_regs.ki.v = 0
+mmio.pi_pipeline0.controller_regs.setpoint.v = 0
+
 # Need to fill variables and transfer output
 mmio.swic0.params.deltaT.v = 600
 mmio.swic0.load('../test.bin')
