@@ -26,12 +26,12 @@ module pi_pipeline #(
 	output pi_result_overflow_detected,
 	output pi_result_underflow_detected
 );
-	localparam integer NUM_STAGES = 5;
+	localparam integer NUM_STAGES = 6;
 
 	reg start_delayed_1clk;
 	reg [NUM_STAGES-2:0] pipeline_tracker;
 
-	// Pipeline stage stacking
+	// Pipeline stage tracking
 	always @(posedge clk) begin
 		start_delayed_1clk <= start;
 
@@ -50,20 +50,21 @@ module pi_pipeline #(
 
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_integral;
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] weighted_proportional;
+	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] pi_weighted_term_sum;
 
 	/* verilator lint_off UNUSEDSIGNAL */
 	reg [UNCLAMPED_PI_RESULT_WIDTH-1:0] pi_result_unclamped;
 	/* verilator lint_on UNUSEDSIGNAL */
 
 	wire [OUTPUT_WIDTH-1:0] actual_sign_extended;
-	wire [OUTPUT_WIDTH-1:0] setpoint_sign_extended;
+	wire [UNCLAMPED_PI_RESULT_WIDTH-1:0] setpoint_sign_extended;
 
 	assign actual_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{actual[INPUT_WIDTH-1]}},actual};
-	assign setpoint_sign_extended = {{OUTPUT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
+	assign setpoint_sign_extended = {{UNCLAMPED_PI_RESULT_WIDTH-INPUT_WIDTH{setpoint[INPUT_WIDTH-1]}},setpoint};
 
 	// Stage 1
 	always @(posedge clk) begin
-		error <= $signed(actual_sign_extended) - $signed(setpoint_sign_extended);
+		error <= $signed(actual_sign_extended) - $signed(setpoint_sign_extended[OUTPUT_WIDTH-1:0]);
 	end
 
 	// Stage 2
@@ -79,10 +80,15 @@ module pi_pipeline #(
 
 	// Stage 4
 	always @(posedge clk) begin
-		pi_result_unclamped <= $signed(weighted_integral) + $signed(weighted_proportional);
+		pi_weighted_term_sum <= $signed(weighted_integral) + $signed(weighted_proportional);
 	end
 
 	// Stage 5
+	always @(posedge clk) begin
+		pi_result_unclamped <= $signed(setpoint_sign_extended) + $signed(pi_weighted_term_sum);
+	end
+
+	// Stage 6
 	always @(posedge clk) begin
 		pi_result <= pi_result_unclamped[OUTPUT_WIDTH-1:0];
 		pi_result_overflow_detected <= 

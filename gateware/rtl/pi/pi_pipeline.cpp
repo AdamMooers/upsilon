@@ -34,9 +34,10 @@ void PIPipelineTestbench::flush_pipeline_and_test_result_valid() {
 	this->run_clock();
 	mod.start = 1;
 
+	const int num_pipeline_stages = 6;
 	int pipeline_cycle_count;
 
-	for (pipeline_cycle_count = 1; pipeline_cycle_count<=5-1; pipeline_cycle_count++) {
+	for (pipeline_cycle_count = 1; pipeline_cycle_count<=num_pipeline_stages-1; pipeline_cycle_count++) {
 		this->run_clock();
 		if (static_cast<int32_t>(mod.result_valid) != 0) {
 			throw std::logic_error("Expected result_valid to be 0 in the "
@@ -72,7 +73,8 @@ void PIPipelineTestbench::run_test(
 	int32_t expected_integral_result = integral_input + expected_error;
 	int64_t expected_unsaturated_pi_result = 
 		kp*static_cast<int64_t>(expected_error) + 
-		ki*static_cast<int64_t>(expected_integral_result);
+		ki*static_cast<int64_t>(expected_integral_result) +
+		static_cast<int64_t>(setpoint);
 	int32_t expected_pi_result = static_cast<int32_t>(expected_unsaturated_pi_result);
 
 	if (static_cast<int32_t>(mod.integral_result) != expected_integral_result) {
