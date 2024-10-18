@@ -14,7 +14,8 @@
 #define TIMER_IRQ_MASK (uint32_t)(0xFFFFFFFE)
 
 #define DAC_BITS 20
-#define DAC_SIGN_BIT_MASK (int32_t)(1 << (_DAC_BITS - 1))
+#define DAC_SIGN_BIT_MASK (int32_t)(1 << (DAC_BITS - 1))
+#define DAC_BIT_MASK (int32_t)((1 << DAC_BITS) - 1)
 #define DAC_SET_MAX (uint32_t)(DAC_SIGN_BIT_MASK - 1)
 #define DAC_SET_MIN (int32_t)(-DAC_SIGN_BIT_MASK)
 
@@ -103,7 +104,7 @@ void main(void)
 		} 
 		else 
 		{
-			*DAC0_TO_SLAVE = DAC_WRITE_MASK | *PI_PIPELINE0_PI_RESULT;
+			*DAC0_TO_SLAVE = DAC_WRITE_MASK | (DAC_BIT_MASK & *PI_PIPELINE0_PI_RESULT);
 		}
 
 		// Arm the DAC and wait until the DAC has updated before
@@ -126,18 +127,21 @@ void main(void)
 
 	*PARAMS_ZPOS = 0;
 	int32_t output = 0;
+	int32_t output_morphed = 0;
 
 	picorv32_set_timer(*PARAMS_DELTAT);
 
 	for (;;)
 	{
-		output = (output + 1024)%(1 << 14);
+		output = (output + 4)%(1 << 14);
+
+		output_morphed = -output;
 
 		// Wait for the DAC to become available
 		while (*DAC0_WAIT_FINISHED_OR_READY == 0);
 
 		// Write voltage to the DAC
-		*DAC0_TO_SLAVE = DAC_WRITE_MASK | output;
+		*DAC0_TO_SLAVE = DAC_WRITE_MASK | (DAC_BIT_MASK & output_morphed);
 		*DAC0_ARM = 1;
 		*DAC0_ARM = 0;
 		wait_for_register(DAC0_WAIT_FINISHED_OR_READY);
