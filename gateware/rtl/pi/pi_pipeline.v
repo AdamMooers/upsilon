@@ -69,7 +69,12 @@ module pi_pipeline #(
 
 	// Stage 2
 	always @(posedge clk) begin
-		integral_result <= $signed(integral_input) + $signed(error);
+		// Prevent integral result from accumulating if it is not enabled
+		if (ki == 0) begin
+			integral_result <= 0;
+		end else begin
+			integral_result <= $signed(integral_input) + $signed(error);
+		end
 	end
 
 	// Stage 3

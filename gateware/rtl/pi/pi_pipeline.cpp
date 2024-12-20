@@ -70,7 +70,7 @@ void PIPipelineTestbench::run_test(
 	flush_pipeline_and_test_result_valid();
 
 	int32_t expected_error = actual - setpoint;
-	int32_t expected_integral_result = integral_input + expected_error;
+	int32_t expected_integral_result = (ki == 0 ? 0 : integral_input + expected_error);
 	int64_t expected_unsaturated_pi_result = 
 		kp*static_cast<int64_t>(expected_error) + 
 		ki*static_cast<int64_t>(expected_integral_result) +
@@ -132,26 +132,17 @@ void cleanup() {
 	delete tb;
 }
 
-#define NUM_INCRS 100000000
-int main(int argc, char *argv[]) {
-	Verilated::commandArgs(argc, argv);
-	Verilated::traceEverOn(true);
-
-	tb = new PIPipelineTestbench();
-	atexit(cleanup);
-
-	std::cout << "Checking pipeline math with " << NUM_INCRS << " random inputs" << std::endl;
+void test_random_inputs(PIPipelineTestbench* tb, int num_iterations) {
+	std::cout << "Checking pipeline math with " << num_iterations << " random inputs" << std::endl;
 	auto engine = std::default_random_engine{};
 
 	auto adc_dist = std::uniform_int_distribution<int32_t>(-(1 << 17),(1 << 17) - 1);
-
-	// This value will be clamped by the SWIC to the provided range
 	auto int_dist = std::uniform_int_distribution<int32_t>(-(1 << 19),(1 << 19) - 1);
 
 	// These are set to scale across the entire range of the DAC output
 	auto pi_dist = std::uniform_int_distribution<int32_t>(-(1 << 19),(1 << 19) - 1);
 
-	for (int i = 1; i < NUM_INCRS; i++) {
+	for (int i = 1; i < num_iterations; i++) {
 		uint32_t kp = pi_dist(engine);
 		uint32_t ki = pi_dist(engine);
 		int32_t setpoint = adc_dist(engine);
@@ -160,6 +151,20 @@ int main(int argc, char *argv[]) {
 
 		tb->run_test(kp, ki, setpoint, actual, integral_input);
 	}
+}
+
+#define NUM_RANDOM_ITER 100000000
+int main(int argc, char *argv[]) {
+	Verilated::commandArgs(argc, argv);
+	Verilated::traceEverOn(true);
+
+	tb = new PIPipelineTestbench();
+	atexit(cleanup);
+
+	// Verify that the integral output is reset to 0 when ki is 0
+	tb->run_test(1, 0, 104, 5435, 567);
+
+	test_random_inputs(tb, NUM_RANDOM_ITER);
 
 	return 0;
 }
